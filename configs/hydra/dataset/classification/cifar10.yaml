@@ -1,0 +1,5 @@
+name: cifar10
+
+data: img
+extras:
+  - label

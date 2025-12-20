@@ -1,0 +1,6 @@
+name: cifar100
+
+data: img
+extras:
+  - fine_label
+  - coarse_label

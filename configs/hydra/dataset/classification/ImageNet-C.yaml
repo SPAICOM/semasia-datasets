@@ -1,0 +1,5 @@
+name: ang9867/ImageNet-C
+
+data: image
+extras:
+  - label

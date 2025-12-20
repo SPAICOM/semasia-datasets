@@ -1,0 +1,25 @@
+defaults:
+  - _self_
+  - dataset: classification/cifar10
+
+seed: 42
+device: cuda
+encode: true
+
+parquet:
+  max_rows_per_shard: 100000
+
+dataloader:
+  num_workers: 1
+  pin_memory: true
+  batch_size: 32
+
+# --------------------------
+# Hugging Face Hub settings
+# --------------------------
+hf:
+  namespace: spaicom-lab        # 👈 replace with your HF username or org
+  repo_prefix: semantic-        # will create repos like "<namespace>/semantic-cifar10"
+  private: false                # set to true if you want private repos
+  push: true                    # whether to push automatically after export
+  commit_message: "Add/update parquet shards and configs"

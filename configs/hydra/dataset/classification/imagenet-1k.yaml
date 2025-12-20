@@ -1,0 +1,5 @@
+name: imagenet-1k
+  
+data: img
+extras:
+  - label
