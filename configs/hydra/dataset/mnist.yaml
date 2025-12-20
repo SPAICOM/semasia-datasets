@@ -2,4 +2,4 @@ name: mnist
 
 data: image
 extras:
- - label
+  - label

@@ -230,8 +230,6 @@ def main(cfg: DictConfig) -> None:
                 commit_message=cfg.hf.commit_message,
             )
 
-        break
-
     return None
 
 
