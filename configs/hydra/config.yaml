@@ -5,6 +5,7 @@ defaults:
 seed: 42
 device: cuda
 encode: true
+re_encode: false
 
 parquet:
   max_rows_per_shard: 100000
@@ -22,4 +23,5 @@ hf:
   repo_prefix: semantic-        # will create repos like "<namespace>/semantic-cifar10"
   private: false                # set to true if you want private repos
   push: true                    # whether to push automatically after export
+  re_push: false                # whether to re push the already present model in HF
   commit_message: "Add/update parquet shards and configs"
