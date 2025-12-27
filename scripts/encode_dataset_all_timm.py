@@ -85,6 +85,13 @@ def main(cfg: DictConfig) -> None:
     all_models = set(timm.list_models(pretrained=True))
     all_models = sorted(all_models)
 
+    if cfg.models_startwith is not None:
+        all_models = [
+            model_name
+            for model_name in all_models
+            if model_name.startswith(cfg.models_startwith)
+        ]
+
     # Get already processed models
     already_processed_models = collect_local_models_by_split(
         dataset_export_root=dataset_export_root
@@ -95,6 +102,15 @@ def main(cfg: DictConfig) -> None:
         repo_id=repo_id,
     )
 
+    if not cfg.hf.re_push:
+        loaded_models = set().union(*already_loaded_models.values())
+
+        all_models = [
+                    model_name
+                    for model_name in all_models
+                    if model_name not in loaded_models
+                ]
+        
     # Handling extras
     data = {}
     for split in dataset:
