@@ -103,7 +103,10 @@ def main(cfg: DictConfig) -> None:
     )
 
     if not cfg.hf.re_push:
-        loaded_models = set().union(*already_loaded_models.values())
+        if already_loaded_models:
+            loaded_models = set().union(*already_loaded_models.values())
+        else:
+            loaded_models = set()
 
         all_models = [
                     model_name
