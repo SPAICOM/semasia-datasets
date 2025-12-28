@@ -38,7 +38,10 @@ from src.huggingface import (
 from src.io import latents_to_parquet_shards
 from src.models.latent import LatentExtractor
 from src.models.timm import load_model
-from src.utils import collect_local_models_by_split
+from src.utils import (
+    collect_local_models_by_split,
+    remove_matching,
+)
 
 
 def collate_fn(
@@ -126,7 +129,7 @@ def main(cfg: DictConfig) -> None:
     # Do not redo already done models
     if not cfg.hf.re_push:
         if already_loaded_models:
-            loaded_models = set().union(*already_loaded_models.values())
+            loaded_models = set.intersection(*already_loaded_models.values())
         else:
             loaded_models = set()
 
@@ -252,6 +255,10 @@ def main(cfg: DictConfig) -> None:
                     private=cfg.hf.private,
                     commit_message=cfg.hf.commit_message,
                 )
+
+        # Clean huggingface cache
+        remove_matching('~/.cache/huggingface/hub', '*timm*')
+
 
     return None
 

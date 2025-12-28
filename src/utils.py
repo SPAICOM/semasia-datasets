@@ -49,6 +49,7 @@ This module is intentionally lightweight and suitable for use in large-scale
 data preprocessing pipelines.
 """
 
+import shutil
 from collections import defaultdict
 from pathlib import Path
 
@@ -113,6 +114,45 @@ def collect_local_models_by_split(dataset_export_root: Path) -> dict[str, set[st
         models_by_split[split].add(model)
 
     return dict(models_by_split)
+
+
+def remove_matching(
+    path: Path | str,
+    pattern: str = None,
+) -> None:
+    """
+    Remove all files/directories in `path` matching `pattern`.
+    If pattern is None, remove everything in `path`.
+
+    Parameters
+    ----------
+        path: Base directory to clean.
+        pattern: Glob pattern (e.g. "model--timm--*").
+
+    Returns
+    -------
+        None
+    """
+    base = Path(path).expanduser().resolve()
+
+    if not base.is_dir():
+        raise ValueError(f"{base} is not a directory")
+
+    # If no pattern is given, match everything
+    pattern = pattern or "*"
+
+    # IMPORTANT: sort deepest paths first so directories are empty when removed
+    for item in sorted(base.rglob(pattern), key=lambda p: len(p.parts), reverse=True):
+        try:
+            if item.is_dir():
+                shutil.rmtree(item)
+            else:
+                item.unlink()
+        except FileNotFoundError:
+            # Already removed as part of a parent directory
+            pass
+
+    return None
 
 
 if __name__ == '__main__':
