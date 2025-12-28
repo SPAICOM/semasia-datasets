@@ -80,11 +80,32 @@ def main(cfg: DictConfig) -> None:
     for split in dataset:
         (dataset_export_root / split).mkdir(parents=True, exist_ok=True)
 
+    # Handling extras
+    data = {}
+    for split in dataset:
+        data[split] = {col: list(dataset[split][col]) for col in cfg.dataset.extras}
+
+    # Hugging Face Token
+    token = get_token()
+    if token is None:
+        print('[WARN] No HF token found. Run `huggingface-cli login` or set HF_TOKEN.')
+        return
+
+    # Ensure Hugging Face repo exists
+    create_repo(
+        repo_id=f'{cfg.hf.namespace}/{cfg.hf.repo_prefix}{cfg.dataset.name}',
+        repo_type='dataset',
+        private=cfg.hf.private,
+        exist_ok=True,
+        token=token,
+    )
+
     # Enumerate ALL pretrained timm models
     # (change to list_models() for non-pretrained too)
     all_models = set(timm.list_models(pretrained=True))
     all_models = sorted(all_models)
 
+    # Consider only the passed subset
     if cfg.models_startwith is not None:
         all_models = [
             model_name
@@ -102,6 +123,7 @@ def main(cfg: DictConfig) -> None:
         repo_id=repo_id,
     )
 
+    # Do not redo already done models
     if not cfg.hf.re_push:
         if already_loaded_models:
             loaded_models = set().union(*already_loaded_models.values())
@@ -114,32 +136,12 @@ def main(cfg: DictConfig) -> None:
                     if model_name not in loaded_models
                 ]
         
-    # Handling extras
-    data = {}
-    for split in dataset:
-        data[split] = {col: list(dataset[split][col]) for col in cfg.dataset.extras}
-
     # Define the Trainer
     trainer = Trainer(
         accelerator=cfg.device,
         devices=1,
         logger=False,
         enable_checkpointing=False,
-    )
-
-    # Hugging Face Token
-    token = get_token()
-    if token is None:
-        print('[WARN] No HF token found. Run `huggingface-cli login` or set HF_TOKEN.')
-        return
-
-    # Ensure Hugging Face repo exists
-    create_repo(
-        repo_id=f'{cfg.hf.namespace}/{cfg.hf.repo_prefix}{cfg.dataset.name}',
-        repo_type='dataset',
-        private=cfg.hf.private,
-        exist_ok=True,
-        token=token,
     )
 
     # Compute the latent encodings for each model
