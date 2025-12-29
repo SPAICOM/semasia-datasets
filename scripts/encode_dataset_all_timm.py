@@ -37,7 +37,10 @@ from src.huggingface import (
 )
 from src.io import latents_to_parquet_shards
 from src.models.latent import LatentExtractor
-from src.models.timm import load_model
+from src.models.timm import (
+    encoder_params_below_threshold,
+    load_model,
+)
 from src.utils import (
     collect_local_models_by_split,
     remove_matching,
@@ -134,11 +137,9 @@ def main(cfg: DictConfig) -> None:
             loaded_models = set()
 
         all_models = [
-                    model_name
-                    for model_name in all_models
-                    if model_name not in loaded_models
-                ]
-        
+            model_name for model_name in all_models if model_name not in loaded_models
+        ]
+
     # Define the Trainer
     trainer = Trainer(
         accelerator=cfg.device,
@@ -149,6 +150,15 @@ def main(cfg: DictConfig) -> None:
 
     # Compute the latent encodings for each model
     for model_name in tqdm(all_models, desc=f'TIMM {len(all_models)} Models'):
+        print(f'\n\n [INFO] Checking {model_name} parameters...', end='\t')
+        if not encoder_params_below_threshold(
+            model_name=model_name,
+            threshold=cfg.parameters_threshold,
+        ):
+            print('[SKIPPED]')
+            continue
+        print('[OK]')
+
         # Encode each split separately
         for split in dataset:
             if cfg.encode:
@@ -258,7 +268,6 @@ def main(cfg: DictConfig) -> None:
 
         # Clean huggingface cache
         remove_matching('~/.cache/huggingface/hub', '*timm*')
-
 
     return None
 

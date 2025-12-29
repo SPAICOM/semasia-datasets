@@ -7,9 +7,10 @@ device: cuda
 encode: true
 re_encode: false
 models_startwith: null
+parameters_threshold: 1e9
 
 parquet:
-  max_rows_per_shard: 100000
+  max_rows_per_shard: 100_000
 
 dataloader:
   num_workers: 1

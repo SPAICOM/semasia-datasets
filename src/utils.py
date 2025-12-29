@@ -136,10 +136,10 @@ def remove_matching(
     base = Path(path).expanduser().resolve()
 
     if not base.is_dir():
-        raise ValueError(f"{base} is not a directory")
+        raise ValueError(f'{base} is not a directory')
 
     # If no pattern is given, match everything
-    pattern = pattern or "*"
+    pattern = pattern or '*'
 
     # IMPORTANT: sort deepest paths first so directories are empty when removed
     for item in sorted(base.rglob(pattern), key=lambda p: len(p.parts), reverse=True):
