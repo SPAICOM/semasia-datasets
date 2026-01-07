@@ -26,7 +26,7 @@ from src.huggingface import (
     config_name='config',
     version_base='1.3',
 )
-def main(cfg: DictConfig):
+def main(cfg: DictConfig) -> None:
     CURRENT: Path = Path('.').resolve()
     EXPORTS_ROOT: Path = CURRENT / 'data'  # Where Parquet trees will be written
     EXPORTS_ROOT.mkdir(exist_ok=True, parents=True)
@@ -39,6 +39,8 @@ def main(cfg: DictConfig):
         repo_id=repo_id,
         push_online=True,
     )
+
+    return None
 
 
 if __name__ == '__main__':
