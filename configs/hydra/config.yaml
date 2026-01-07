@@ -1,6 +1,6 @@
 defaults:
   - _self_
-  - dataset: cifar10
+  - dataset: cifa100
 
 seed: 42
 device: cuda
@@ -24,6 +24,6 @@ hf:
   namespace: spaicom-lab        # 👈 replace with your HF username or org
   repo_prefix: semantic-        # will create repos like "<namespace>/semantic-cifar10"
   private: false                # set to true if you want private repos
-  push: true                    # whether to push automatically after export
+  push: false                    # whether to push automatically after export
   re_push: false                # whether to re push the already present model in HF
   commit_message: "Add/update parquet shards and configs"
