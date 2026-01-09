@@ -59,7 +59,7 @@ def collate_fn(
 
 @hydra.main(
     config_path='../configs/hydra/',
-    config_name='config',
+    config_name='encode_timm',
     version_base='1.3',
 )
 def main(cfg: DictConfig) -> None:
