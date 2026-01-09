@@ -1,11 +1,13 @@
 """"""
 
 import sys
+import time
 from pathlib import Path
 
 sys.path.append(str(Path(sys.path[0]).parent))
 
 import hydra
+from huggingface_hub.errors import HfHubHTTPError
 from omegaconf import DictConfig
 from tqdm.auto import tqdm
 
@@ -13,6 +15,8 @@ from src.huggingface import (
     collect_unloaded_model_folders,
     push_folder_to_hub,
 )
+
+RATE_LIMIT_SLEEP = 3600 + 60  # 1h + 60s safety delta
 
 
 @hydra.main(
@@ -41,14 +45,31 @@ def main(cfg: DictConfig) -> None:
             split = model_folder.parent.name
             model_name = model_folder.name
 
-            # Push the entire model folder
-            push_folder_to_hub(
-                local_folder=model_folder,
-                path_in_repo=f'{split}/{model_name}',
-                repo_id=repo_id,
-                private=cfg.hf.private,
-                commit_message=cfg.hf.commit_message,
-            )
+            try:
+                # Push the entire model folder
+                push_folder_to_hub(
+                    local_folder=model_folder,
+                    path_in_repo=f'{split}/{model_name}',
+                    repo_id=repo_id,
+                    private=cfg.hf.private,
+                    commit_message=cfg.hf.commit_message,
+                )
+            except HfHubHTTPError as e:
+                # Detect rate limit
+                if '429' in str(e) or 'Too Many Requests' in str(e):
+                    print(
+                        f'Rate limit hit while pushing {split}/{model_name}. '
+                        f'Sleeping for {RATE_LIMIT_SLEEP // 60} minutes...'
+                    )
+
+                    # Re-add the model so it will be retried
+                    model_folders_to_push.append(model_folder)
+
+                    time.sleep(RATE_LIMIT_SLEEP)
+                    continue
+
+                # Any other HF error should be raised
+                raise
 
             # One unit of work completed
             i += 1
