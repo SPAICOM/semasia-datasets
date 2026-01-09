@@ -133,8 +133,118 @@ def push_folder_to_hub(
     return None
 
 
+def collect_unloaded_parquet_files(
+    dataset_path: Path,
+    repo_id: str,
+) -> set[Path]:
+    """
+    Collect local parquet files that have not yet been uploaded to Hugging Face.
+
+    A parquet file is considered already uploaded if its corresponding
+    (split, model) pair exists in the Hugging Face repository.
+
+    The expected directory structure is::
+
+        dataset_path/
+            split_name/
+                model_name/
+                    *.parquet
+
+    Parameters
+    ----------
+    dataset_path : pathlib.Path
+        Root path of the local dataset.
+    repo_id : str
+        Hugging Face repository ID used to check which models are already loaded.
+
+    Returns
+    -------
+    set[pathlib.Path]
+        Set of local parquet file paths that are not yet present on
+        Hugging Face.
+    """
+    # Get models already loaded on Hugging Face, grouped by split
+    already_loaded_models: dict[str, set[str]] = collect_models_by_split(
+        repo_id=repo_id
+    )
+
+    # Collect all local parquet files
+    local_files: set[Path] = set(dataset_path.rglob('*.parquet'))
+
+    unloaded_files: set[Path] = set()
+
+    for path in local_files:
+        # Expected structure: .../<split>/<model>/<file>.parquet
+        split_name = path.parent.parent.name
+        model_name = path.parent.name
+
+        loaded_models_for_split = already_loaded_models.get(split_name, set())
+
+        if model_name not in loaded_models_for_split:
+            unloaded_files.add(path)
+
+    return unloaded_files
+
+
+def collect_unloaded_model_folders(
+    dataset_path: Path,
+    repo_id: str,
+) -> set[Path]:
+    """
+    Collect local model folders that have not yet been uploaded to Hugging Face.
+
+    A model folder is considered already uploaded if its corresponding
+    (split, model) pair exists in the Hugging Face repository.
+
+    The expected directory structure is::
+
+        dataset_path/
+            split_name/
+                model_name/
+                    *.parquet
+
+    Parameters
+    ----------
+    dataset_path : pathlib.Path
+        Root path of the local dataset.
+    repo_id : str
+        Hugging Face repository ID used to check which models are already loaded.
+
+    Returns
+    -------
+    set[pathlib.Path]
+        Set of local model folder paths that are not yet present on
+        Hugging Face.
+    """
+    # Get models already loaded on Hugging Face, grouped by split
+    already_loaded_models: dict[str, set[str]] = collect_models_by_split(
+        repo_id=repo_id
+    )
+
+    # Collect all local model folders containing parquet files
+    model_folders: set[Path] = {
+        parquet_path.parent for parquet_path in dataset_path.rglob('*.parquet')
+    }
+
+    unloaded_model_folders: set[Path] = set()
+
+    for model_folder in model_folders:
+        # Expected structure: .../<split>/<model>
+        split_name = model_folder.parent.name
+        model_name = model_folder.name
+
+        loaded_models_for_split = already_loaded_models.get(split_name, set())
+
+        if model_name not in loaded_models_for_split:
+            unloaded_model_folders.add(model_folder)
+
+    return unloaded_model_folders
+
+
 def _split_front_matter(readme_text: str) -> tuple[dict, str]:
-    """Return (yaml_dict, body_markdown). If no front matter, returns ({}, original_text)."""
+    """Return (yaml_dict, body_markdown).
+    If no front matter, returns ({}, original_text).
+    """
     _FRONT_MATTER_RE = re.compile(r'^---\s*\n(.*?)\n---\s*\n?', re.DOTALL)
     m = _FRONT_MATTER_RE.match(readme_text)
     if not m:
@@ -306,7 +416,8 @@ def generate_readme_with_configs(
     out_path = repo_dir / 'README.md'
     out_path.write_text(yaml_text + md_body, encoding='utf-8')
     print(
-        f'[OK] Wrote {out_path} with {len(config_entries)} configs (online models only).'
+        f'[OK] Wrote {out_path} with {len(config_entries)}'
+        ' configs (online models only).'
     )
 
     # 6) Push only README

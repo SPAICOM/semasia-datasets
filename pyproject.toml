@@ -36,3 +36,6 @@ dev = [
 
 [tool.ruff.lint.pydocstyle]
 convention = 'numpy'
+
+[tool.ruff.lint.per-file-ignores]
+"src/huggingface.py" = ["E501"]
