@@ -7,4 +7,9 @@ format:
     uvx ruff format .
 
 # Run formatting and linting (CI-style target)
-all: format check 
+all:
+    format check
+
+# Generate or Update all readme on HF (Update yaml)
+readme:
+    uv run scripts/generate_readme.py

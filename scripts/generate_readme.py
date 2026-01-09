@@ -23,7 +23,7 @@ from src.huggingface import (
 
 @hydra.main(
     config_path='../configs/hydra/',
-    config_name='config',
+    config_name='generate_readme',
     version_base='1.3',
 )
 def main(cfg: DictConfig) -> None:

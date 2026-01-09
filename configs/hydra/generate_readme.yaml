@@ -1,0 +1,18 @@
+defaults:
+  - _self_
+  - dataset: cifar10
+
+# --------------------------
+# Hugging Face Hub settings
+# --------------------------
+hf:
+  namespace: spaicom-lab        # 👈 replace with your HF username or org
+  repo_prefix: semantic-        # will create repos like "<namespace>/semantic-cifar10"
+  private: false                # set to true if you want private repos
+  commit_message: "Add/update readme"
+
+hydra:
+  mode: MULTIRUN
+  sweeper:
+    params:
+      dataset: cifar10,cifar100,mnist,fashion_mnist
