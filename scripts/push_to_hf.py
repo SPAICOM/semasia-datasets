@@ -63,7 +63,7 @@ def main(cfg: DictConfig) -> None:
                     )
 
                     # Re-add the model so it will be retried
-                    model_folders_to_push.append(model_folder)
+                    model_folders_to_push.add(model_folder)
 
                     time.sleep(RATE_LIMIT_SLEEP)
                     continue
