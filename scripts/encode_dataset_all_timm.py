@@ -141,7 +141,7 @@ def main(cfg: DictConfig) -> None:
         ]
 
     # Do not redo already done models
-    if not cfg.re_encode:
+    if not cfg.re_encode and not cfg.re_push:
         if already_loaded_models:
             processed_models = set.intersection(*already_processed_models.values())
         else:
