@@ -140,6 +140,19 @@ def main(cfg: DictConfig) -> None:
             model_name for model_name in all_models if model_name not in loaded_models
         ]
 
+    # Do not redo already done models
+    if not cfg.re_encode:
+        if already_loaded_models:
+            processed_models = set.intersection(*already_processed_models.values())
+        else:
+            processed_models = set()
+
+        all_models = [
+            model_name
+            for model_name in all_models
+            if model_name not in processed_models
+        ]
+
     # Define the Trainer
     trainer = Trainer(
         accelerator=cfg.device,
