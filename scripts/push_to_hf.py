@@ -113,11 +113,14 @@ def main(cfg: DictConfig) -> None:
                 time.sleep(sleep_time)
                 continue
 
-            # Recompute unloaded files AFTER upload
-            model_folders_to_push = collect_unloaded_model_folders(
-                dataset_path=DATASET_PATH,
-                repo_id=repo_id,
-            )
+            try:
+                # Recompute unloaded files AFTER upload
+                model_folders_to_push = collect_unloaded_model_folders(
+                    dataset_path=DATASET_PATH,
+                    repo_id=repo_id,
+                )
+            except (httpx.ReadTimeout, httpcore.ReadTimeout, httpx.TransportError):
+                continue
 
             # Enforce invariant: total = completed + remaining
             pbar.total = i + len(model_folders_to_push)
