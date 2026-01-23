@@ -12,3 +12,7 @@ all: format check
 # Generate or Update all readme on HF (Update yaml)
 readme:
     uv run scripts/generate_readme.py
+
+# Push models of a dataset to HF
+push DATASET:
+    uv run scripts/push_to_hf.py dataset={{DATASET}}
