@@ -1,4 +1,4 @@
-name: cifar100
+name: uoft-cs/cifar100
 
 data: img
 extras:

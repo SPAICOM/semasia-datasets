@@ -70,7 +70,8 @@ def main(cfg: DictConfig) -> None:
     EXPORT_ROOT.mkdir(exist_ok=True, parents=True)
 
     # Variables
-    repo_id: str = f'{cfg.hf.namespace}/{cfg.hf.repo_prefix}{cfg.dataset.name}'
+    dataset_name = cfg.dataset.name.split('/')[-1]
+    repo_id: str = f'{cfg.hf.namespace}/{cfg.hf.repo_prefix}{dataset_name}'
 
     # Log the name of the dataset
     print(f'[INFO] Dataset that will be encoded: {cfg.dataset.name}')
@@ -82,7 +83,7 @@ def main(cfg: DictConfig) -> None:
     dataset = load_dataset(cfg.dataset.name)
 
     # Create subdirectories
-    dataset_export_root = EXPORT_ROOT / cfg.dataset.name
+    dataset_export_root = EXPORT_ROOT / dataset_name
     for split in dataset:
         (dataset_export_root / split).mkdir(parents=True, exist_ok=True)
 
@@ -99,7 +100,7 @@ def main(cfg: DictConfig) -> None:
 
     # Ensure Hugging Face repo exists
     create_repo(
-        repo_id=f'{cfg.hf.namespace}/{cfg.hf.repo_prefix}{cfg.dataset.name}',
+        repo_id=f'{cfg.hf.namespace}/{cfg.hf.repo_prefix}{dataset_name}',
         repo_type='dataset',
         private=cfg.hf.private,
         exist_ok=True,
