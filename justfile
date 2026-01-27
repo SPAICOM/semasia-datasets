@@ -13,6 +13,10 @@ all: format check
 readme:
     uv run scripts/generate_readme.py
 
+# Just encode a dataset for timm models
+timm-encode DATASET:
+    uv run scripts/encode_dataset_all_timm.py dataset={{DATASET}} hf.push=false
+
 # Push models of a dataset to HF & update readme
 push DATASET:
     uv run scripts/push_to_hf.py dataset={{DATASET}}
