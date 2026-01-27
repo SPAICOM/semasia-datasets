@@ -33,12 +33,13 @@ MAX_RETRIES_PER_MODEL = 5
 )
 def main(cfg: DictConfig) -> None:
     """"""
+    # Variables
+    dataset_name = cfg.dataset.name.split('/')[-1]
+    repo_id: str = f'{cfg.hf.namespace}/{cfg.hf.repo_prefix}{dataset_name}'
+
     CURRENT: Path = Path('.')
     DATA_PATH: Path = CURRENT / 'data'
-    DATASET_PATH: Path = DATA_PATH / cfg.dataset.name
-
-    # Variables
-    repo_id: str = f'{cfg.hf.namespace}/{cfg.hf.repo_prefix}{cfg.dataset.name}'
+    DATASET_PATH: Path = DATA_PATH / dataset_name
 
     model_folders_to_push = collect_unloaded_model_folders(
         dataset_path=DATASET_PATH,

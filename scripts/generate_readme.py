@@ -30,12 +30,13 @@ def main(cfg: DictConfig) -> None:
     CURRENT: Path = Path('.').resolve()
     EXPORTS_ROOT: Path = CURRENT / 'data'  # Where Parquet trees will be written
     EXPORTS_ROOT.mkdir(exist_ok=True, parents=True)
-    repo_id: str = f'{cfg.hf.namespace}/{cfg.hf.repo_prefix}{cfg.dataset.name}'
-    dataset_dir = EXPORTS_ROOT / cfg.dataset.name
+    dataset_name = cfg.dataset.name.split('/')[-1]
+    repo_id: str = f'{cfg.hf.namespace}/{cfg.hf.repo_prefix}{dataset_name}'
+    dataset_dir = EXPORTS_ROOT / dataset_name
 
     generate_readme_with_configs(
         repo_dir=dataset_dir,
-        dataset_name=cfg.dataset.name,
+        dataset_name=dataset_name,
         repo_id=repo_id,
         push_online=True,
     )
