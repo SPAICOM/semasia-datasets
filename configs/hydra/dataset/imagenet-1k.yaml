@@ -1,4 +1,4 @@
-name: imagenet-1k
+name: ILSVRC/imagenet-1k
   
 data: img
 extras:
