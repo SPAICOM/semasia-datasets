@@ -156,8 +156,9 @@ def main(cfg: DictConfig) -> None:
 
     # Define the Trainer
     trainer = Trainer(
-        accelerator=cfg.device,
-        devices=1,
+        accelerator=cfg.accelerator,
+        devices=cfg.devices,
+        strategy=cfg.strategy,
         logger=False,
         enable_checkpointing=False,
     )
@@ -191,7 +192,7 @@ def main(cfg: DictConfig) -> None:
                 print(f'\n\n[INFO] Proceed with {model_name} {split=}')
 
                 try:
-                    model = load_model(model_name=model_name, device=cfg.device)
+                    model = load_model(model_name=model_name, device=cfg.accelerator)
 
                     model_cfg = resolve_data_config({}, model=model)
                     transform = create_transform(**model_cfg)
