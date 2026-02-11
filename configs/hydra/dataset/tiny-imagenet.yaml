@@ -1,0 +1,5 @@
+name: zh-plus/tiny-imagenet
+
+data: image
+extras:
+  - label
