@@ -15,4 +15,4 @@ hydra:
   mode: MULTIRUN
   sweeper:
     params:
-      dataset: cifar10,cifar100,mnist,fashion_mnist,tiny_imagenet
+      dataset: cifar10,cifar100,mnist,fashion_mnist,tiny_imagenet,svhn
