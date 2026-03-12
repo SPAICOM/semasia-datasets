@@ -3,7 +3,7 @@ defaults:
   - dataset: cifar10
 
 seed: 42
-accelerator: cuda
+accelerator: auto
 devices:
   - 0
 strategy: auto
