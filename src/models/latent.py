@@ -1,9 +1,9 @@
 """"""
 
-import pytorch_lightning as pl
+import lightning as l
 
 
-class LatentExtractor(pl.LightningModule):
+class LatentExtractor(l.LightningModule):
     def __init__(self, model):
         super().__init__()
         self.model = model

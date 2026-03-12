@@ -24,8 +24,8 @@ import torch
 from datasets import load_dataset
 from huggingface_hub import create_repo
 from huggingface_hub.utils import get_token
+from lightning import Trainer, seed_everything
 from omegaconf import DictConfig
-from pytorch_lightning import Trainer, seed_everything
 from timm.data import resolve_data_config
 from timm.data.transforms_factory import create_transform
 from torch.utils.data import DataLoader
