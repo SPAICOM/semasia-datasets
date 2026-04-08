@@ -12,7 +12,6 @@ trainer:
   accelerator: auto
   devices:
     - 0
-    - 1
   strategy: auto
   logger: false
   enable_checkpointing: false
