@@ -18,11 +18,9 @@ def call_model(
 
 def load_model(
     model_name: str,
-    device: str,
 ) -> Module:
     """Load a timm model as an embedding extractor (no classifier)."""
     model = timm.create_model(model_name, pretrained=True, num_classes=0)
-    model = model.to(device)
     return model.requires_grad_(False).eval()
 
 

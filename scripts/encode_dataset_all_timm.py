@@ -24,7 +24,7 @@ import torch
 from datasets import load_dataset
 from huggingface_hub import create_repo
 from huggingface_hub.utils import get_token
-from lightning import Trainer, seed_everything
+from lightning.pytorch import Trainer, seed_everything
 from omegaconf import DictConfig
 from timm.data import resolve_data_config
 from timm.data.transforms_factory import create_transform
@@ -156,11 +156,7 @@ def main(cfg: DictConfig) -> None:
 
     # Define the Trainer
     trainer = Trainer(
-        accelerator=cfg.accelerator,
-        devices=cfg.devices,
-        strategy=cfg.strategy,
-        logger=False,
-        enable_checkpointing=False,
+        **cfg.trainer,
     )
 
     # Compute the latent encodings for each model
@@ -192,7 +188,7 @@ def main(cfg: DictConfig) -> None:
                 print(f'\n\n[INFO] Proceed with {model_name} {split=}')
 
                 try:
-                    model = load_model(model_name=model_name, device=cfg.accelerator)
+                    model = load_model(model_name=model_name)
 
                     model_cfg = resolve_data_config({}, model=model)
                     transform = create_transform(**model_cfg)
