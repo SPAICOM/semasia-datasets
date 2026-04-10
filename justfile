@@ -7,7 +7,7 @@ format:
     uvx ruff format .
 
 # Run formatting and linting (CI-style target)
-all: format check
+clean: format check
 
 # Generate or Update all readme on HF (Update yaml)
 readme:
