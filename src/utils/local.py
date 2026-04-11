@@ -31,7 +31,7 @@ Typical usage
 -------------
 
     from pathlib import Path
-    from utils import collect_local_models_by_split
+    from src.utils.local import collect_local_models_by_split
 
     dataset_export_root = Path("/data/datasets/my_dataset")
     models_by_split = collect_local_models_by_split(dataset_export_root)

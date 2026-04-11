@@ -1,21 +1,21 @@
-# /// script
-# requires-python = ">=3.12"
-# dependencies = [
-#     "datasets",
-#     "hydra-core",
-#     "lightning",
-#     "polars",
-#     "timm",
-# ]
-# ///
-""""""
+"""
+Encode dataset images using timm models and upload to Hugging Face.
+
+This script processes images from a dataset using pretrained timm models,
+extracts latent embeddings, saves them as Parquet shards, and optionally
+uploads them to a Hugging Face repository.
+
+Usage:
+    uv run scripts/encode_dataset_all_timm.py dataset=cifar10 hf.push=false
+"""
 
 import sys
+from functools import partial
 from pathlib import Path
 
 sys.path.append(str(Path(sys.path[0]).parent))
 
-from functools import partial
+from typing import Any
 
 import hydra
 import polars as pl
@@ -31,30 +31,35 @@ from timm.data.transforms_factory import create_transform
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 
-from src.huggingface import (
-    collect_models_by_split,
-    push_folder_to_hub,
-)
-from src.io import latents_to_parquet_shards
-from src.models.latent import LatentExtractor
-from src.models.timm import (
-    encoder_params_below_threshold,
-    load_model,
-)
-from src.utils import (
+from src import (
+    LatentExtractor,
     collect_local_models_by_split,
+    collect_models_by_split,
+    encoder_params_below_threshold,
+    latents_to_parquet_shards,
+    load_model,
+    push_folder_to_hub,
     remove_matching,
 )
 
 
-def collate_fn(
-    batch,
-    transform,
-):
-    return torch.stack(
-        [transform(sample.convert('RGB')) for sample in batch],
-        dim=0,
-    )
+def collate_fn(batch: list[Any], transform: Any) -> torch.Tensor:
+    """
+    Collate a batch of images with the given transform.
+
+    Parameters
+    ----------
+    batch : list[Any]
+        List of image samples.
+    transform : Any
+        Transform to apply to each image.
+
+    Returns
+    -------
+    torch.Tensor
+        Stacked and transformed images.
+    """
+    return torch.stack([transform(sample.convert('RGB')) for sample in batch], dim=0)
 
 
 @hydra.main(
@@ -63,105 +68,76 @@ def collate_fn(
     version_base='1.3',
 )
 def main(cfg: DictConfig) -> None:
-    """"""
-    # Define paths
-    CURRENT: Path = Path('.')
-    EXPORT_ROOT: Path = CURRENT / 'data'  # Where Parquet trees will be written
-    EXPORT_ROOT.mkdir(exist_ok=True, parents=True)
+    """
+    Encode dataset images using timm models.
 
-    # Variables
+    Parameters
+    ----------
+    cfg : DictConfig
+        Hydra configuration containing dataset, model, trainer, and
+        HuggingFace settings.
+    """
+    current: Path = Path('.')
+    export_root: Path = current / 'data'
+    export_root.mkdir(exist_ok=True, parents=True)
+
     dataset_name = cfg.dataset.name.split('/')[-1]
     repo_id: str = f'{cfg.hf.namespace}/{cfg.hf.repo_prefix}{dataset_name}'
 
-    # Log the name of the dataset
-    print(f'[INFO] Dataset that will be encoded: {cfg.dataset.name}')
+    print(f'[INFO] Dataset: {cfg.dataset.name}')
 
-    # Seed everything
     seed_everything(cfg.seed)
 
-    # Retrieve the datasets - both train and test
     dataset = load_dataset(cfg.dataset.name)
 
-    # Create subdirectories
-    dataset_export_root = EXPORT_ROOT / dataset_name
+    dataset_export_root = export_root / dataset_name
     for split in dataset:
         (dataset_export_root / split).mkdir(parents=True, exist_ok=True)
 
-    # Handling extras
-    data = {}
+    data: dict[str, dict[str, list[Any]]] = {}
     for split in dataset:
         data[split] = {col: list(dataset[split][col]) for col in cfg.dataset.extras}
 
-    # Hugging Face Token
     token = get_token()
     if token is None:
         print('[WARN] No HF token found. Run `huggingface-cli login` or set HF_TOKEN.')
         return
 
-    # Ensure Hugging Face repo exists
     create_repo(
-        repo_id=f'{cfg.hf.namespace}/{cfg.hf.repo_prefix}{dataset_name}',
+        repo_id=repo_id,
         repo_type='dataset',
         private=cfg.hf.private,
         exist_ok=True,
         token=token,
     )
 
-    # Enumerate ALL pretrained timm models
-    # (change to list_models() for non-pretrained too)
     all_models = set(timm.list_models(pretrained=True))
     all_models = sorted(all_models)
 
-    # Consider only the passed subset
     if cfg.models_startwith is not None:
-        all_models = [
-            model_name
-            for model_name in all_models
-            if model_name.startswith(cfg.models_startwith)
-        ]
+        all_models = [m for m in all_models if m.startswith(cfg.models_startwith)]
 
-    # Get already processed models
     already_processed_models = collect_local_models_by_split(
         dataset_export_root=dataset_export_root
     )
+    already_loaded_models = collect_models_by_split(repo_id=repo_id)
 
-    # Get models already loaded on Hugging Face
-    already_loaded_models = collect_models_by_split(
-        repo_id=repo_id,
-    )
+    if not cfg.hf.re_push and already_loaded_models:
+        loaded_models = set.intersection(*already_loaded_models.values())
+    else:
+        loaded_models = set()
+    all_models = [m for m in all_models if m not in loaded_models]
 
-    # Do not redo already done models
-    if not cfg.hf.re_push:
-        if already_loaded_models:
-            loaded_models = set.intersection(*already_loaded_models.values())
-        else:
-            loaded_models = set()
+    if not cfg.re_encode and not cfg.hf.re_push and already_processed_models:
+        processed_models = set.intersection(*already_processed_models.values())
+    else:
+        processed_models = set()
+    all_models = [m for m in all_models if m not in processed_models]
 
-        all_models = [
-            model_name for model_name in all_models if model_name not in loaded_models
-        ]
+    trainer = Trainer(**cfg.trainer)
 
-    # Do not redo already done models
-    if not cfg.re_encode and not cfg.hf.re_push:
-        if already_processed_models:
-            processed_models = set.intersection(*already_processed_models.values())
-        else:
-            processed_models = set()
-
-        all_models = [
-            model_name
-            for model_name in all_models
-            if model_name not in processed_models
-        ]
-
-    # Define the Trainer
-    trainer = Trainer(
-        **cfg.trainer,
-    )
-
-    # Compute the latent encodings for each model
     for model_name in tqdm(all_models, desc=f'TIMM {len(all_models)} Models'):
-        print(f'\n\n [INFO] Checking {model_name} parameters...', end='\t')
+        print(f'\n\n[INFO] Checking {model_name} parameters...', end='\t')
         if not encoder_params_below_threshold(
             model_name=model_name,
             threshold=cfg.parameters_threshold,
@@ -170,105 +146,72 @@ def main(cfg: DictConfig) -> None:
             continue
         print('[OK]')
 
-        # Encode each split separately
         for split in dataset:
             if cfg.encode:
-                # Check if model has already been loaded in HF
                 if (
                     model_name in already_loaded_models.get(split, set())
                 ) and not cfg.hf.re_push:
                     continue
 
-                # Check if model has already been processed
                 if (
                     model_name in already_processed_models.get(split, set())
                 ) and not cfg.re_encode:
                     continue
 
-                print(f'\n\n[INFO] Proceed with {model_name} {split=}')
+                print(f'\n\n[INFO] Processing {model_name} {split=}')
 
                 try:
                     model = load_model(model_name=model_name)
-
                     model_cfg = resolve_data_config({}, model=model)
                     transform = create_transform(**model_cfg)
-
                     extractor = LatentExtractor(model=model)
                 except Exception as e:
                     print(f'[ERROR][{model_name}] creating model: {e}')
                     continue
 
-                # -----------------------------------------------------------------
-                #                   Prepare the DataLoader
-                # -----------------------------------------------------------------
-                # Training Set
                 dataloader = DataLoader(
                     dataset[split][cfg.dataset.data],
                     num_workers=cfg.dataloader.num_workers,
                     pin_memory=cfg.dataloader.pin_memory,
                     batch_size=cfg.dataloader.batch_size,
-                    collate_fn=partial(
-                        collate_fn,
-                        transform=transform,
-                    ),
+                    collate_fn=partial(collate_fn, transform=transform),
                 )
-                # -----------------------------------------------------------------
 
                 try:
-                    # Encode the data, both train and test
-                    latents = trainer.predict(
-                        extractor,
-                        dataloaders=dataloader,
-                    )
+                    latents = trainer.predict(extractor, dataloaders=dataloader)
                 except torch.OutOfMemoryError as e:
-                    print(
-                        f'[ERROR] Skipped model {model_name} {split=}, because of {e}'
-                    )
+                    print(f'[ERROR] Skipped {model_name} {split=}: {e}')
                     continue
 
-                # Concatenate
                 latents = torch.cat(latents, dim=0).contiguous()
 
-                # -----------------------------------------------------------------
-                #                   Dump the Latents
-                # -----------------------------------------------------------------
                 temp = data[split].copy()
                 temp['model_name'] = model_name
                 temp['embedding'] = latents.numpy()
 
-                # Save the encodings in a polars DataFrame
                 df = pl.DataFrame(temp).with_row_index('id')
 
-                # Write the parquet in shards
                 latents_to_parquet_shards(
                     df=df,
                     export_path=(dataset_export_root / split) / model_name,
                     max_rows_per_shard=cfg.parquet.max_rows_per_shard,
                 )
 
-                # Cleaning:
-                # - delete temp
-                # - remove model from gpu
                 del temp
                 model = model.cpu()
 
-            # -----------------------------------------------------------------
-            #                   Push dataset to Hugging Face
-            # -----------------------------------------------------------------
             if cfg.hf.push:
                 local_folder = dataset_export_root / f'{split}/{model_name}'
 
                 if not local_folder.is_dir():
-                    print(f'\n[INFO] Skipped HF push for model {model_name} {split=}.')
+                    print(f'\n[INFO] Skipped HF push for {model_name} {split=}.')
                     continue
 
-                # Check if model has already been loaded on Hugging Face
                 if (
                     model_name in already_loaded_models.get(split, set())
                 ) and not cfg.hf.re_push:
                     continue
 
-                # Pust to Hugging Face
                 push_folder_to_hub(
                     local_folder=local_folder,
                     path_in_repo=f'{split}/{model_name}',
@@ -277,10 +220,7 @@ def main(cfg: DictConfig) -> None:
                     commit_message=cfg.hf.commit_message,
                 )
 
-        # Clean huggingface cache
         remove_matching('~/.cache/huggingface/hub', '*timm*')
-
-    return None
 
 
 if __name__ == '__main__':

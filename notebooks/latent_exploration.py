@@ -16,7 +16,7 @@ with app.setup:
     from datasets import load_dataset
 
     sys.path.insert(0, str(Path(__file__).parent.parent))
-    from src.huggingface import collect_models_by_split
+    from src import collect_models_by_split
 
     HF_REPO = 'spaicom-lab/semantic-'
 
