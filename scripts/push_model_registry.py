@@ -129,54 +129,57 @@ def main() -> None:
     print(f'To process: {len(models_to_process)}')
 
     if not models_to_process:
-        print('Nothing to process. Exiting.')
-        return
-
-    start_time = time.time()
-    batch: list[dict] = []
-    batch_num = 0
-    total_new = 0
-
-    with tqdm(models_to_process, desc='Extracting metadata', leave=True) as pbar:
-        for model_name in pbar:
-            pbar.set_postfix_str(model_name[:40])
-            try:
-                meta = get_model_metadata(model_name)
-                batch.append(meta)
-            except Exception:
-                failed.append(model_name)
-                save_failed_models(failed_path, failed)
-
-            if len(batch) >= BATCH_SIZE:
-                batch_num += 1
-                batch_df = normalize_batch(batch)
-                batch_path = temp_dir / f'batch_{batch_num:03d}.parquet'
-                batch_df.write_parquet(batch_path)
-                total_new += len(batch)
-                batch = []
-
-    if batch:
-        batch_num += 1
-        batch_df = normalize_batch(batch)
-        batch_path = temp_dir / f'batch_{batch_num:03d}.parquet'
-        batch_df.write_parquet(batch_path)
-        total_new += len(batch)
-
-    elapsed = time.time() - start_time
-    print(f'\nProcessed {total_new} new models in {elapsed:.1f}s')
-    print(f'Total failed: {len(failed)}')
-
-    batch_files = sorted(temp_dir.glob('batch_*.parquet'))
-    if batch_files:
-        dfs = [pl.read_parquet(f) for f in batch_files]
-        df = pl.concat(dfs)
-        df = df.unique(subset='model_name', keep='first')
-        df.write_parquet(parquet_path)
-        print(f'Saved {len(df)} total models to {parquet_path}')
-
-        shutil.rmtree(temp_dir)
+        print('Nothing new to process. Using existing parquet.')
+        if parquet_path.exists():
+            df = pl.read_parquet(parquet_path)
+        else:
+            df = pl.DataFrame(schema=METADATA_SCHEMA)
     else:
-        df = pl.DataFrame(schema=METADATA_SCHEMA)
+        start_time = time.time()
+        batch: list[dict] = []
+        batch_num = 0
+        total_new = 0
+
+        with tqdm(models_to_process, desc='Extracting metadata', leave=True) as pbar:
+            for model_name in pbar:
+                pbar.set_postfix_str(model_name[:40])
+                try:
+                    meta = get_model_metadata(model_name)
+                    batch.append(meta)
+                except Exception:
+                    failed.append(model_name)
+                    save_failed_models(failed_path, failed)
+
+                if len(batch) >= BATCH_SIZE:
+                    batch_num += 1
+                    batch_df = normalize_batch(batch)
+                    batch_path = temp_dir / f'batch_{batch_num:03d}.parquet'
+                    batch_df.write_parquet(batch_path)
+                    total_new += len(batch)
+                    batch = []
+
+        if batch:
+            batch_num += 1
+            batch_df = normalize_batch(batch)
+            batch_path = temp_dir / f'batch_{batch_num:03d}.parquet'
+            batch_df.write_parquet(batch_path)
+            total_new += len(batch)
+
+        elapsed = time.time() - start_time
+        print(f'\nProcessed {total_new} new models in {elapsed:.1f}s')
+        print(f'Total failed: {len(failed)}')
+
+        batch_files = sorted(temp_dir.glob('batch_*.parquet'))
+        if batch_files:
+            dfs = [pl.read_parquet(f) for f in batch_files]
+            df = pl.concat(dfs)
+            df = df.unique(subset='model_name', keep='first')
+            df.write_parquet(parquet_path)
+            print(f'Saved {len(df)} total models to {parquet_path}')
+
+            shutil.rmtree(temp_dir)
+        else:
+            df = pl.DataFrame(schema=METADATA_SCHEMA)
 
     print(f'DataFrame shape: {df.shape}')
     print(f'Columns: {df.columns}')

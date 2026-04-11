@@ -454,16 +454,16 @@ def generate_model_registry_readme(
     import polars as pl
 
     ds = load_dataset("spaicom-lab/model-registry")
-    df = ds["train"].to_pandas()
+    df = ds["train"].to_polars()
 
     # Query by model name
-    model = df[df["model_name"] == "vit_base_patch16_224"]
+    model = df.filter(pl.col("model_name") == "vit_base_patch16_224")
 
     # Filter by family
-    vit_models = df[df["family"] == "ViT"]
+    vit_models = df.filter(pl.col("family") == "ViT")
 
     # Filter by parameter count
-    small_models = df[df["num_parameters"] < 50_000_000]
+    small_models = df.filter(pl.col("num_parameters") < 50_000_000)
     ```
 
     ## Fields
