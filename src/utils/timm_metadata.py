@@ -19,14 +19,14 @@ where the model was pretrained (and optionally fine-tuned).
 Usage
 -----
 >>> from model_metadata import get_model_metadata
->>> meta = get_model_metadata("vit_base_patch16_rope_reg1_gap_256.sbb_in1k")
->>> meta["family"]               # "ViT"
->>> meta["size"]                 # "Base"
->>> meta["positional_encoding"]  # "RoPE"
->>> meta["num_registers"]        # 1
->>> meta["head_type"]            # "GAP"
->>> meta["pretrain_org"]         # "timm SBB recipe"
->>> meta["pretrain_dataset"]     # "ImageNet-1K"
+>>> meta = get_model_metadata('vit_base_patch16_rope_reg1_gap_256.sbb_in1k')
+>>> meta['family']  # "ViT"
+>>> meta['size']  # "Base"
+>>> meta['positional_encoding']  # "RoPE"
+>>> meta['num_registers']  # 1
+>>> meta['head_type']  # "GAP"
+>>> meta['pretrain_org']  # "timm SBB recipe"
+>>> meta['pretrain_dataset']  # "ImageNet-1K"
 
 Field reference
 ---------------
@@ -420,7 +420,7 @@ pretrain_epochs : int | None
     convention). Only the training-phase epoch count is captured.
     Examples:
       hiera_small_abswin_256.sbb2_e200_in12k    → 200
-      efficientnet_b0.ra4_e3600_r224_in1k       → 3600  (training steps for MobileNet-style short-schedule recipes, not epochs)
+      efficientnet_b0.ra4_e3600_r224_in1k → 3600  # steps for short-schedule recipes
       flexivit_small.1200ep_in1k                → 1200
       mobilenetv4_conv_medium.e250_r384_in12k   → 250
     None when not encoded.
@@ -523,228 +523,228 @@ logger = logging.getLogger(__name__)
 # More specific prefixes MUST come before more general ones.
 
 _FAMILY_RULES: list[tuple[str, str, str | None]] = [
-    ("aimv2",               "AIMv2",            "v2"),
-    ("sam2_hiera",          "SAM2-Hiera",       "2"),
-    ("eva02",               "EVA",              "v2"),
-    ("eva",                 "EVA",              None),
-    ("beitv2",              "BEiT",             "v2"),
-    ("beit3",               "BEiT",             "v3"),
-    ("beit",                "BEiT",             None),
+    ('aimv2', 'AIMv2', 'v2'),
+    ('sam2_hiera', 'SAM2-Hiera', '2'),
+    ('eva02', 'EVA', 'v2'),
+    ('eva', 'EVA', None),
+    ('beitv2', 'BEiT', 'v2'),
+    ('beit3', 'BEiT', 'v3'),
+    ('beit', 'BEiT', None),
     # ViT — many capacity prefixes to prevent fall-through to "vit_" catch-all
-    ("vit_so400m",          "ViT",              None),
-    ("vit_so150m",          "ViT",              None),
-    ("vit_gigantic",        "ViT",              None),
-    ("vit_giantopt",        "ViT",              None),
-    ("vit_huge_plus",       "ViT",              None),
-    ("vit_huge",            "ViT",              None),
-    ("vit_giant",           "ViT",              None),
-    ("vit_large",           "ViT",              None),
-    ("vit_base",            "ViT",              None),
-    ("vit_mediumd",         "ViT",              None),
-    ("vit_medium",          "ViT",              None),
-    ("vit_betwixt",         "ViT",              None),
-    ("vit_small",           "ViT",              None),
-    ("vit_wee",             "ViT",              None),
-    ("vit_pwee",            "ViT",              None),
-    ("vit_dwee",            "ViT",              None),
-    ("vit_dpwee",           "ViT",              None),
-    ("vit_little",          "ViT",              None),
-    ("vit_tiny",            "ViT",              None),
-    ("vit_pe",              "ViT",              None),
-    ("vit_intern",          "ViT",              None),
-    ("vit_relpos",          "ViT",              None),
-    ("vit_srelpos",         "ViT",              None),
-    ("naflexvit",           "ViT",              None),
-    ("vit_",                "ViT",              None),
-    ("deit3",               "DeiT",             "III"),
-    ("deit",                "DeiT",             None),
-    ("swinv2",              "Swin",             "v2"),
-    ("swin_s3",             "Swin",             "S3"),
-    ("swin",                "Swin",             None),
-    ("convnextv2",          "ConvNeXt",         "v2"),
-    ("convnext",            "ConvNeXt",         None),
-    ("caformer",            "MetaFormer",       None),
-    ("convformer",          "MetaFormer",       None),
-    ("poolformerv2",        "MetaFormer",       "v2"),
-    ("poolformerv2",        "MetaFormer",       "v2"),
-    ("poolformer",          "MetaFormer",       None),
-    ("efficientvit",        "EfficientViT",     None),
-    ("efficientformerv2_l",  "EfficientFormer",  "v2"),
-    ("efficientformerv2",    "EfficientFormer",  "v2"),
-    ("efficientformer",     "EfficientFormer",  None),
-    ("efficientnetv2",      "EfficientNet",     "v2"),
-    ("tf_efficientnetv2",   "EfficientNet",     "v2"),
-    ("tf_efficientnet",     "EfficientNet",     None),
-    ("efficientnet",        "EfficientNet",     None),
-    ("mobilenetv5",         "MobileNet",        "v5"),
-    ("mobilenetv4",         "MobileNet",        "v4"),
-    ("mobilenetv3",         "MobileNet",        "v3"),
-    ("mobilenetv2",         "MobileNet",        "v2"),
-    ("mobilenetv1",         "MobileNet",        "v1"),
-    ("mobilenet_edgetpu",   "MobileNet",        "EdgeTPU"),
-    ("tf_mobilenetv3",      "MobileNet",        "v3"),
-    ("mobilenet",           "MobileNet",        None),
-    ("mobileone",           "MobileOne",        None),
-    ("mobilevitv2_050",     "MobileViT",        "v2"),   # 0.50x channel width
-    ("mobilevitv2_075",     "MobileViT",        "v2"),   # 0.75x
-    ("mobilevitv2_100",     "MobileViT",        "v2"),   # 1.00x
-    ("mobilevitv2_125",     "MobileViT",        "v2"),   # 1.25x
-    ("mobilevitv2_150",     "MobileViT",        "v2"),   # 1.50x
-    ("mobilevitv2_175",     "MobileViT",        "v2"),   # 1.75x
-    ("mobilevitv2_200",     "MobileViT",        "v2"),   # 2.00x
-    ("mobilevitv2",         "MobileViT",        "v2"),
-    ("mobilevit_xxs",       "MobileViT",        None),   # extra-extra-small
-    ("mobilevit_xs",        "MobileViT",        None),   # extra-small
-    ("mobilevit_s",         "MobileViT",        None),   # small
-    ("mobilevit",           "MobileViT",        None),
-    ("resnetv2",            "ResNet",           "v2"),
-    ("resnetrs",            "ResNet",           "RS"),
-    ("resnetaa",            "ResNet",           "AA"),
-    ("resnetblur",          "ResNet",           "Blur"),
-    ("resnext",             "ResNeXt",          None),
-    ("resnest",             "ResNeSt",          None),
-    ("resnet50_clip",       "ResNet",           "CLIP"),
-    ("resnet50x",           "ResNet",           "CLIP-scaled"),
-    ("resnet101_clip",      "ResNet",           "CLIP"),
-    ("resnet",              "ResNet",           None),
-    ("wide_resnet",         "Wide-ResNet",      None),
-    ("regnety",             "RegNet",           "Y"),
-    ("regnetx",             "RegNet",           "X"),
-    ("regnetv",             "RegNet",           "V"),
-    ("regnetz",             "RegNet",           "Z"),
-    ("maxxvitv2",           "MaxViT",           "v2"),
-    ("maxxvit",             "MaxViT",           None),
-    ("maxvit",              "MaxViT",           None),
-    ("vitamin",             "ViTamin",          None),
-    ("hiera",               "Hiera",            None),
-    ("mvitv2",              "MViT",             "v2"),
-    ("mvit",                "MViT",             None),
-    ("coatnet",             "CoAtNet",          None),
-    ("coatnext",            "CoAtNeXt",         None),
-    ("coat_lite",           "CoaT",             None),
-    ("coat",                "CoaT",             None),
-    ("davit",               "DaViT",            None),
-    ("dm_nfnet",            "NFNet",            None),
-    ("eca_nfnet",           "NFNet",            None),
-    ("nfnet",               "NFNet",            None),
-    ("nf_resnet",           "ResNet",           "NF"),
-    ("nf_regnet",           "RegNet",           "NF"),
-    ("mambaout",            "MambaOut",         None),
-    ("samvit",              "SAM-ViT",          None),
-    ("xcit",                "XCiT",             None),
-    ("csatv2",              "CSAFormer",        "v2"),
-    ("csat",                "CSAFormer",        None),
-    ("gc_efficientnetv2",   "EfficientNet",     "v2-GC"),
-    ("gcvit",               "GCViT",            None),
-    ("focalnet",            "FocalNet",         None),
-    ("fastvit",             "FastViT",          None),
-    ("shvit",               "ShViT",            None),
-    ("starnet",             "StarNet",          None),
-    ("nextvit",             "NextViT",          None),
-    ("flexivit",            "FlexiViT",         None),
-    ("dpn",                 "DPN",              None),
-    ("dla",                 "DLA",              None),
-    ("pvt_v2",              "PVT",              "v2"),
-    ("pvt",                 "PVT",              None),
-    ("twins",               "Twins",            None),
-    ("sequencer2d",         "Sequencer2D",      None),
-    ("mixer",               "MLP-Mixer",        None),
-    ("gmlp",                "gMLP",             None),
-    ("gmixer",              "gMixer",           None),
-    ("resmlp",              "ResMLP",           None),
-    ("vgg",                 "VGG",              None),
-    ("densenet",            "DenseNet",         None),
-    ("hrnet",               "HRNet",            None),
-    ("hgnetv2",             "HGNet",            "v2"),
-    ("hgnet",               "HGNet",            None),
-    ("xception",            "Xception",         None),
-    ("inception_resnet",    "InceptionResNet",  None),
-    ("inception_next",      "InceptionNeXt",    None),
-    ("inception",           "Inception",        None),
-    ("nasnet",              "NASNet",           None),
-    ("pnasnet",             "PNASNet",          None),
-    ("repvgg",              "RepVGG",           None),
-    ("repvit",              "RepViT",           None),
-    ("repghostnet",         "RepGhostNet",      None),
-    ("convmixer",           "ConvMixer",        None),
-    ("convit",              "ConViT",           None),
-    ("crossvit",            "CrossViT",         None),
-    ("cait",                "CaiT",             None),
-    ("volo",                "VOLO",             None),
-    ("pit",                 "PiT",              None),
-    ("tnt",                 "TNT",              None),
-    ("visformer",           "VisFormer",        None),
-    ("fasternet",           "FasterNet",        None),
-    ("ghostnetv3",          "GhostNet",         "v3"),
-    ("ghostnetv2",          "GhostNet",         "v2"),
-    ("ghostnet",            "GhostNet",         None),
-    ("eca_botnext",         "BotNet",           "ECA"),
-    ("eca_halonext",        "HaloNet",          "ECA"),
-    ("eca_resnet",          "ResNet",           "ECA"),
-    ("eca_resnext",         "ResNeXt",          "ECA"),
-    ("ecaresnet",           "ResNet",           "ECA"),
-    ("seresnet",            "ResNet",           "SE"),
-    ("seresnext",           "ResNeXt",          "SE"),
-    ("sehalonet",           "HaloNet",          "SE"),
-    ("sebotnet",            "BotNet",           "SE"),
-    ("gcresnet",            "ResNet",           "GC"),
-    ("gcresnext",           "ResNeXt",          "GC"),
-    ("tiny_vit",            "TinyViT",          None),
-    ("res2net",             "Res2Net",          None),
-    ("res2next",            "Res2NeXt",         None),
-    ("tresnet",             "TResNet",          None),
-    ("swiftformer",         "SwiftFormer",      None),
-    ("levit",               "LeViT",            None),
-    ("lambda_resnet",       "ResNet",           "Lambda"),
-    ("halonet",             "HaloNet",          None),
-    ("halo2botnet",         "HaloNet",          None),
-    ("halobotnet",          "HaloNet",          None),
-    ("lamhalobotnet",       "HaloNet",          None),
-    ("bat_resnext",         "ResNeXt",          "BAT"),
-    ("botnet",              "BotNet",           None),
-    ("cspdarknet",          "DarkNet",          "CSP"),
-    ("cspresnext",          "ResNeXt",          "CSP"),
-    ("cspresnet",           "ResNet",           "CSP"),
-    ("cs3sedarknet",        "DarkNet",          "CS3-SE"),
-    ("cs3darknet",          "DarkNet",          "CS3"),
-    ("cs3edgenet",          "EdgeNet",          "CS3"),
-    ("cs3se_edgenet",       "EdgeNet",          "CS3-SE"),
-    ("darknetaa",           "DarkNet",          "AA"),
-    ("darknet",             "DarkNet",          None),
-    ("gernet",              "GENet",            None),
-    ("haloregnetz",         "RegNet",           "HaloZ"),
-    ("senet",               "SENet",            None),
-    ("spnasnet",            "SPNASNet",         None),
+    ('vit_so400m', 'ViT', None),
+    ('vit_so150m', 'ViT', None),
+    ('vit_gigantic', 'ViT', None),
+    ('vit_giantopt', 'ViT', None),
+    ('vit_huge_plus', 'ViT', None),
+    ('vit_huge', 'ViT', None),
+    ('vit_giant', 'ViT', None),
+    ('vit_large', 'ViT', None),
+    ('vit_base', 'ViT', None),
+    ('vit_mediumd', 'ViT', None),
+    ('vit_medium', 'ViT', None),
+    ('vit_betwixt', 'ViT', None),
+    ('vit_small', 'ViT', None),
+    ('vit_wee', 'ViT', None),
+    ('vit_pwee', 'ViT', None),
+    ('vit_dwee', 'ViT', None),
+    ('vit_dpwee', 'ViT', None),
+    ('vit_little', 'ViT', None),
+    ('vit_tiny', 'ViT', None),
+    ('vit_pe', 'ViT', None),
+    ('vit_intern', 'ViT', None),
+    ('vit_relpos', 'ViT', None),
+    ('vit_srelpos', 'ViT', None),
+    ('naflexvit', 'ViT', None),
+    ('vit_', 'ViT', None),
+    ('deit3', 'DeiT', 'III'),
+    ('deit', 'DeiT', None),
+    ('swinv2', 'Swin', 'v2'),
+    ('swin_s3', 'Swin', 'S3'),
+    ('swin', 'Swin', None),
+    ('convnextv2', 'ConvNeXt', 'v2'),
+    ('convnext', 'ConvNeXt', None),
+    ('caformer', 'MetaFormer', None),
+    ('convformer', 'MetaFormer', None),
+    ('poolformerv2', 'MetaFormer', 'v2'),
+    ('poolformerv2', 'MetaFormer', 'v2'),
+    ('poolformer', 'MetaFormer', None),
+    ('efficientvit', 'EfficientViT', None),
+    ('efficientformerv2_l', 'EfficientFormer', 'v2'),
+    ('efficientformerv2', 'EfficientFormer', 'v2'),
+    ('efficientformer', 'EfficientFormer', None),
+    ('efficientnetv2', 'EfficientNet', 'v2'),
+    ('tf_efficientnetv2', 'EfficientNet', 'v2'),
+    ('tf_efficientnet', 'EfficientNet', None),
+    ('efficientnet', 'EfficientNet', None),
+    ('mobilenetv5', 'MobileNet', 'v5'),
+    ('mobilenetv4', 'MobileNet', 'v4'),
+    ('mobilenetv3', 'MobileNet', 'v3'),
+    ('mobilenetv2', 'MobileNet', 'v2'),
+    ('mobilenetv1', 'MobileNet', 'v1'),
+    ('mobilenet_edgetpu', 'MobileNet', 'EdgeTPU'),
+    ('tf_mobilenetv3', 'MobileNet', 'v3'),
+    ('mobilenet', 'MobileNet', None),
+    ('mobileone', 'MobileOne', None),
+    ('mobilevitv2_050', 'MobileViT', 'v2'),  # 0.50x channel width
+    ('mobilevitv2_075', 'MobileViT', 'v2'),  # 0.75x
+    ('mobilevitv2_100', 'MobileViT', 'v2'),  # 1.00x
+    ('mobilevitv2_125', 'MobileViT', 'v2'),  # 1.25x
+    ('mobilevitv2_150', 'MobileViT', 'v2'),  # 1.50x
+    ('mobilevitv2_175', 'MobileViT', 'v2'),  # 1.75x
+    ('mobilevitv2_200', 'MobileViT', 'v2'),  # 2.00x
+    ('mobilevitv2', 'MobileViT', 'v2'),
+    ('mobilevit_xxs', 'MobileViT', None),  # extra-extra-small
+    ('mobilevit_xs', 'MobileViT', None),  # extra-small
+    ('mobilevit_s', 'MobileViT', None),  # small
+    ('mobilevit', 'MobileViT', None),
+    ('resnetv2', 'ResNet', 'v2'),
+    ('resnetrs', 'ResNet', 'RS'),
+    ('resnetaa', 'ResNet', 'AA'),
+    ('resnetblur', 'ResNet', 'Blur'),
+    ('resnext', 'ResNeXt', None),
+    ('resnest', 'ResNeSt', None),
+    ('resnet50_clip', 'ResNet', 'CLIP'),
+    ('resnet50x', 'ResNet', 'CLIP-scaled'),
+    ('resnet101_clip', 'ResNet', 'CLIP'),
+    ('resnet', 'ResNet', None),
+    ('wide_resnet', 'Wide-ResNet', None),
+    ('regnety', 'RegNet', 'Y'),
+    ('regnetx', 'RegNet', 'X'),
+    ('regnetv', 'RegNet', 'V'),
+    ('regnetz', 'RegNet', 'Z'),
+    ('maxxvitv2', 'MaxViT', 'v2'),
+    ('maxxvit', 'MaxViT', None),
+    ('maxvit', 'MaxViT', None),
+    ('vitamin', 'ViTamin', None),
+    ('hiera', 'Hiera', None),
+    ('mvitv2', 'MViT', 'v2'),
+    ('mvit', 'MViT', None),
+    ('coatnet', 'CoAtNet', None),
+    ('coatnext', 'CoAtNeXt', None),
+    ('coat_lite', 'CoaT', None),
+    ('coat', 'CoaT', None),
+    ('davit', 'DaViT', None),
+    ('dm_nfnet', 'NFNet', None),
+    ('eca_nfnet', 'NFNet', None),
+    ('nfnet', 'NFNet', None),
+    ('nf_resnet', 'ResNet', 'NF'),
+    ('nf_regnet', 'RegNet', 'NF'),
+    ('mambaout', 'MambaOut', None),
+    ('samvit', 'SAM-ViT', None),
+    ('xcit', 'XCiT', None),
+    ('csatv2', 'CSAFormer', 'v2'),
+    ('csat', 'CSAFormer', None),
+    ('gc_efficientnetv2', 'EfficientNet', 'v2-GC'),
+    ('gcvit', 'GCViT', None),
+    ('focalnet', 'FocalNet', None),
+    ('fastvit', 'FastViT', None),
+    ('shvit', 'ShViT', None),
+    ('starnet', 'StarNet', None),
+    ('nextvit', 'NextViT', None),
+    ('flexivit', 'FlexiViT', None),
+    ('dpn', 'DPN', None),
+    ('dla', 'DLA', None),
+    ('pvt_v2', 'PVT', 'v2'),
+    ('pvt', 'PVT', None),
+    ('twins', 'Twins', None),
+    ('sequencer2d', 'Sequencer2D', None),
+    ('mixer', 'MLP-Mixer', None),
+    ('gmlp', 'gMLP', None),
+    ('gmixer', 'gMixer', None),
+    ('resmlp', 'ResMLP', None),
+    ('vgg', 'VGG', None),
+    ('densenet', 'DenseNet', None),
+    ('hrnet', 'HRNet', None),
+    ('hgnetv2', 'HGNet', 'v2'),
+    ('hgnet', 'HGNet', None),
+    ('xception', 'Xception', None),
+    ('inception_resnet', 'InceptionResNet', None),
+    ('inception_next', 'InceptionNeXt', None),
+    ('inception', 'Inception', None),
+    ('nasnet', 'NASNet', None),
+    ('pnasnet', 'PNASNet', None),
+    ('repvgg', 'RepVGG', None),
+    ('repvit', 'RepViT', None),
+    ('repghostnet', 'RepGhostNet', None),
+    ('convmixer', 'ConvMixer', None),
+    ('convit', 'ConViT', None),
+    ('crossvit', 'CrossViT', None),
+    ('cait', 'CaiT', None),
+    ('volo', 'VOLO', None),
+    ('pit', 'PiT', None),
+    ('tnt', 'TNT', None),
+    ('visformer', 'VisFormer', None),
+    ('fasternet', 'FasterNet', None),
+    ('ghostnetv3', 'GhostNet', 'v3'),
+    ('ghostnetv2', 'GhostNet', 'v2'),
+    ('ghostnet', 'GhostNet', None),
+    ('eca_botnext', 'BotNet', 'ECA'),
+    ('eca_halonext', 'HaloNet', 'ECA'),
+    ('eca_resnet', 'ResNet', 'ECA'),
+    ('eca_resnext', 'ResNeXt', 'ECA'),
+    ('ecaresnet', 'ResNet', 'ECA'),
+    ('seresnet', 'ResNet', 'SE'),
+    ('seresnext', 'ResNeXt', 'SE'),
+    ('sehalonet', 'HaloNet', 'SE'),
+    ('sebotnet', 'BotNet', 'SE'),
+    ('gcresnet', 'ResNet', 'GC'),
+    ('gcresnext', 'ResNeXt', 'GC'),
+    ('tiny_vit', 'TinyViT', None),
+    ('res2net', 'Res2Net', None),
+    ('res2next', 'Res2NeXt', None),
+    ('tresnet', 'TResNet', None),
+    ('swiftformer', 'SwiftFormer', None),
+    ('levit', 'LeViT', None),
+    ('lambda_resnet', 'ResNet', 'Lambda'),
+    ('halonet', 'HaloNet', None),
+    ('halo2botnet', 'HaloNet', None),
+    ('halobotnet', 'HaloNet', None),
+    ('lamhalobotnet', 'HaloNet', None),
+    ('bat_resnext', 'ResNeXt', 'BAT'),
+    ('botnet', 'BotNet', None),
+    ('cspdarknet', 'DarkNet', 'CSP'),
+    ('cspresnext', 'ResNeXt', 'CSP'),
+    ('cspresnet', 'ResNet', 'CSP'),
+    ('cs3sedarknet', 'DarkNet', 'CS3-SE'),
+    ('cs3darknet', 'DarkNet', 'CS3'),
+    ('cs3edgenet', 'EdgeNet', 'CS3'),
+    ('cs3se_edgenet', 'EdgeNet', 'CS3-SE'),
+    ('darknetaa', 'DarkNet', 'AA'),
+    ('darknet', 'DarkNet', None),
+    ('gernet', 'GENet', None),
+    ('haloregnetz', 'RegNet', 'HaloZ'),
+    ('senet', 'SENet', None),
+    ('spnasnet', 'SPNASNet', None),
     # test_* variants — timm internal regression / CI models,
     # mapped to the family they are testing
-    ("test_byobnet",        "BYOBNet",          "test"),
-    ("test_convnext",       "ConvNeXt",         "test"),
-    ("test_efficientnet_evos", "EfficientNet",  "test-EvoS"),
-    ("test_efficientnet_gn",   "EfficientNet",  "test-GN"),
-    ("test_efficientnet_ln",   "EfficientNet",  "test-LN"),
-    ("test_efficientnet",   "EfficientNet",     "test"),
-    ("test_nfnet",          "NFNet",            "test"),
-    ("test_resnet",         "ResNet",           "test"),
-    ("test_vit",            "ViT",              "test"),
-    ("selecsls",            "SelecSLS",         None),
-    ("mixnet",              "MixNet",           None),
-    ("tf_mixnet",           "MixNet",           None),
-    ("skresnext",           "ResNeXt",          "SK"),
-    ("skresnet",            "ResNet",           "SK"),
-    ("edgenext",            "EdgeNeXt",         None),
-    ("rdnet",               "RDNet",            None),
-    ("rexnetr",             "RexNet",           "R"),
-    ("rexnet",              "RexNet",           None),
-    ("fbnetv3",             "FBNet",            "v3"),
-    ("fbnetc",              "FBNet",            "C"),
-    ("semnasnet",           "MnasNet",          "SE"),
-    ("mnasnet",             "MnasNet",          None),
-    ("lcnet",               "LCNet",            None),
-    ("hardcorenas",         "HardCoreNAS",      None),
-    ("nest",                "NestNet",          None),
-    ("ese_vovnet",          "VoVNet",           "ESE"),
-    ("tinynet",             "TinyNet",          None),
-    ("csp",                 "CSP-Net",          None),
+    ('test_byobnet', 'BYOBNet', 'test'),
+    ('test_convnext', 'ConvNeXt', 'test'),
+    ('test_efficientnet_evos', 'EfficientNet', 'test-EvoS'),
+    ('test_efficientnet_gn', 'EfficientNet', 'test-GN'),
+    ('test_efficientnet_ln', 'EfficientNet', 'test-LN'),
+    ('test_efficientnet', 'EfficientNet', 'test'),
+    ('test_nfnet', 'NFNet', 'test'),
+    ('test_resnet', 'ResNet', 'test'),
+    ('test_vit', 'ViT', 'test'),
+    ('selecsls', 'SelecSLS', None),
+    ('mixnet', 'MixNet', None),
+    ('tf_mixnet', 'MixNet', None),
+    ('skresnext', 'ResNeXt', 'SK'),
+    ('skresnet', 'ResNet', 'SK'),
+    ('edgenext', 'EdgeNeXt', None),
+    ('rdnet', 'RDNet', None),
+    ('rexnetr', 'RexNet', 'R'),
+    ('rexnet', 'RexNet', None),
+    ('fbnetv3', 'FBNet', 'v3'),
+    ('fbnetc', 'FBNet', 'C'),
+    ('semnasnet', 'MnasNet', 'SE'),
+    ('mnasnet', 'MnasNet', None),
+    ('lcnet', 'LCNet', None),
+    ('hardcorenas', 'HardCoreNAS', None),
+    ('nest', 'NestNet', None),
+    ('ese_vovnet', 'VoVNet', 'ESE'),
+    ('tinynet', 'TinyNet', None),
+    ('csp', 'CSP-Net', None),
     # legacy_ prefix is stripped before matching; handled via is_legacy flag
 ]
 
@@ -753,148 +753,207 @@ _FAMILY_RULES: list[tuple[str, str, str | None]] = [
 # ===========================================================================
 # Matched as whole underscore-delimited tokens. More specific first.
 _SIZE_RULES: list[tuple[str, str]] = [
-    ("3b",          "3B"),
-    ("1b",          "1B"),
-    ("xxs",  "XXSmall"),
-    ("xs",   "XSmall"),
-    ("xxlarge",     "XXLarge"),
-    ("xlarge",      "XLarge"),
-    ("gigantic",    "Gigantic"),
-    ("giantopt",    "GiantOpt"),
-    ("huge_plus",   "Huge+"),
-    ("huge",        "Huge"),
-    ("giant",       "Giant"),
-    ("so400m",      "SO400M"),
-    ("so150m2",     "SO150M2"),
-    ("so150m",      "SO150M"),
-    ("large2",      "Large2"),
-    ("large",       "Large"),
-    ("base_plus",   "Base+"),
-    ("base",        "Base"),
-    ("mediumd",     "MediumD"),
-    ("medium",      "Medium"),
-    ("betwixt",     "Betwixt"),
-    ("small_plus",  "Small+"),
-    ("small",       "Small"),
-    ("little",      "Little"),
-    ("wee",         "Wee"),
-    ("pwee",        "pWee"),
-    ("dwee",        "dWee"),
-    ("dpwee",       "dpWee"),
-    ("tiny",        "Tiny"),
-    ("femto",       "Femto"),
-    ("atto",        "Atto"),
-    ("pico",        "Pico"),
-    ("nano",        "Nano"),
-    ("micro",       "Micro"),
-    ("mini",        "Mini"),
-    ("zepto",       "Zepto"),
+    ('3b', '3B'),
+    ('1b', '1B'),
+    ('xxs', 'XXSmall'),
+    ('xs', 'XSmall'),
+    ('xxlarge', 'XXLarge'),
+    ('xlarge', 'XLarge'),
+    ('gigantic', 'Gigantic'),
+    ('giantopt', 'GiantOpt'),
+    ('huge_plus', 'Huge+'),
+    ('huge', 'Huge'),
+    ('giant', 'Giant'),
+    ('so400m', 'SO400M'),
+    ('so150m2', 'SO150M2'),
+    ('so150m', 'SO150M'),
+    ('large2', 'Large2'),
+    ('large', 'Large'),
+    ('base_plus', 'Base+'),
+    ('base', 'Base'),
+    ('mediumd', 'MediumD'),
+    ('medium', 'Medium'),
+    ('betwixt', 'Betwixt'),
+    ('small_plus', 'Small+'),
+    ('small', 'Small'),
+    ('little', 'Little'),
+    ('wee', 'Wee'),
+    ('pwee', 'pWee'),
+    ('dwee', 'dWee'),
+    ('dpwee', 'dpWee'),
+    ('tiny', 'Tiny'),
+    ('femto', 'Femto'),
+    ('atto', 'Atto'),
+    ('pico', 'Pico'),
+    ('nano', 'Nano'),
+    ('micro', 'Micro'),
+    ('mini', 'Mini'),
+    ('zepto', 'Zepto'),
     # EfficientNet B-series
-    ("b8",  "B8"), ("b7",  "B7"), ("b6",  "B6"), ("b5",  "B5"),
-    ("b4",  "B4"), ("b3",  "B3"), ("b2",  "B2"), ("b1",  "B1"), ("b0",  "B0"),
+    ('b8', 'B8'),
+    ('b7', 'B7'),
+    ('b6', 'B6'),
+    ('b5', 'B5'),
+    ('b4', 'B4'),
+    ('b3', 'B3'),
+    ('b2', 'B2'),
+    ('b1', 'B1'),
+    ('b0', 'B0'),
     # EfficientFormer latency tiers (l1=fastest, l7=largest)
-    ("l1",   "L1"), ("l3",   "L3"), ("l7",   "L7"),
+    ('l1', 'L1'),
+    ('l3', 'L3'),
+    ('l7', 'L7'),
     # EfficientFormerV2 large (single-letter — matched via family prefix rule)
     # MobileViT single-letter sizes (matched via family prefix rule above)
     # ViT-InternImage param size (matched via family prefix rule)
     # MobileViTv2 decimal-multiplier sizes — extract from variant numeric suffix
-    ("050",  "0.50x"), ("075",  "0.75x"), ("100",  "1.00x"),
-    ("125",  "1.25x"), ("150",  "1.50x"), ("175",  "1.75x"), ("200",  "2.00x"),
+    ('050', '0.50x'),
+    ('075', '0.75x'),
+    ('100', '1.00x'),
+    ('125', '1.25x'),
+    ('150', '1.50x'),
+    ('175', '1.75x'),
+    ('200', '2.00x'),
     # EVA enormous
-    ("enormous", "Enormous"),
+    ('enormous', 'Enormous'),
     # ViT xsmall
-    ("xsmall",   "XSmall"),
+    ('xsmall', 'XSmall'),
     # MobileViT / MobileViTv2 decimal-multiplier sizes (050=0.50x, etc.)
-    ("050",  "0.50x"), ("075",  "0.75x"), ("100",  "1.00x"),
-    ("125",  "1.25x"), ("150",  "1.50x"), ("175",  "1.75x"), ("200",  "2.00x"),
+    ('050', '0.50x'),
+    ('075', '0.75x'),
+    ('100', '1.00x'),
+    ('125', '1.25x'),
+    ('150', '1.50x'),
+    ('175', '1.75x'),
+    ('200', '2.00x'),
     # ViT-InternImage param size
-    ("300m", "300M"),
+    ('300m', '300M'),
     # EfficientNet L/M/S/XL
-    ("xl",  "XL"), ("el",  "EL"), ("em",  "EM"), ("es",  "ES"),
-    ("lite4","Lite4"),("lite3","Lite3"),("lite2","Lite2"),("lite1","Lite1"),("lite0","Lite0"),
+    ('xl', 'XL'),
+    ('el', 'EL'),
+    ('em', 'EM'),
+    ('es', 'ES'),
+    ('lite4', 'Lite4'),
+    ('lite3', 'Lite3'),
+    ('lite2', 'Lite2'),
+    ('lite1', 'Lite1'),
+    ('lite0', 'Lite0'),
     # MobileViT extra-small codes
-    ("xxs", "XXSmall"),
-    ("xs",  "XSmall"),
-    # MetaFormer / PoolFormer stage-config size codes (sN = small N stages, mN = medium, bN = base)
-    ("s12", "S12"), ("s18", "S18"), ("s24", "S24"), ("s36", "S36"),
-    ("m36", "M36"), ("m48", "M48"),
-    ("b36", "B36"), ("b48", "B48"),
+    ('xxs', 'XXSmall'),
+    ('xs', 'XSmall'),
+    # MetaFormer / PoolFormer stage-config size codes
+    ('s12', 'S12'),
+    ('s18', 'S18'),
+    ('s24', 'S24'),
+    ('s36', 'S36'),
+    ('m36', 'M36'),
+    ('m48', 'M48'),
+    ('b36', 'B36'),
+    ('b48', 'B48'),
     # MambaOut named sizes
-    ("kobe",        "Kobe"),
+    ('kobe', 'Kobe'),
     # TinyNet a–e
-    ("tinynet_a","A"),("tinynet_b","B"),("tinynet_c","C"),("tinynet_d","D"),("tinynet_e","E"),
+    ('tinynet_a', 'A'),
+    ('tinynet_b', 'B'),
+    ('tinynet_c', 'C'),
+    ('tinynet_d', 'D'),
+    ('tinynet_e', 'E'),
     # CoaT-Lite
-    ("lite",        "Lite"),
+    ('lite', 'Lite'),
     # Tiny-ViT param sizes
-    ("5m",  "5M"),  ("11m", "11M"), ("21m", "21M"),
+    ('5m', '5M'),
+    ('11m', '11M'),
+    ('21m', '21M'),
     # ViTamin named sizes
-    ("xlarge", "XLarge"),
+    ('xlarge', 'XLarge'),
     # AIMv2 / ViTamin named
-    ("huge",   "Huge"),
+    ('huge', 'Huge'),
 ]
 
 # ===========================================================================
 # HEAD TYPE RULES
 # ===========================================================================
 _HEAD_RULES: list[tuple[str, str]] = [
-    ("clsgap",  "CLS+GAP"),
-    ("gap",     "GAP"),
-    ("cls",     "CLS"),
+    ('clsgap', 'CLS+GAP'),
+    ('gap', 'GAP'),
+    ('cls', 'CLS'),
 ]
 
 # ===========================================================================
 # POSITIONAL ENCODING RULES
 # ===========================================================================
 _PE_RULES: list[tuple[str, str]] = [
-    ("rope_mixed_ape",  "RoPE-Mixed-APE"),
-    ("rope_mixed",      "RoPE-Mixed"),
-    ("rope_ape",        "RoPE-APE"),
-    ("rope_reg",        "RoPE"),
-    ("rope",            "RoPE"),
-    ("relpos",          "RelPos"),
-    ("srelpos",         "SRelPos"),
-    ("rpn",             "RPN"),
-    ("sincos",          "SinCos"),
-    ("ape",             "APE"),
+    ('rope_mixed_ape', 'RoPE-Mixed-APE'),
+    ('rope_mixed', 'RoPE-Mixed'),
+    ('rope_ape', 'RoPE-APE'),
+    ('rope_reg', 'RoPE'),
+    ('rope', 'RoPE'),
+    ('relpos', 'RelPos'),
+    ('srelpos', 'SRelPos'),
+    ('rpn', 'RPN'),
+    ('sincos', 'SinCos'),
+    ('ape', 'APE'),
 ]
 
 # ===========================================================================
 # VALID RESOLUTION VALUES
 # ===========================================================================
-_VALID_RES = frozenset({
-    160, 192, 224, 240, 256, 288, 320, 336, 378, 384,
-    396, 448, 475, 480, 512, 576, 640, 768, 896, 1024,
-})
+_VALID_RES = frozenset(
+    {
+        160,
+        192,
+        224,
+        240,
+        256,
+        288,
+        320,
+        336,
+        378,
+        384,
+        396,
+        448,
+        475,
+        480,
+        512,
+        576,
+        640,
+        768,
+        896,
+        1024,
+    }
+)
 
 # ===========================================================================
 # HELPER
 # ===========================================================================
 
+
 def _tok(kw: str, s: str) -> bool:
     """True if kw appears as a whole underscore-delimited token in s."""
-    return bool(re.search(rf"(?:^|_){re.escape(kw)}(?:_|$)", s))
+    return bool(re.search(rf'(?:^|_){re.escape(kw)}(?:_|$)', s))
 
 
 # ===========================================================================
 # VARIANT PARSER
 # ===========================================================================
 
+
 def _parse_variant(model_variant: str) -> dict:
     v = model_variant.lower()
 
     # --- legacy prefix ---
-    is_legacy = v.startswith("legacy_")
-    v_clean = v[len("legacy_"):] if is_legacy else v
+    is_legacy = v.startswith('legacy_')
+    v_clean = v[len('legacy_') :] if is_legacy else v
 
     # --- family + model_version ---
-    family = "unknown"
+    family = 'unknown'
     model_version: str | None = None
     for prefix, fam, ver in _FAMILY_RULES:
         if v_clean.startswith(prefix):
             family, model_version = fam, ver
             break
-    if family == "unknown":
-        logger.warning("Unknown family for model variant: %s", model_variant)
+    if family == 'unknown':
+        logger.warning('Unknown family for model variant: %s', model_variant)
 
     # --- size ---
     size: str | None = None
@@ -904,17 +963,17 @@ def _parse_variant(model_variant: str) -> dict:
             break
 
     # --- patch size ---
-    m = re.search(r"(?:^|_)patch(\d+)(?:_|$)", v_clean)
+    m = re.search(r'(?:^|_)patch(\d+)(?:_|$)', v_clean)
     patch_size: int | None = int(m.group(1)) if m else None
     # also catch p8 / p16 style (XCiT)
     if patch_size is None:
-        m = re.search(r"(?:^|_)p(\d+)(?:_|$)", v_clean)
+        m = re.search(r'(?:^|_)p(\d+)(?:_|$)', v_clean)
         if m:
             patch_size = int(m.group(1))
 
     # --- native input resolution ---
     input_resolution: int | None = None
-    for m in re.finditer(r"(?:^|_)(\d{3,4})(?:_|$)", v_clean):
+    for m in re.finditer(r'(?:^|_)(\d{3,4})(?:_|$)', v_clean):
         c = int(m.group(1))
         if c in _VALID_RES:
             input_resolution = c
@@ -922,25 +981,25 @@ def _parse_variant(model_variant: str) -> dict:
 
     # --- window size (Swin, MaxViT) ---
     window_size: int | None = None
-    m = re.search(r"(?:^|_)window(\d+)(?:to\d+)?(?:_|$)", v_clean)
+    m = re.search(r'(?:^|_)window(\d+)(?:to\d+)?(?:_|$)', v_clean)
     if m:
         window_size = int(m.group(1))
 
     # --- stride / stage code (CaiT s24, gMLP s16, ConvFormer s18, ShViT s4…) ---
     stride_code: str | None = None
-    m = re.search(r"(?:^|_)(s\d+)(?:_|$)", v_clean)
-    if m and not v_clean.startswith("swin") and not v_clean.startswith("sam"):
+    m = re.search(r'(?:^|_)(s\d+)(?:_|$)', v_clean)
+    if m and not v_clean.startswith('swin') and not v_clean.startswith('sam'):
         stride_code = m.group(1)
 
     # --- depth code (ResNet 50/101/152, NFNet f0–f6, TResNet L/M…) ---
     depth_code: str | None = None
     # Try explicit _fN (NFNet), _lN (NF-L), _dN depth suffixes first
-    m = re.search(r"(?:^|_)(f\d+|l\d+)(?:_|$)", v_clean)
+    m = re.search(r'(?:^|_)(f\d+|l\d+)(?:_|$)', v_clean)
     if m:
         depth_code = m.group(1)
     else:
         # numeric depth token (50, 101, 152, 270…)
-        m = re.search(r"(?:^|_)(\d{2,3})(?:_|$)", v_clean)
+        m = re.search(r'(?:^|_)(\d{2,3})(?:_|$)', v_clean)
         if m:
             candidate = int(m.group(1))
             # exclude patch sizes and resolutions
@@ -950,27 +1009,27 @@ def _parse_variant(model_variant: str) -> dict:
     # --- width / channel multiplier ---
     width_code: str | None = None
     # ResNeXt grouping: 32x4d
-    m = re.search(r"(?:^|_)(\d+x\d+d)(?:_|$)", v_clean)
+    m = re.search(r'(?:^|_)(\d+x\d+d)(?:_|$)', v_clean)
     if m:
         width_code = m.group(1)
     else:
         # HRNet wNN, MobileNet 100/125/150d style
-        m = re.search(r"(?:^|_)(w\d+)(?:_|$)", v_clean)
+        m = re.search(r'(?:^|_)(w\d+)(?:_|$)', v_clean)
         if m:
             width_code = m.group(1)
         else:
             # Res2Net 14w_8s / 26w_4s
-            m = re.search(r"(?:^|_)(\d+w(?:_\d+s)?)(?:_|$)", v_clean)
+            m = re.search(r'(?:^|_)(\d+w(?:_\d+s)?)(?:_|$)', v_clean)
             if m:
                 width_code = m.group(1)
             else:
                 # x4, x8 style (ResNet-CLIP scaled)
-                m = re.search(r"(?:^|_)(x\d+)(?:_|$)", v_clean)
+                m = re.search(r'(?:^|_)(x\d+)(?:_|$)', v_clean)
                 if m:
                     width_code = m.group(1)
                 else:
                     # MobileNet 100 / 075 / 050 style percentage multipliers
-                    m = re.search(r"(?:^|_)(\d{3})(?:_|$)", v_clean)
+                    m = re.search(r'(?:^|_)(\d{3})(?:_|$)', v_clean)
                     if m and int(m.group(1)) not in _VALID_RES:
                         width_code = m.group(1)
 
@@ -982,7 +1041,7 @@ def _parse_variant(model_variant: str) -> dict:
             break
 
     # --- register tokens ---
-    m = re.search(r"(?:^|_)reg(\d+)(?:_|$)", v_clean)
+    m = re.search(r'(?:^|_)reg(\d+)(?:_|$)', v_clean)
     num_registers: int | None = int(m.group(1)) if m else None
 
     # --- positional encoding ---
@@ -993,57 +1052,58 @@ def _parse_variant(model_variant: str) -> dict:
             break
 
     # --- activation ---
-    activation: str | None = "QuickGELU" if _tok("quickgelu", v_clean) else None
+    activation: str | None = 'QuickGELU' if _tok('quickgelu', v_clean) else None
 
     # --- ViT-PE scope ---
     pe_scope: str | None = None
-    m = re.search(r"(?:^|_)pe_(lang|core|spatial)(?:_|$)", v_clean)
+    m = re.search(r'(?:^|_)pe_(lang|core|spatial)(?:_|$)', v_clean)
     if m:
         pe_scope = m.group(1).capitalize()
 
     # --- boolean flags ---
     # is_distilled: variant only — config-side dist is handled in get_model_metadata()
-    is_distilled  = _tok("distilled", v_clean) or _tok("dist", v_clean)
-    is_pruned     = _tok("pruned", v_clean)
-    is_gap        = _tok("gap", v_clean)
-    uses_rmlp     = _tok("rmlp", v_clean)
-    uses_rw       = _tok("rw", v_clean)
-    uses_cr       = _tok("cr", v_clean)
-    uses_ns       = _tok("ns", v_clean)
-    uses_abswin   = _tok("abswin", v_clean)
-    uses_quickgelu = _tok("quickgelu", v_clean)
-    uses_ts       = bool(re.search(r"\dts(?:_|$)", v_clean))
-    # uses_aa: check _aa_ token OR aa-prefixed family names (resnetaa, darknetaa, seresnextaa)
-    uses_aa       = (_tok("aa", v_clean)
-                     or bool(re.match(r"(?:resnetaa|darknetaa|seresnextaa)", v_clean)))
+    is_distilled = _tok('distilled', v_clean) or _tok('dist', v_clean)
+    is_pruned = _tok('pruned', v_clean)
+    is_gap = _tok('gap', v_clean)
+    uses_rmlp = _tok('rmlp', v_clean)
+    uses_rw = _tok('rw', v_clean)
+    uses_cr = _tok('cr', v_clean)
+    uses_ns = _tok('ns', v_clean)
+    uses_abswin = _tok('abswin', v_clean)
+    uses_quickgelu = _tok('quickgelu', v_clean)
+    uses_ts = bool(re.search(r'\dts(?:_|$)', v_clean))
+    # uses_aa: check _aa_ token OR aa-prefixed family names
+    uses_aa = _tok('aa', v_clean) or bool(
+        re.match(r'(?:resnetaa|darknetaa|seresnextaa)', v_clean)
+    )
 
     return {
-        "family":              family,
-        "model_version":       model_version,
-        "size":                size,
-        "depth_code":          depth_code,
-        "width_code":          width_code,
-        "patch_size":          patch_size,
-        "input_resolution":    input_resolution,
-        "window_size":         window_size,
-        "stride_code":         stride_code,
-        "head_type":           head_type,
-        "num_registers":       num_registers,
-        "positional_encoding": positional_encoding,
-        "activation":          activation,
-        "pe_scope":            pe_scope,
-        "is_distilled":        is_distilled,
-        "is_pruned":           is_pruned,
-        "is_legacy":           is_legacy,
-        "is_gap":              is_gap,
-        "uses_rmlp":           uses_rmlp,
-        "uses_rw":             uses_rw,
-        "uses_cr":             uses_cr,
-        "uses_ns":             uses_ns,
-        "uses_abswin":         uses_abswin,
-        "uses_quickgelu":      uses_quickgelu,
-        "uses_ts":             uses_ts,
-        "uses_aa":             uses_aa,
+        'family': family,
+        'model_version': model_version,
+        'size': size,
+        'depth_code': depth_code,
+        'width_code': width_code,
+        'patch_size': patch_size,
+        'input_resolution': input_resolution,
+        'window_size': window_size,
+        'stride_code': stride_code,
+        'head_type': head_type,
+        'num_registers': num_registers,
+        'positional_encoding': positional_encoding,
+        'activation': activation,
+        'pe_scope': pe_scope,
+        'is_distilled': is_distilled,
+        'is_pruned': is_pruned,
+        'is_legacy': is_legacy,
+        'is_gap': is_gap,
+        'uses_rmlp': uses_rmlp,
+        'uses_rw': uses_rw,
+        'uses_cr': uses_cr,
+        'uses_ns': uses_ns,
+        'uses_abswin': uses_abswin,
+        'uses_quickgelu': uses_quickgelu,
+        'uses_ts': uses_ts,
+        'uses_aa': uses_aa,
     }
 
 
@@ -1052,150 +1112,169 @@ def _parse_variant(model_variant: str) -> dict:
 # ===========================================================================
 
 _DATASET_MAP: dict[str, str] = {
-    "in1k":         "ImageNet-1K",
-    "in21k":        "ImageNet-21K",
-    "in22k":        "ImageNet-22K",
-    "in12k":        "ImageNet-12K",
-    "inw21k":       "ImageNet-Winter-21K",
-    "ig1b":         "Instagram-1B",
-    "yfcc15m":      "YFCC-15M",
-    "yfcc100m":     "YFCC-100M",
-    "cc12m":        "CC-12M",
-    "sa1b":         "SA-1B",
-    "laion2b":      "LAION-2B",
-    "laion400m":    "LAION-400M",
-    "laion2":       "LAION-2B",
-    "laiona":       "LAION-Aesthetic",
-    "datacompxl":   "DataComp-XL",
-    "datacomp1b":   "DataComp-1B",
-    "metaclip2":    "MetaCLIP-2",
-    "metaclip":     "MetaCLIP",
-    "dfn5b":        "DFN-5B",
-    "dfn2b":        "DFN-2B",
-    "dfndr2b":      "DFN-DR-2B",
-    "merged2b":     "Merged-2B",
-    "webli":        "WebLI",
-    "pali2":        "PaLI-2",
-    "pali":         "PaLI",
-    "ogvl":         "OGVL",
-    "m38m":         "M-3.8B",
-    "m30m":         "M-3B",
-    "jft":          "JFT",
-    "lvd142m":      "LVD-142M",
-    "lvd1689m":     "LVD-1689M",
-    "sat493m":      "SAT-493M",
-    "green":        "Green-dataset",       # HardCoreNAS green subset
-    "mclip2":       "mCLIP-2",
-    "seer":         "Instagram-1B",        # SEER pretrains on Instagram (no explicit dataset tag)
-    "swag":         "Instagram-3.6B",      # SWAG: weakly-supervised on ~3.6B Instagram images+hashtags
-    "wit":          "WIT-400M",            # OpenAI WebImageText (private, 400M image-text pairs)
+    'in1k': 'ImageNet-1K',
+    'in21k': 'ImageNet-21K',
+    'in22k': 'ImageNet-22K',
+    'in12k': 'ImageNet-12K',
+    'inw21k': 'ImageNet-Winter-21K',
+    'ig1b': 'Instagram-1B',
+    'yfcc15m': 'YFCC-15M',
+    'yfcc100m': 'YFCC-100M',
+    'cc12m': 'CC-12M',
+    'sa1b': 'SA-1B',
+    'laion2b': 'LAION-2B',
+    'laion400m': 'LAION-400M',
+    'laion2': 'LAION-2B',
+    'laiona': 'LAION-Aesthetic',
+    'datacompxl': 'DataComp-XL',
+    'datacomp1b': 'DataComp-1B',
+    'metaclip2': 'MetaCLIP-2',
+    'metaclip': 'MetaCLIP',
+    'dfn5b': 'DFN-5B',
+    'dfn2b': 'DFN-2B',
+    'dfndr2b': 'DFN-DR-2B',
+    'merged2b': 'Merged-2B',
+    'webli': 'WebLI',
+    'pali2': 'PaLI-2',
+    'pali': 'PaLI',
+    'ogvl': 'OGVL',
+    'm38m': 'M-3.8B',
+    'm30m': 'M-3B',
+    'jft': 'JFT',
+    'lvd142m': 'LVD-142M',
+    'lvd1689m': 'LVD-1689M',
+    'sat493m': 'SAT-493M',
+    'green': 'Green-dataset',  # HardCoreNAS green subset
+    'mclip2': 'mCLIP-2',
+    'seer': 'Instagram-1B',  # SEER pretrains on Instagram
+    'swag': 'Instagram-3.6B',  # SWAG: weakly-supervised on ~3.6B Instagram images
+    'wit': 'WIT-400M',  # OpenAI WebImageText (private, 400M image-text pairs)
 }
 _DS_KEYS = sorted(_DATASET_MAP, key=len, reverse=True)
 
 _ORG_MAP: dict[str, str] = {
-    "apple":    "Apple",
-    "openai":   "OpenAI",
-    "msft":     "Microsoft",
-    "ms":       "Microsoft",
-    "goog":     "Google",
-    "tf":       "Google/TF",
-    "naver":    "Naver",
-    "paddle":   "Baidu/PaddlePaddle",
-    "sail":     "SAIL",
-    "miil":     "MIIL",
-    "snap":     "Snap",
-    "nv":       "NVIDIA",
-    "bd":       "Baidu",
-    "fb":       "Meta",
-    "ch":       "Chris Ha",
-    "dm":       "DeepMind",
-    "mx":       "MXNet community",
-    "gluon":    "GluonCV/MXNet",       # Apache MXNet GluonCV authors
-    "nav":      "NaverAI",
-    "pycls":    "pycls",
-    "cvnets":   "CVNets/Apple",
-    "rmsp":     "RMSProp recipe",
-    "lamb":     "LAMB recipe",
-    "sbb2":     "timm SBB-v2 recipe",
-    "sbb":      "timm SBB recipe",
-    "ra4":      "timm RA4 recipe",
-    "ra3":      "timm RA3 recipe",
-    "ra2":      "timm RA2 recipe",
-    "ra":       "timm RA recipe",
-    "a1h":      "timm A1H recipe",
-    "a1":       "timm A1 recipe",
-    "a2":       "timm A2 recipe",
-    "a3":       "timm A3 recipe",
-    "b1k":      "timm B1K recipe",
-    "b2k":      "timm B2K recipe",
-    "bt":       "Bag-of-Tricks recipe",
-    "tv2":      "torchvision-v2",
-    "tv":       "torchvision",
-    "sw":       "Ross Wightman",
-    "c2ns":     "timm C2-NS recipe",
-    "c2":       "timm C2 recipe",
-    "c1":       "timm C1 recipe",
-    "ah":       "timm AH recipe",
-    "agc":      "AGC recipe",
-    "d":        "timm D recipe",
+    'apple': 'Apple',
+    'openai': 'OpenAI',
+    'msft': 'Microsoft',
+    'ms': 'Microsoft',
+    'goog': 'Google',
+    'tf': 'Google/TF',
+    'naver': 'Naver',
+    'paddle': 'Baidu/PaddlePaddle',
+    'sail': 'SAIL',
+    'miil': 'MIIL',
+    'snap': 'Snap',
+    'nv': 'NVIDIA',
+    'bd': 'Baidu',
+    'fb': 'Meta',
+    'ch': 'Chris Ha',
+    'dm': 'DeepMind',
+    'mx': 'MXNet community',
+    'gluon': 'GluonCV/MXNet',  # Apache MXNet GluonCV authors
+    'nav': 'NaverAI',
+    'pycls': 'pycls',
+    'cvnets': 'CVNets/Apple',
+    'rmsp': 'RMSProp recipe',
+    'lamb': 'LAMB recipe',
+    'sbb2': 'timm SBB-v2 recipe',
+    'sbb': 'timm SBB recipe',
+    'ra4': 'timm RA4 recipe',
+    'ra3': 'timm RA3 recipe',
+    'ra2': 'timm RA2 recipe',
+    'ra': 'timm RA recipe',
+    'a1h': 'timm A1H recipe',
+    'a1': 'timm A1 recipe',
+    'a2': 'timm A2 recipe',
+    'a3': 'timm A3 recipe',
+    'b1k': 'timm B1K recipe',
+    'b2k': 'timm B2K recipe',
+    'bt': 'Bag-of-Tricks recipe',
+    'tv2': 'torchvision-v2',
+    'tv': 'torchvision',
+    'sw': 'Ross Wightman',
+    'c2ns': 'timm C2-NS recipe',
+    'c2': 'timm C2 recipe',
+    'c1': 'timm C1 recipe',
+    'ah': 'timm AH recipe',
+    'agc': 'AGC recipe',
+    'd': 'timm D recipe',
 }
 _ORG_KEYS = sorted(_ORG_MAP, key=len, reverse=True)
 
 _METHOD_KEYWORDS: list[tuple[str, str]] = [
-    ("siglip",      "SigLIP"),
-    ("mclip",       "mCLIP"),
-    ("clip",        "CLIP"),
-    ("fcmae",       "FCMAE"),
-    ("mae",         "MAE"),
-    ("mim",         "MIM"),
-    ("ijepa",       "I-JEPA"),
-    ("dinov3",      "DINOv3"),
-    ("dinov2",      "DINOv2"),
-    ("dino",        "DINO"),
-    ("swsl",        "SWSL"),
-    ("swag",        "SWAG"),
-    ("wsl",         "WSL"),
-    ("ssl",         "SSL"),
-    ("ssld",        "SSLD"),
-    ("seer",        "SEER"),
-    ("nadamuon",    "NadAMuon"),
-    ("augreg",      "AugReg"),
-    ("distilled",   "Distillation"),
-    ("dist",        "Distillation"),
-    ("pt",          "Pretraining"),
-    ("ltt",         "LTT"),
+    ('siglip', 'SigLIP'),
+    ('mclip', 'mCLIP'),
+    ('clip', 'CLIP'),
+    ('fcmae', 'FCMAE'),
+    ('mae', 'MAE'),
+    ('mim', 'MIM'),
+    ('ijepa', 'I-JEPA'),
+    ('dinov3', 'DINOv3'),
+    ('dinov2', 'DINOv2'),
+    ('dino', 'DINO'),
+    ('swsl', 'SWSL'),
+    ('swag', 'SWAG'),
+    ('wsl', 'WSL'),
+    ('ssl', 'SSL'),
+    ('ssld', 'SSLD'),
+    ('seer', 'SEER'),
+    ('nadamuon', 'NadAMuon'),
+    ('augreg', 'AugReg'),
+    ('distilled', 'Distillation'),
+    ('dist', 'Distillation'),
+    ('pt', 'Pretraining'),
+    ('ltt', 'LTT'),
 ]
 
 # Dataset-size qualifiers that appear after a dataset token
 _DS_SIZE_PATTERNS: list[tuple[str, str]] = [
-    (r"metaclip_400m",  "400M"),
-    (r"metaclip_2pt5b", "2.5B"),
-    (r"dfn2b_s39b",     "s39b"),
-    (r"2pt5",           "2.5T"),
-    (r"2pt1",           "2.1T"),
-    (r"400m",           "400M"),
-    (r"s39b",           "s39b"),
-    (r"6m",             "6M"),
+    (r'metaclip_400m', '400M'),
+    (r'metaclip_2pt5b', '2.5B'),
+    (r'dfn2b_s39b', 's39b'),
+    (r'2pt5', '2.5T'),
+    (r'2pt1', '2.1T'),
+    (r'400m', '400M'),
+    (r's39b', 's39b'),
+    (r'6m', '6M'),
 ]
 
 # Augmentation-recipe tokens in pretrain config (not the RA training recipe)
 _AUG_PATTERNS: list[tuple[str, str]] = [
-    ("augreg",  "AugReg"),
-    ("ap",      "AdvProp"),
-    ("ns",      "NoisyStudent"),
-    ("aa",      "AutoAugment"),
-    ("ra",      "RandAugment"),
+    ('augreg', 'AugReg'),
+    ('ap', 'AdvProp'),
+    ('ns', 'NoisyStudent'),
+    ('aa', 'AutoAugment'),
+    ('ra', 'RandAugment'),
 ]
 
-_VALID_PRETRAIN_RES = frozenset({
-    160, 192, 224, 240, 256, 288, 320, 336, 378, 384,
-    396, 448, 475, 480, 512, 576, 640, 896, 1024,
-})
+_VALID_PRETRAIN_RES = frozenset(
+    {
+        160,
+        192,
+        224,
+        240,
+        256,
+        288,
+        320,
+        336,
+        378,
+        384,
+        396,
+        448,
+        475,
+        480,
+        512,
+        576,
+        640,
+        896,
+        1024,
+    }
+)
 
 
 def _parse_pretrain_config(pretrain_config: str) -> dict:
-    cfg    = pretrain_config.lower()
-    tokens = re.split(r"[_]", cfg)
+    cfg = pretrain_config.lower()
+    tokens = re.split(r'[_]', cfg)
 
     # --- training method ---
     method: str | None = None
@@ -1220,10 +1299,10 @@ def _parse_pretrain_config(pretrain_config: str) -> dict:
                 break
 
     # --- fine-tune target ---
-    ft_start = cfg.find("_ft_")
+    ft_start = cfg.find('_ft_')
     ft_target: str | None = None
     if ft_start != -1:
-        ft_str = cfg[ft_start + 4:]
+        ft_str = cfg[ft_start + 4 :]
         for key in _DS_KEYS:
             if ft_str.startswith(key):
                 ft_target = _DATASET_MAP[key]
@@ -1231,10 +1310,10 @@ def _parse_pretrain_config(pretrain_config: str) -> dict:
     # implicit ft patterns: in22k_in1k, in22k_ft_in22k_in1k, mae_in1k_ft_in1k
     if ft_target is None:
         for pat, tgt in [
-            (r"in22k_in1k",  "ImageNet-1K"),
-            (r"in21k_in1k",  "ImageNet-1K"),
-            (r"in12k_in1k",  "ImageNet-1K"),
-            (r"mae_in1k",    "ImageNet-1K"),
+            (r'in22k_in1k', 'ImageNet-1K'),
+            (r'in21k_in1k', 'ImageNet-1K'),
+            (r'in12k_in1k', 'ImageNet-1K'),
+            (r'mae_in1k', 'ImageNet-1K'),
         ]:
             if re.search(pat, cfg):
                 ft_target = tgt
@@ -1243,30 +1322,30 @@ def _parse_pretrain_config(pretrain_config: str) -> dict:
     # --- primary pretrain dataset ---
     dataset: str | None = None
     pre_ft_cfg = cfg[:ft_start] if ft_start != -1 else cfg
-    pre_ft_tok = set(re.split(r"[_]", pre_ft_cfg))
+    pre_ft_tok = set(re.split(r'[_]', pre_ft_cfg))
     for key in _DS_KEYS:
         if key in pre_ft_tok or key in pre_ft_cfg:
             dataset = _DATASET_MAP[key]
             break
 
     # Fallback: OpenAI configs always mean WIT-400M pretraining
-    if dataset is None and org == "OpenAI":
-        dataset = "WIT-400M"
+    if dataset is None and org == 'OpenAI':
+        dataset = 'WIT-400M'
 
     # Fallback: SAM2-Hiera backbone pretraining is always on SA-1B
     # (the config encodes resolution 'r896' and token count '2pt1' but not the dataset)
     # We detect this by checking if the pretrain_config starts with 'fb_r'
-    if dataset is None and re.match(r"fb_r\d+", cfg):
-        dataset = "SA-1B"
+    if dataset is None and re.match(r'fb_r\d+', cfg):
+        dataset = 'SA-1B'
 
     # Fallback: FCMAE/MAE/MIM configs where the pretrain dataset is implicit.
     # Only applies when ft_target is an *intermediate* dataset (not the final IN-1K),
     # i.e. the pattern is "method_ft_in22k_in1k" meaning pretrain→ft-22k→ft-1k.
     # When ft_target IS IN-1K already (e.g. fcmae_ft_in1k), there's no implicit
     # pretrain dataset we can infer reliably, so we leave dataset=None.
-    if dataset is None and ft_target is not None and ft_target != "ImageNet-1K":
+    if dataset is None and ft_target is not None and ft_target != 'ImageNet-1K':
         dataset = ft_target
-        ft_target = "ImageNet-1K"  # the real ft target is always IN-1K in these cases
+        ft_target = 'ImageNet-1K'  # the real ft target is always IN-1K in these cases
 
     # --- dataset size qualifier ---
     ds_size: str | None = None
@@ -1277,13 +1356,13 @@ def _parse_pretrain_config(pretrain_config: str) -> dict:
 
     # --- pretrain resolution  (explicit r{N} token) ---
     pretrain_resolution: int | None = None
-    m = re.search(r"(?:^|_)r(\d{3,4})(?:_|$)", pretrain_config)
+    m = re.search(r'(?:^|_)r(\d{3,4})(?:_|$)', pretrain_config)
     if m:
         pretrain_resolution = int(m.group(1))
     else:
         # fallback: trailing resolution in the pre-ft portion only
         pre_ft_part = pretrain_config[:ft_start] if ft_start != -1 else pretrain_config
-        m2 = re.search(r"_(\d{3,4})$", pre_ft_part)
+        m2 = re.search(r'_(\d{3,4})$', pre_ft_part)
         if m2:
             c = int(m2.group(1))
             if c in _VALID_PRETRAIN_RES:
@@ -1293,7 +1372,7 @@ def _parse_pretrain_config(pretrain_config: str) -> dict:
     pretrain_ft_resolution: int | None = None
     if ft_start != -1:
         ft_suffix = pretrain_config[ft_start:]
-        m3 = re.search(r"_(\d{3,4})$", ft_suffix)
+        m3 = re.search(r'_(\d{3,4})$', ft_suffix)
         if m3:
             c = int(m3.group(1))
             if c in _VALID_PRETRAIN_RES:
@@ -1301,17 +1380,17 @@ def _parse_pretrain_config(pretrain_config: str) -> dict:
 
     # --- training epochs (e{N} or {N}ep tokens) ---
     pretrain_epochs: int | None = None
-    m = re.search(r"(?:^|_)e(\d{2,4})(?:_|$)", cfg)
+    m = re.search(r'(?:^|_)e(\d{2,4})(?:_|$)', cfg)
     if m:
         pretrain_epochs = int(m.group(1))
     else:
-        m = re.search(r"(?:^|_)(\d{3,4})ep(?:_|$)", cfg)
+        m = re.search(r'(?:^|_)(\d{3,4})ep(?:_|$)', cfg)
         if m:
             pretrain_epochs = int(m.group(1))
 
     # --- token-count qualifier (2pt1, 2pt5) ---
     pretrain_tokens_qual: str | None = None
-    m = re.search(r"(?:^|_)(\d+pt\d+)(?:_|$)", cfg)
+    m = re.search(r'(?:^|_)(\d+pt\d+)(?:_|$)', cfg)
     if m:
         pretrain_tokens_qual = m.group(1)
 
@@ -1323,27 +1402,28 @@ def _parse_pretrain_config(pretrain_config: str) -> dict:
             break
 
     # --- i18n / multilingual flag (WebLI-i18n) ---
-    pretrain_i18n = "i18n" in tokens
+    pretrain_i18n = 'i18n' in tokens
 
     return {
-        "pretrain_config":          pretrain_config,
-        "pretrain_org":             org,
-        "pretrain_dataset":         dataset,
-        "pretrain_dataset_size":    ds_size,
-        "pretrain_method":          method,
-        "pretrain_ft":              ft_target,
-        "pretrain_resolution":      pretrain_resolution,
-        "pretrain_ft_resolution":   pretrain_ft_resolution,
-        "pretrain_epochs":          pretrain_epochs,
-        "pretrain_tokens":          pretrain_tokens_qual,
-        "pretrain_aug":             pretrain_aug,
-        "pretrain_i18n":            pretrain_i18n,
+        'pretrain_config': pretrain_config,
+        'pretrain_org': org,
+        'pretrain_dataset': dataset,
+        'pretrain_dataset_size': ds_size,
+        'pretrain_method': method,
+        'pretrain_ft': ft_target,
+        'pretrain_resolution': pretrain_resolution,
+        'pretrain_ft_resolution': pretrain_ft_resolution,
+        'pretrain_epochs': pretrain_epochs,
+        'pretrain_tokens': pretrain_tokens_qual,
+        'pretrain_aug': pretrain_aug,
+        'pretrain_i18n': pretrain_i18n,
     }
 
 
 # ===========================================================================
 # TIMM FIELDS
 # ===========================================================================
+
 
 def _get_timm_info(model_name: str) -> tuple[int | None, int | None]:
     """
@@ -1358,15 +1438,16 @@ def _get_timm_info(model_name: str) -> tuple[int | None, int | None]:
     """
     try:
         import timm
+
         model = timm.create_model(model_name, pretrained=False)
         num_params = sum(p.numel() for p in model.parameters())
         # timm standard: num_features is the pre-head feature dim.
         # Fall back through a chain of common attribute names.
         latent_dim = (
-            getattr(model, "num_features", None)
-            or getattr(model, "embed_dim", None)
-            or getattr(model, "hidden_size", None)
-            or getattr(model, "d_model", None)
+            getattr(model, 'num_features', None)
+            or getattr(model, 'embed_dim', None)
+            or getattr(model, 'hidden_size', None)
+            or getattr(model, 'd_model', None)
         )
         return num_params, latent_dim
     except Exception as exc:
@@ -1377,6 +1458,7 @@ def _get_timm_info(model_name: str) -> tuple[int | None, int | None]:
 # ===========================================================================
 # PUBLIC API
 # ===========================================================================
+
 
 def get_model_metadata(model_name: str, use_timm: bool = True) -> dict:
     """
@@ -1393,87 +1475,98 @@ def get_model_metadata(model_name: str, use_timm: bool = True) -> dict:
         to populate ``num_parameters`` and ``latent_dim``.
         Set to False for fast name-only parsing when those fields aren't needed.
     """
-    if "." not in model_name:
+    if '.' not in model_name:
         raise ValueError(
             f"model_name must follow 'variant.pretrain_config', got: {model_name!r}"
         )
-    model_variant, pretrain_config = model_name.split(".", 1)
-    num_parameters, latent_dim = _get_timm_info(model_name) if use_timm else (None, None)
+    model_variant, pretrain_config = model_name.split('.', 1)
+    num_parameters, latent_dim = (
+        _get_timm_info(model_name) if use_timm else (None, None)
+    )
 
-    variant_fields  = _parse_variant(model_variant)
+    variant_fields = _parse_variant(model_variant)
     pretrain_fields = _parse_pretrain_config(pretrain_config)
 
     # Cross-field inference:
     # 0. Config-side distillation token — CaiT, RepViT, SwiftFormer encode
     #    distillation in the config (e.g. fb_dist_in1k, dist_450e_in1k,
     #    dist_in1k) rather than in the variant.
-    if not variant_fields["is_distilled"]:
-        if re.search(r"(?:^|_)dist(?:_|$)", pretrain_config.lower()):
-            variant_fields["is_distilled"] = True
+    if not variant_fields['is_distilled'] and re.search(
+        r'(?:^|_)dist(?:_|$)', pretrain_config.lower()
+    ):
+        variant_fields['is_distilled'] = True
 
     # 1. If variant contains '_clip_' or '_clip' and method is still None,
     #    infer CLIP (the model architecture was trained with CLIP objective
     #    but the config token doesn't spell it out, e.g. openai, openai_ft_in1k).
-    if pretrain_fields["pretrain_method"] is None:
+    if pretrain_fields['pretrain_method'] is None:
         v = model_variant.lower()
-        if "_clip" in v or v.endswith("clip"):
-            pretrain_fields["pretrain_method"] = "CLIP"
+        if '_clip' in v or v.endswith('clip'):
+            pretrain_fields['pretrain_method'] = 'CLIP'
 
     # 2. AIMv2 uses a multimodal autoregressive objective, not generic "Pretraining".
-    if (variant_fields["family"] == "AIMv2"
-            and pretrain_fields["pretrain_method"] == "Pretraining"):
-        pretrain_fields["pretrain_method"] = "Autoregressive"
+    if (
+        variant_fields['family'] == 'AIMv2'
+        and pretrain_fields['pretrain_method'] == 'Pretraining'
+    ):
+        pretrain_fields['pretrain_method'] = 'Autoregressive'
 
-    # 3. DINOv2 method from variant dinov2 token (e.g. vit_large_patch14_reg4_dinov2.lvd142m)
-    if pretrain_fields["pretrain_method"] is None:
-        if "dinov2" in model_variant.lower():
-            pretrain_fields["pretrain_method"] = "DINOv2"
-        elif "dinov3" in model_variant.lower():
-            pretrain_fields["pretrain_method"] = "DINOv3"
-        elif "dino" in model_variant.lower() and "dinov" not in model_variant.lower():
-            pretrain_fields["pretrain_method"] = "DINO"
+    # 3. DINOv2 method from variant dinov2 token
+    mv_lower = model_variant.lower()
+    if pretrain_fields['pretrain_method'] is None:
+        if 'dinov2' in mv_lower:
+            pretrain_fields['pretrain_method'] = 'DINOv2'
+        elif 'dinov3' in mv_lower:
+            pretrain_fields['pretrain_method'] = 'DINOv3'
+        elif 'dino' in mv_lower and 'dinov' not in mv_lower:
+            pretrain_fields['pretrain_method'] = 'DINO'
 
     # 4. Size inference for families that use short suffixes SIZE_RULES can't
     #    safely match without false positives on other families.
-    if variant_fields["size"] is None:
+    if variant_fields['size'] is None:
         v = model_variant.lower()
-        fam = variant_fields["family"]
+        fam = variant_fields['family']
         # EfficientFormerV2: _l, _s0, _s1, _s2 suffix
-        if fam == "EfficientFormer" and variant_fields.get("model_version") == "v2":
-            if v.startswith("efficientformerv2_l"):
-                variant_fields["size"] = "L"
-            elif v.startswith("efficientformerv2_s0"):
-                variant_fields["size"] = "S0"
-            elif v.startswith("efficientformerv2_s1"):
-                variant_fields["size"] = "S1"
-            elif v.startswith("efficientformerv2_s2"):
-                variant_fields["size"] = "S2"
+        if fam == 'EfficientFormer' and variant_fields.get('model_version') == 'v2':
+            if v.startswith('efficientformerv2_l'):
+                variant_fields['size'] = 'L'
+            elif v.startswith('efficientformerv2_s0'):
+                variant_fields['size'] = 'S0'
+            elif v.startswith('efficientformerv2_s1'):
+                variant_fields['size'] = 'S1'
+            elif v.startswith('efficientformerv2_s2'):
+                variant_fields['size'] = 'S2'
         # EfficientFormerV1: _l1, _l3, _l7 — already in SIZE_RULES so usually fine,
         # but add fallback here in case prefix match didn't fire
         # MobileViT: _s / _xs / _xxs suffix (already handled by prefix rules,
         # but size_rules don't fire — derive from prefix match)
-        elif fam == "MobileViT":
-            if v.startswith("mobilevit_xxs"):
-                variant_fields["size"] = "XXSmall"
-            elif v.startswith("mobilevit_xs"):
-                variant_fields["size"] = "XSmall"
-            elif v.startswith("mobilevit_s"):
-                variant_fields["size"] = "Small"
-            elif re.search(r"(?:^|_)(050|075|100|125|150|175|200)(?:_|$)", v):
-                m = re.search(r"(?:^|_)(050|075|100|125|150|175|200)(?:_|$)", v)
-                variant_fields["size"] = {
-                    "050": "0.50x", "075": "0.75x", "100": "1.00x",
-                    "125": "1.25x", "150": "1.50x", "175": "1.75x", "200": "2.00x",
+        elif fam == 'MobileViT':
+            if v.startswith('mobilevit_xxs'):
+                variant_fields['size'] = 'XXSmall'
+            elif v.startswith('mobilevit_xs'):
+                variant_fields['size'] = 'XSmall'
+            elif v.startswith('mobilevit_s'):
+                variant_fields['size'] = 'Small'
+            elif re.search(r'(?:^|_)(050|075|100|125|150|175|200)(?:_|$)', v):
+                m = re.search(r'(?:^|_)(050|075|100|125|150|175|200)(?:_|$)', v)
+                variant_fields['size'] = {
+                    '050': '0.50x',
+                    '075': '0.75x',
+                    '100': '1.00x',
+                    '125': '1.25x',
+                    '150': '1.50x',
+                    '175': '1.75x',
+                    '200': '2.00x',
                 }[m.group(1)]
         # ViT-InternImage: intern300m encodes param count
-        elif fam == "ViT" and "intern300m" in v:
-            variant_fields["size"] = "300M"
+        elif fam == 'ViT' and 'intern300m' in v:
+            variant_fields['size'] = '300M'
 
     return {
-        "model_name":     model_name,
+        'model_name': model_name,
         **variant_fields,
-        "num_parameters": num_parameters,
-        "latent_dim":     latent_dim,
+        'num_parameters': num_parameters,
+        'latent_dim': latent_dim,
         **pretrain_fields,
     }
 
@@ -1482,107 +1575,105 @@ def get_model_metadata(model_name: str, use_timm: bool = True) -> dict:
 # SMOKE TEST — covers every pattern found in the real model list
 # ===========================================================================
 
-if __name__ == "__main__":
-    import pprint
-
+if __name__ == '__main__':
     tests = [
         # AIMv2 — param size, Apple PT, token count
-        "aimv2_1b_patch14_224.apple_pt",
-        "aimv2_3b_patch14_224.apple_pt",
+        'aimv2_1b_patch14_224.apple_pt',
+        'aimv2_3b_patch14_224.apple_pt',
         # ViT sizes
-        "vit_tiny_patch16_224.augreg_in21k_ft_in1k",
-        "vit_base_patch16_224.dino",
-        "vit_large_patch14_clip_224.openai_ft_in1k",
-        "vit_large_patch14_clip_quickgelu_224.openai",     # QuickGELU
-        "vit_so400m_patch14_siglip_224.v2_webli",          # SO400M SigLIP WebLI-v2
-        "vit_huge_patch14_clip_224.laion2b",
+        'vit_tiny_patch16_224.augreg_in21k_ft_in1k',
+        'vit_base_patch16_224.dino',
+        'vit_large_patch14_clip_224.openai_ft_in1k',
+        'vit_large_patch14_clip_quickgelu_224.openai',  # QuickGELU
+        'vit_so400m_patch14_siglip_224.v2_webli',  # SO400M SigLIP WebLI-v2
+        'vit_huge_patch14_clip_224.laion2b',
         # ViT with registers + RoPE + GAP
-        "vit_base_patch16_rope_reg1_gap_256.sbb_in1k",
-        "vit_large_patch14_reg4_dinov2.lvd142m",
+        'vit_base_patch16_rope_reg1_gap_256.sbb_in1k',
+        'vit_large_patch14_reg4_dinov2.lvd142m',
         # ViT-PE scope
-        "vit_pe_lang_large_patch14_448.fb",
+        'vit_pe_lang_large_patch14_448.fb',
         # ViT distilled / dwee
-        "vit_dwee_patch16_reg1_gap_256.sbb_nadamuon_in1k",
+        'vit_dwee_patch16_reg1_gap_256.sbb_nadamuon_in1k',
         # WebLI i18n
-        "vit_so400m_patch16_siglip_gap_256.webli_i18n",
+        'vit_so400m_patch16_siglip_gap_256.webli_i18n',
         # ConvNeXt — version + size separate
-        "convnext_tiny.fb_in22k_ft_in1k",
-        "convnext_large.fb_in22k_ft_in1k",
-        "convnextv2_large.fcmae_ft_in22k_in1k",
-        "convnextv2_huge.fcmae_ft_in22k_in1k_384",        # ft@384
+        'convnext_tiny.fb_in22k_ft_in1k',
+        'convnext_large.fb_in22k_ft_in1k',
+        'convnextv2_large.fcmae_ft_in22k_in1k',
+        'convnextv2_huge.fcmae_ft_in22k_in1k_384',  # ft@384
         # Swin — version from rule, size from scan, window size, CR+NS
-        "swinv2_base_window12to16_192to256.ms_in22k_ft_in1k",
-        "swin_tiny_patch4_window7_224.ms_in1k",
-        "swinv2_cr_tiny_ns_224.sw_in1k",                  # CR + NS flags
+        'swinv2_base_window12to16_192to256.ms_in22k_ft_in1k',
+        'swin_tiny_patch4_window7_224.ms_in1k',
+        'swinv2_cr_tiny_ns_224.sw_in1k',  # CR + NS flags
         # ResNet — depth code, no size
-        "resnet50.a1h_in1k",
-        "resnet101d.ra2_in1k",                             # d suffix
-        "resnetrs270.tf_in1k",                             # RS + depth
-        "wide_resnet50_2.tv_in1k",
+        'resnet50.a1h_in1k',
+        'resnet101d.ra2_in1k',  # d suffix
+        'resnetrs270.tf_in1k',  # RS + depth
+        'wide_resnet50_2.tv_in1k',
         # ResNeXt — width code
-        "resnext50_32x4d.fb_swsl_ig1b_ft_in1k",
+        'resnext50_32x4d.fb_swsl_ig1b_ft_in1k',
         # DeiT-III — version=III, size from scan
-        "deit3_base_patch16_384.fb_in22k_ft_in1k",
-        "deit3_huge_patch14_224.fb_in22k_ft_in1k",
+        'deit3_base_patch16_384.fb_in22k_ft_in1k',
+        'deit3_huge_patch14_224.fb_in22k_ft_in1k',
         # DeiT distilled
-        "deit_tiny_distilled_patch16_224.fb_in1k",
+        'deit_tiny_distilled_patch16_224.fb_in1k',
         # EVA — version from rule, size from scan
-        "eva02_large_patch14_448.mim_m38m_ft_in1k",       # M38M dataset
-        "eva_giant_patch14_clip_224.laion400m",
+        'eva02_large_patch14_448.mim_m38m_ft_in1k',  # M38M dataset
+        'eva_giant_patch14_clip_224.laion400m',
         # EfficientNet B-series, pruned, lite
-        "efficientnet_b0.ra4_e3600_r224_in1k",
-        "efficientnet_b2_pruned.in1k",
-        "efficientnet_lite0.ra_in1k",
+        'efficientnet_b0.ra4_e3600_r224_in1k',
+        'efficientnet_b2_pruned.in1k',
+        'efficientnet_lite0.ra_in1k',
         # NFNet depth code
-        "dm_nfnet_f4.dm_in1k",
+        'dm_nfnet_f4.dm_in1k',
         # MambaOut named sizes
-        "mambaout_kobe.in1k",
-        "mambaout_small.in1k",
+        'mambaout_kobe.in1k',
+        'mambaout_small.in1k',
         # SAM2-Hiera, token count qualifier
-        "sam2_hiera_tiny.fb_r896_2pt1",
+        'sam2_hiera_tiny.fb_r896_2pt1',
         # Hiera abswin flag
-        "hiera_small_abswin_256.sbb2_e200_in12k",
+        'hiera_small_abswin_256.sbb2_e200_in12k',
         # MaxViT rmlp + rw flags
-        "maxxvitv2_rmlp_base_rw_224.sw_in12k_ft_in1k",
+        'maxxvitv2_rmlp_base_rw_224.sw_in12k_ft_in1k',
         # FocalNet receptive field (lrf)
-        "focalnet_base_lrf.ms_in1k",
+        'focalnet_base_lrf.ms_in1k',
         # CaiT / XCiT stride + p-patch style
-        "cait_s24_384.fb_dist_in1k",
-        "xcit_small_12_p16_224.fb_dist_in1k",
+        'cait_s24_384.fb_dist_in1k',
+        'xcit_small_12_p16_224.fb_dist_in1k',
         # Res2Net width+scale
-        "res2net50_14w_8s.in1k",
+        'res2net50_14w_8s.in1k',
         # FlexiViT epoch-based pretrain tag
-        "flexivit_small.1200ep_in1k",
-        "flexivit_base.1000ep_in21k",
+        'flexivit_small.1200ep_in1k',
+        'flexivit_base.1000ep_in21k',
         # MobileNetV4 epochs + resolution
-        "mobilenetv4_conv_medium.e250_r384_in12k_ft_in1k",
+        'mobilenetv4_conv_medium.e250_r384_in12k_ft_in1k',
         # FastViT MCI (mobile CLIP image encoder)
-        "fastvit_mci0.apple_mclip2_dfndr2b",
+        'fastvit_mci0.apple_mclip2_dfndr2b',
         # Legacy prefix
-        "legacy_seresnet34.in1k",
+        'legacy_seresnet34.in1k',
         # MetaCLIP dataset size qualifier
-        "vit_large_patch14_clip_224.metaclip_400m",
+        'vit_large_patch14_clip_224.metaclip_400m',
         # DFN dataset size qualifier s39b
-        "vit_large_patch14_clip_224.dfn2b_s39b",
+        'vit_large_patch14_clip_224.dfn2b_s39b',
         # AdvProp augmentation
-        "tf_efficientnet_b0.ap_in1k",
+        'tf_efficientnet_b0.ap_in1k',
         # ViTamin with DataComp1B
-        "vitamin_large2_256.datacomp1b_clip",
+        'vitamin_large2_256.datacomp1b_clip',
         # NextViT SSLD + 6M token qualifier
-        "nextvit_base.bd_ssld_6m_in1k",
+        'nextvit_base.bd_ssld_6m_in1k',
         # ft resolution in trailing suffix
-        "convnext_tiny.fb_in22k_ft_in1k_384",
-        "rdnet_large.nv_in1k_ft_in1k_384",
+        'convnext_tiny.fb_in22k_ft_in1k_384',
+        'rdnet_large.nv_in1k_ft_in1k_384',
         # NoisyStudent augmentation
-        "tf_efficientnet_b0.ns_jft_in1k",
+        'tf_efficientnet_b0.ns_jft_in1k',
     ]
 
     for name in tests:
-        print(f"\n{'='*72}")
-        print(f"  {name}")
-        print('='*72)
+        print(f'\n{"=" * 72}')
+        print(f'  {name}')
+        print('=' * 72)
         m = get_model_metadata(name)
         # Print only non-None / non-False fields for readability
         for k, v in m.items():
-            if v is not None and v is not False and k != "model_name":
-                print(f"  {k:<30} {v}")
+            if v is not None and v is not False and k != 'model_name':
+                print(f'  {k:<30} {v}')

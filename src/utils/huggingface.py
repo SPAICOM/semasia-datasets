@@ -444,8 +444,8 @@ def generate_model_registry_readme(
     md_body = textwrap.dedent(f"""
     # Timm Model Metadata Registry
 
-    This dataset contains a lookup table of metadata for all pretrained models
-    available in the [timm](https://github.com/huggingface/pytorch-image-models) library.
+    This dataset contains a lookup table of metadata for all pretrained
+    models available in the timm library.
 
     ## Usage
 

@@ -20,8 +20,8 @@ from pathlib import Path
 
 sys.path.append(str(Path(sys.path[0]).parent))
 
-import timm
 import polars as pl
+import timm
 from huggingface_hub import HfApi
 from huggingface_hub.utils import get_token
 from tqdm.auto import tqdm
