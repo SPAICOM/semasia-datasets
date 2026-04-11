@@ -395,5 +395,116 @@ def generate_readme_with_configs(
         print(f'[OK] Updated README online: https://huggingface.co/datasets/{repo_id}')
 
 
+def generate_model_registry_readme(
+    repo_dir: Path,
+    repo_id: str,
+    *,
+    num_models: int,
+    push_online: bool = True,
+    commit_message: str = 'Update README',
+) -> None:
+    """
+    Generate README.md for the model-registry dataset on HuggingFace.
+
+    Parameters
+    ----------
+    repo_dir : Path
+        Local directory where the README.md will be written.
+    repo_id : str
+        Full Hugging Face repository ID (e.g., "spaicom-lab/model-registry").
+    num_models : int
+        Number of models in the registry.
+    push_online : bool, optional
+        Whether to upload the README to HuggingFace. Defaults to True.
+    commit_message : str, optional
+        Commit message for the upload. Defaults to "Update README".
+
+    Returns
+    -------
+    None
+        This function is called for its side effects only.
+    """
+    token = get_token()
+    if token is None:
+        raise RuntimeError(
+            'No HF token found. Run `huggingface-cli login` or set HF_TOKEN.'
+        )
+
+    api = HfApi(token=token)
+
+    repo_dir = Path(repo_dir)
+    repo_dir.mkdir(parents=True, exist_ok=True)
+
+    yaml_top = {
+        'pretty_name': 'Timm Model Metadata Registry',
+        'num_models': num_models,
+    }
+    yaml_text = '---\n' + yaml.safe_dump(yaml_top, sort_keys=False) + '---\n'
+
+    md_body = textwrap.dedent(f"""
+    # Timm Model Metadata Registry
+
+    This dataset contains a lookup table of metadata for all pretrained models
+    available in the [timm](https://github.com/huggingface/pytorch-image-models) library.
+
+    ## Usage
+
+    ```python
+    from datasets import load_dataset
+    import polars as pl
+
+    ds = load_dataset("spaicom-lab/model-registry")
+    df = ds["train"].to_pandas()
+
+    # Query by model name
+    model = df[df["model_name"] == "vit_base_patch16_224"]
+
+    # Filter by family
+    vit_models = df[df["family"] == "ViT"]
+
+    # Filter by parameter count
+    small_models = df[df["num_parameters"] < 50_000_000]
+    ```
+
+    ## Fields
+
+    | Field | Description |
+    |-------|-------------|
+    | model_name | Full timm model identifier |
+    | family | Architecture family (e.g., ViT, ConvNeXt, ResNet) |
+    | model_version | Architecture generation (e.g., v2, v3) |
+    | size | Human-readable size label (e.g., Base, Large) |
+    | num_parameters | Total trainable parameters |
+    | latent_dim | Output embedding dimension |
+    | patch_size | ViT patch size in pixels (if applicable) |
+    | input_resolution | Native input resolution |
+    | pretrain_org | Organisation responsible for training |
+    | pretrain_dataset | Pretraining dataset |
+    | pretrain_method | Training objective (e.g., CLIP, MAE, DINO) |
+    | pretrain_ft | Fine-tuning dataset (if applicable) |
+
+    ## Notes
+
+    - Metadata is extracted using the `get_model_metadata` function from the
+      [semantic-datasets](https://github.com/spaicom-lab/semantic-datasets) library.
+    - Some fields may be ``None`` if they cannot be inferred from the model name.
+    - Total number of models: **{num_models}**
+    """)
+
+    out_path = repo_dir / 'README.md'
+    out_path.write_text(yaml_text + md_body, encoding='utf-8')
+    print(f'[OK] Wrote {out_path}')
+
+    if push_online:
+        api.upload_file(
+            repo_id=repo_id,
+            repo_type='dataset',
+            path_or_fileobj=str(out_path),
+            path_in_repo='README.md',
+            commit_message=commit_message,
+        )
+        print(f'[OK] Updated README online: https://huggingface.co/datasets/{repo_id}')
+
+
 if __name__ == '__main__':
     pass

@@ -21,3 +21,7 @@ timm-encode DATASET:
 push DATASET:
     uv run scripts/push_to_hf.py dataset={{DATASET}}
     just readme
+
+# Push timm model metadata registry to HuggingFace
+model-registry:
+    uv run scripts/push_model_registry.py

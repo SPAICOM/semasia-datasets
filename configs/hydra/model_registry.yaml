@@ -1,0 +1,8 @@
+defaults:
+  - _self_
+
+hf:
+  namespace: spaicom-lab
+  repo_id: spaicom-lab/model-registry
+  private: false
+  commit_message: "Add/update model metadata registry"
