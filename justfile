@@ -1,3 +1,7 @@
+# # Setup the repo .venv via uv
+setup:
+    uv sync
+
 # Run static analysis and automatically fix issues where possible
 check:
     uvx ruff check . --fix
