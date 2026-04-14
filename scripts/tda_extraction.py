@@ -65,7 +65,13 @@ def main(cfg: DictConfig) -> None:
             # At the first time it will download all the splits
             # and then load the fist split
             # From the second split on it will only load it
-            data = load_dataset(dataset, model, split=split).with_format('torch')
+            try:
+                data = load_dataset(dataset, model, split=split).with_format('torch')
+            except Exception as e:
+                print(
+                    f"Error loading dataset for model '{model}', split '{split}': {e}"
+                )
+                continue
 
             # Get the latent in torch format
             latent: torch.Tensor = torch.vstack(list(data['embedding']))
