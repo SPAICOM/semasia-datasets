@@ -52,6 +52,25 @@ family : str
               "EfficientNet", "MobileNet", "MaxViT", "AIMv2", "EVA".
     Falls back to "unknown" with a logged warning for unrecognised prefixes.
 
+macro_family : str | None
+    Coarse architectural category grouping families by their dominant
+    computational motif. Values:
+      "Vision Transformer"              → pure self-attention over patches
+                                          (ViT, DeiT, CaiT, BEiT, EVA, …)
+      "Hierarchical Vision Transformer" → multi-stage windowed / pooling
+                                          attention (Swin, MViT, Hiera, …)
+      "Hybrid CNN-Transformer"          → conv stages + transformer blocks
+                                          (CoAtNet, MaxViT, FastViT, …)
+      "MetaFormer"                      → abstract token-mixer backbone
+                                          (PoolFormer, ConvFormer, …)
+      "Convolutional"                   → pure convolutional backbone
+                                          (ResNet, EfficientNet, ConvNeXt, …)
+      "MLP"                             → pure MLP / token-mixing
+                                          (MLP-Mixer, ResMLP, …)
+      "State Space Model"               → selective state-space models
+                                          (MambaOut, …)
+    None for unrecognised families.
+
 model_version : str | None
     The *architecture generation* tag encoded in the prefix — distinct
     from the size or the pretrain recipe version.
@@ -420,7 +439,8 @@ pretrain_epochs : int | None
     convention). Only the training-phase epoch count is captured.
     Examples:
       hiera_small_abswin_256.sbb2_e200_in12k    → 200
-      efficientnet_b0.ra4_e3600_r224_in1k → 3600  # steps for short-schedule recipes
+      # training steps for MobileNet-style short-schedule recipes, not epochs
+      efficientnet_b0.ra4_e3600_r224_in1k       → 3600
       flexivit_small.1200ep_in1k                → 1200
       mobilenetv4_conv_medium.e250_r384_in12k   → 250
     None when not encoded.
@@ -517,6 +537,134 @@ logger = logging.getLogger(__name__)
 
 # ===========================================================================
 # FAMILY RULES  (prefix → family, model_version)
+# ===========================================================================
+# MACRO FAMILY — coarse architectural category, independent of family.
+# Groups families by the dominant computational motif of their backbone.
+# ===========================================================================
+
+_MACRO_FAMILY_MAP: dict[str, str] = {
+    # ── Pure Vision Transformers ──────────────────────────────────────────
+    # Self-attention over patch tokens, no conv stages in backbone
+    'ViT': 'Vision Transformer',
+    'DeiT': 'Vision Transformer',
+    'CaiT': 'Vision Transformer',
+    'BEiT': 'Vision Transformer',
+    'EVA': 'Vision Transformer',
+    'FlexiViT': 'Vision Transformer',
+    'AIMv2': 'Vision Transformer',
+    'ViTamin': 'Vision Transformer',
+    'SAM-ViT': 'Vision Transformer',
+    'NaFlexViT': 'Vision Transformer',
+    'CSAFormer': 'Vision Transformer',
+    # ── Hierarchical Vision Transformers ─────────────────────────────────
+    # Multi-stage with shifted / local windows or hierarchical pooling
+    'Swin': 'Hierarchical Vision Transformer',
+    'MViT': 'Hierarchical Vision Transformer',
+    'Hiera': 'Hierarchical Vision Transformer',
+    'SAM2-Hiera': 'Hierarchical Vision Transformer',
+    'PVT': 'Hierarchical Vision Transformer',
+    'Twins': 'Hierarchical Vision Transformer',
+    'DaViT': 'Hierarchical Vision Transformer',
+    'GCViT': 'Hierarchical Vision Transformer',
+    'FocalNet': 'Hierarchical Vision Transformer',
+    # ── Cross-Attention / Token Mixing Transformers ───────────────────────
+    # Attention across scales, cross-image, or novel token-mixing operators
+    'CrossViT': 'Vision Transformer',
+    'XCiT': 'Vision Transformer',
+    'TNT': 'Vision Transformer',
+    'VOLO': 'Vision Transformer',
+    'VisFormer': 'Vision Transformer',
+    'Sequencer2D': 'Vision Transformer',
+    # ── Hybrid CNN-Transformer ────────────────────────────────────────────
+    # Convolutional stem/stages mixed with transformer blocks
+    'CoAtNet': 'Hybrid CNN-Transformer',
+    'CoAtNeXt': 'Hybrid CNN-Transformer',
+    'MaxViT': 'Hybrid CNN-Transformer',
+    'CoaT': 'Hybrid CNN-Transformer',
+    'TinyViT': 'Hybrid CNN-Transformer',
+    'NextViT': 'Hybrid CNN-Transformer',
+    'FastViT': 'Hybrid CNN-Transformer',
+    'MobileViT': 'Hybrid CNN-Transformer',
+    'EfficientViT': 'Hybrid CNN-Transformer',  # MSRA EfficientViT (conv+attn)
+    'LeViT': 'Hybrid CNN-Transformer',
+    'NestNet': 'Hybrid CNN-Transformer',
+    'PiT': 'Hybrid CNN-Transformer',
+    'BotNet': 'Hybrid CNN-Transformer',
+    'HaloNet': 'Hybrid CNN-Transformer',
+    'ShViT': 'Hybrid CNN-Transformer',
+    'SwiftFormer': 'Hybrid CNN-Transformer',
+    'EfficientFormer': 'Hybrid CNN-Transformer',
+    'RepViT': 'Hybrid CNN-Transformer',
+    # ── MetaFormer / ConvFormer / PoolFormer ─────────────────────────────
+    # Abstract token-mixer framework; token mixer can be conv, pool, or attn
+    'MetaFormer': 'MetaFormer',
+    # ── Pure MLP ─────────────────────────────────────────────────────────
+    'MLP-Mixer': 'MLP',
+    'ResMLP': 'MLP',
+    'gMixer': 'MLP',
+    # ── ConvNeXt family ──────────────────────────────────────────────────
+    # Modernised pure-conv architectures inspired by ViT design choices
+    'ConvNeXt': 'Convolutional',
+    'ConViT': 'Hybrid CNN-Transformer',  # conv-attn attention gate
+    'InceptionNeXt': 'Convolutional',
+    'RDNet': 'Convolutional',
+    # ── Classic / Standard CNNs ───────────────────────────────────────────
+    'ResNet': 'Convolutional',
+    'ResNeXt': 'Convolutional',
+    'Wide-ResNet': 'Convolutional',
+    'ResNeSt': 'Convolutional',
+    'Res2Net': 'Convolutional',
+    'Res2NeXt': 'Convolutional',
+    'SENet': 'Convolutional',
+    'DenseNet': 'Convolutional',
+    'VGG': 'Convolutional',
+    'Inception': 'Convolutional',
+    'InceptionResNet': 'Convolutional',
+    'NFNet': 'Convolutional',
+    'HRNet': 'Convolutional',
+    'DLA': 'Convolutional',
+    'DPN': 'Convolutional',
+    'RegNet': 'Convolutional',
+    'EfficientNet': 'Convolutional',
+    'HGNet': 'Convolutional',
+    'HGNetV2': 'Convolutional',
+    'TResNet': 'Convolutional',
+    'MobileNet': 'Convolutional',
+    'MobileOne': 'Convolutional',
+    'MixNet': 'Convolutional',
+    'MnasNet': 'Convolutional',
+    'FBNet': 'Convolutional',
+    'LCNet': 'Convolutional',
+    'RexNet': 'Convolutional',
+    'GENet': 'Convolutional',
+    'GhostNet': 'Convolutional',
+    'RepGhostNet': 'Convolutional',
+    'RepVGG': 'Convolutional',
+    'EdgeNeXt': 'Convolutional',
+    'FasterNet': 'Convolutional',
+    'VoVNet': 'Convolutional',
+    'NASNet': 'Convolutional',
+    'HardCoreNAS': 'Convolutional',
+    'Xception': 'Convolutional',
+    'TinyNet': 'Convolutional',
+    'SPNASNet': 'Convolutional',
+    'CSPNet': 'Convolutional',
+    'DarkNet': 'Convolutional',
+    'StarNet': 'Convolutional',
+    # ── State Space Models ────────────────────────────────────────────────
+    # Selective / gated state-space sequence models for vision
+    'MambaOut': 'State Space Model',
+    # ── CLIP / Contrastive image encoders ─────────────────────────────────
+    # Architectures primarily used as CLIP image towers — kept in their
+    # natural structural category (ViT or CNN); not a separate macro_family.
+}
+
+
+def _get_macro_family(family: str) -> str | None:
+    """Return the coarse architectural category for a parsed family name."""
+    return _MACRO_FAMILY_MAP.get(family)
+
+
 # ===========================================================================
 # model_version = architecture *generation* tag only (v2, III, RS …).
 # All other variant info is parsed separately below.
@@ -841,7 +989,7 @@ _SIZE_RULES: list[tuple[str, str]] = [
     # MobileViT extra-small codes
     ('xxs', 'XXSmall'),
     ('xs', 'XSmall'),
-    # MetaFormer / PoolFormer stage-config size codes
+    # MetaFormer / PoolFormer stageconfig codes (sN=mN=bN: small/medium/base)
     ('s12', 'S12'),
     ('s18', 'S18'),
     ('s24', 'S24'),
@@ -1072,13 +1220,14 @@ def _parse_variant(model_variant: str) -> dict:
     uses_abswin = _tok('abswin', v_clean)
     uses_quickgelu = _tok('quickgelu', v_clean)
     uses_ts = bool(re.search(r'\dts(?:_|$)', v_clean))
-    # uses_aa: check _aa_ token OR aa-prefixed family names
+    # uses_aa: check _aa_ OR aa-prefixed names (resnetaa, darknetaa, seresnextaa)
     uses_aa = _tok('aa', v_clean) or bool(
         re.match(r'(?:resnetaa|darknetaa|seresnextaa)', v_clean)
     )
 
     return {
         'family': family,
+        'macro_family': _get_macro_family(family),
         'model_version': model_version,
         'size': size,
         'depth_code': depth_code,
@@ -1146,7 +1295,7 @@ _DATASET_MAP: dict[str, str] = {
     'sat493m': 'SAT-493M',
     'green': 'Green-dataset',  # HardCoreNAS green subset
     'mclip2': 'mCLIP-2',
-    'seer': 'Instagram-1B',  # SEER pretrains on Instagram
+    'seer': 'Instagram-1B',  # SEER: Instagram images (no explicit dataset tag)
     'swag': 'Instagram-3.6B',  # SWAG: weakly-supervised on ~3.6B Instagram images
     'wit': 'WIT-400M',  # OpenAI WebImageText (private, 400M image-text pairs)
 }
@@ -1512,13 +1661,12 @@ def get_model_metadata(model_name: str, use_timm: bool = True) -> dict:
         pretrain_fields['pretrain_method'] = 'Autoregressive'
 
     # 3. DINOv2 method from variant dinov2 token
-    mv_lower = model_variant.lower()
     if pretrain_fields['pretrain_method'] is None:
-        if 'dinov2' in mv_lower:
+        if 'dinov2' in model_variant.lower():
             pretrain_fields['pretrain_method'] = 'DINOv2'
-        elif 'dinov3' in mv_lower:
+        elif 'dinov3' in model_variant.lower():
             pretrain_fields['pretrain_method'] = 'DINOv3'
-        elif 'dino' in mv_lower and 'dinov' not in mv_lower:
+        elif 'dino' in model_variant.lower() and 'dinov' not in model_variant.lower():  # noqa: E501
             pretrain_fields['pretrain_method'] = 'DINO'
 
     # 4. Size inference for families that use short suffixes SIZE_RULES can't
