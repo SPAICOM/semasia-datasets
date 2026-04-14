@@ -25,3 +25,7 @@ push DATASET:
 # Push timm model metadata registry to HuggingFace
 model-registry:
     uv run scripts/push_model_registry.py
+
+# Run the tda signature extraction for all the timm models
+tda-extraction:
+    uv run scripts/tda_extraction.py
