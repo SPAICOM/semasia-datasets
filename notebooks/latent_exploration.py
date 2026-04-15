@@ -234,7 +234,6 @@ with app.setup:
     ORIG_SPLITS: dict[str, str] = {
         'imagenet-1k': 'validation',
         'tiny-imagenet': 'valid',
-        'tiny_imagenet': 'valid',
     }
 
 
@@ -250,6 +249,7 @@ def _():
             'imagenet-1k',
             'celeba',
             'svhn',
+            'oxford-flowers',
         ],
         value='cifar10',
         label='Dataset',
@@ -308,6 +308,7 @@ def _(attr_ui, dataset_ui, method_ui, model_ui, n_samples_ui, split_ui):
             mo.hstack([method_ui, n_samples_ui], gap=2),
         ]
     )
+    return
 
 
 @app.cell
@@ -348,7 +349,7 @@ def _(dataset_ui, split_ui):
 
 
 @app.cell
-def _(attr_ui, dataset_ui, ds):
+def _(attr_ui, ds):
     latent = torch.vstack(list(ds['embedding']))
 
     label = extract_label(ds, attr_ui.value)
@@ -666,6 +667,7 @@ def _(dataset_ui, df_pc, orig_ds, pc_label_col, pc_widget, sel_ds_indices):
             mo.image(_buf.getvalue()),
         ]
     )
+    return
 
 
 if __name__ == '__main__':
