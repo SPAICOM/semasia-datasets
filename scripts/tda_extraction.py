@@ -1,7 +1,10 @@
+import logging
 import sys
 from pathlib import Path
 
 sys.path.append(str(Path(sys.path[0]).parent))
+
+logging.getLogger('httpx').setLevel(logging.WARNING)
 
 import hydra
 import polars as pl
@@ -11,6 +14,7 @@ from omegaconf import DictConfig
 from tqdm.auto import tqdm
 
 from src import remove_matching
+from src.tda import TDA_KEYS, compute_tda_signature
 
 DATASET_SPLITS = {
     'cifar10': {'train', 'test'},
@@ -47,6 +51,8 @@ def main(cfg: DictConfig) -> None:
     # Get all the models from the model-registry
     models: list[str] = (
         pl.read_parquet('hf://datasets/spaicom-lab/model-registry/**/*.parquet')
+        .filter(pl.col('latent_dim') < cfg.tda.max_points)
+        .filter((cfg.model is None) | pl.col('model_name').str.contains(cfg.model))
         .select('model_name')
         .unique()
         .sort('model_name')['model_name']
@@ -55,11 +61,12 @@ def main(cfg: DictConfig) -> None:
 
     for model in tqdm(models):
         for split in DATASET_SPLITS[cfg.dataset]:
-            # Instantiate the temp dictionary
+            # Instantiate the temp dictionary (TDA columns pre-filled with None)
             temp: dict[str, any] = {
                 'dataset': dataset,
                 'split': split,
-                'key1': None,
+                'model': model,
+                **dict.fromkeys(TDA_KEYS),
             }
 
             # At the first time it will download all the splits
@@ -76,21 +83,22 @@ def main(cfg: DictConfig) -> None:
             # Get the latent in torch format
             latent: torch.Tensor = torch.vstack(list(data['embedding']))
 
-            # Dummy computation to check if all works
-            print(latent.shape)
+            # Compute TDA signature for this model × dataset × split triplet
+            output_tda: dict[str, list] = compute_tda_signature(
+                latent,
+                max_dim=cfg.tda.max_dim,
+                simplicial_filter=cfg.tda.simplicial_filter,
+                n_bins=cfg.tda.n_bins,
+                sigma=cfg.tda.sigma,
+                metric=cfg.tda.metric,
+                max_points=cfg.tda.max_points,
+                seed=cfg.tda.seed,
+                normalize=cfg.tda.normalize or None,
+                dim_reduction=cfg.tda.dim_reduction or None,
+                dim_reduction_components=cfg.tda.dim_reduction_components,
+            )
 
-            # TODO: Calculate TDA signature
-            # I need you to create a function or more, inside the src/tda/ subfolder
-            # The function should return a dictionary with
-            # as keys the attributes (will be the columns) and as values
-            # the measurements.
-            # Then update the temp dictionary and pass it to the dataframe
-            # Pls initialize the temp also with the tda keys (see example in line 60)
-            #
-            # ...
-            output_tda: dict[str, any] = {'key1': 'value1'}
-
-            # Dump the parquet file: one for each dataset-split-model triplet
+            # Dump the parquet file: one row per dataset-split-model triplet
             (
                 pl.DataFrame(temp | output_tda).write_parquet(
                     RESULTS
