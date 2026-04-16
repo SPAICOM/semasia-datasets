@@ -12,10 +12,9 @@ Usage:
 import sys
 from functools import partial
 from pathlib import Path
-
-sys.path.append(str(Path(sys.path[0]).parent))
-
 from typing import Any
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import hydra
 import polars as pl

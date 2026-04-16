@@ -2,4 +2,4 @@ name: uoft-cs/cifar10
 
 data: img
 extras:
-  - label
+    - label

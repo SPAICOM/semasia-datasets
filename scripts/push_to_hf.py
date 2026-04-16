@@ -14,12 +14,10 @@ import sys
 import time
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 import httpcore
 import httpx
-
-sys.path.append(str(Path(sys.path[0]).parent))
-
-
 import hydra
 from huggingface_hub.errors import HfHubHTTPError
 from omegaconf import DictConfig

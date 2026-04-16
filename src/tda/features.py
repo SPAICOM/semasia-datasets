@@ -13,6 +13,7 @@ def _finite(dgm: np.ndarray) -> np.ndarray:
 # Diagram entropy
 # ---------------------------------------------------------------------------
 
+
 def compute_diagram_entropy(dgms: list[np.ndarray]) -> list[float]:
     """Compute persistent entropy for each homological dimension.
 
@@ -55,6 +56,7 @@ def compute_diagram_entropy(dgms: list[np.ndarray]) -> list[float]:
 # ---------------------------------------------------------------------------
 # Persistence image
 # ---------------------------------------------------------------------------
+
 
 def compute_persistence_image(
     dgms: list[np.ndarray],
@@ -111,7 +113,7 @@ def compute_persistence_image(
             images.append(torch.zeros(n_bins, n_bins, dtype=torch.float32))
             continue
 
-        b = fd[:, 0]              # (n_pts,)
+        b = fd[:, 0]  # (n_pts,)
         p = fd[:, 1] - fd[:, 0]  # (n_pts,)
 
         # Vectorised Gaussian kernels:
@@ -131,6 +133,7 @@ def compute_persistence_image(
 # ---------------------------------------------------------------------------
 # Betti curve
 # ---------------------------------------------------------------------------
+
 
 def compute_betti_curve(
     dgms: list[np.ndarray],
@@ -155,7 +158,11 @@ def compute_betti_curve(
         One Betti curve per homological dimension.
     """
     # Build t-grid from the range of all births and finite deaths
-    all_b = np.concatenate([d[:, 0] for d in dgms if len(d)]) if any(len(d) for d in dgms) else np.array([0.0])
+    all_b = (
+        np.concatenate([d[:, 0] for d in dgms if len(d)])
+        if any(len(d) for d in dgms)
+        else np.array([0.0])
+    )
     finite_deaths = [_finite(d)[:, 1] for d in dgms if len(_finite(d))]
     all_d = np.concatenate(finite_deaths) if finite_deaths else np.array([1.0])
 
@@ -174,9 +181,7 @@ def compute_betti_curve(
         births = dgm[:, 0]  # (n_pts,)
         deaths = dgm[:, 1]  # (n_pts,) — may be inf
         # alive[i, j] = True if point i is alive at t_grid[j]
-        alive = (
-            births[:, np.newaxis] <= t_grid[np.newaxis, :]
-        ) & (
+        alive = (births[:, np.newaxis] <= t_grid[np.newaxis, :]) & (
             deaths[:, np.newaxis] > t_grid[np.newaxis, :]
         )
         curves.append(alive.sum(axis=0).astype(np.float64))

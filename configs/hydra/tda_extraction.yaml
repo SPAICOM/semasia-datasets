@@ -1,58 +1,74 @@
-
 defaults:
-  - _self_
+    - _self_
 
-repo_id: 'spaicom-lab'
-prefix: 'semantic-'
+repo_id: "spaicom-lab"
+prefix: "semantic-"
 dataset: cifar10
-model: null  # set to a specific model name to filter, or leave null to plot all
+model: null # set to a specific model name to filter, or leave null to plot all
 
 tda:
-  # Maximum homological dimension (inclusive): 0, 1, …, max_dim are computed
-  max_dim: 2
-  # Simplicial filtration method.
-  # Choices: VietorisRips | SparseRips | WeakAlpha | EuclideanCech
-  simplicial_filter: VietorisRips
-  # Grid resolution for persistence image (n_bins × n_bins) and Betti curve
-  n_bins: 100
-  # Gaussian kernel width for the persistence image
-  sigma: 0.1
-  # ripser metric passed to ripser.ripser() — e.g. euclidean, cosine
-  metric: euclidean
-  # Landmark subsample size. Vietoris-Rips overflows for large clouds;
-  # keep ≤ 1000. Set to -1 to disable (only for small point clouds).
-  max_points: 1000
-  # Random seed for the landmark subsample and stochastic dim-reduction methods
-  seed: 42
+    # Maximum homological dimension (inclusive): 0, 1, …, max_dim are computed
+    max_dim: 2
+    # Simplicial filtration method.
+    # Choices: VietorisRips | SparseRips | WeakAlpha | EuclideanCech
+    simplicial_filter: VietorisRips
+    # Grid resolution for persistence image (n_bins × n_bins) and Betti curve
+    n_bins: 100
+    # Gaussian kernel width for the persistence image
+    sigma: 0.1
+    # ripser metric passed to ripser.ripser() — e.g. euclidean, cosine
+    metric: euclidean
+    # Landmark subsample size. Vietoris-Rips overflows for large clouds;
+    # keep ≤ 1000. Set to -1 to disable (only for small point clouds).
+    max_points: 1000
+    # Random seed for the landmark subsample and stochastic dim-reduction methods
+    seed: 42
 
-  # --- Preprocessing flags ---------------------------------------------------
+    # --- Preprocessing flags ---------------------------------------------------
 
-  # Normalise each point cloud before applying TDA.
-  # Choices: standard | minmax | l2 | null (no normalisation)
-  #   standard : zero mean, unit std per feature
-  #   minmax   : scale each feature to [0, 1]
-  #   l2       : L2-normalise each sample to unit norm
-  normalize: standard
+    # Normalise each point cloud before applying TDA.
+    # Choices: standard | minmax | l2 | null (no normalisation)
+    #   standard : zero mean, unit std per feature
+    #   minmax   : scale each feature to [0, 1]
+    #   l2       : L2-normalise each sample to unit norm
+    normalize: standard
 
-  # Reduce the embedding dimension before the filtration.
-  # Helpful for high-dimensional spaces (e.g. 512-d / 768-d) where
-  # Vietoris-Rips is expensive. Applied after normalisation.
-  # Choices: pca | umap | tsne | null (no reduction)
-  #   pca  : linear PCA via scikit-learn (fast)
-  #   umap : UMAP via umap-learn (non-linear, requires: pip install umap-learn)
-  #   tsne : t-SNE via scikit-learn (slow; best for n_components ≤ 3)
-  dim_reduction: umap
+    # Reduce the embedding dimension before the filtration.
+    # Helpful for high-dimensional spaces (e.g. 512-d / 768-d) where
+    # Vietoris-Rips is expensive. Applied after normalisation.
+    # Choices: pca | umap | tsne | lle | isomap | prototype_analysis | null (no reduction)
+    #   pca    : linear PCA via scikit-learn (fast)
+    #   umap   : UMAP via umap-learn (non-linear)
+    #   tsne   : t-SNE via scikit-learn (slow; best for n_components ≤ 3)
+    #   lle    : Locally Linear Embedding (Eigenmaps)
+    #   isomap : Isomap (geodesic distance-based)
+    #   prototype_analysis : cluster-based dim reduction via Parseval frame
+    dim_reduction: pca
 
-  # Target number of dimensions for the reduction step (ignored if null above)
-  dim_reduction_components: 2
+    # Target number of dimensions for the reduction step (ignored if null above)
+    dim_reduction_components: 2
+
+    # --- Prototype-based subsampling -------------------------------------------
+    # If enabled, uses prototype computation instead of random sampling.
+    # The number of prototypes equals max_points (n_clusters = max_points).
+    prototypes:
+        enable: true
+        # Number of samples per cluster to compute prototype
+        n_samples: 10
+        # Clustering class (e.g., KMeans, DBSCAN, AgglomerativeClustering)
+        clusterer_cls: KMeans
+        # Additional kwargs passed to the clusterer (e.g., eps for DBSCAN)
+        clusterer_kwargs: {}
+        # Apply Parseval frame to prototypes
+        apply_parseval: true
 
 comparison:
-  # Distance metric used by scripts/tda_comparison.py
-  # Choices: bottleneck | wasserstein | hausdorff | betti_curve
-  distance: bottleneck
-  # Extra kwargs forwarded to the distance function:
-  #   wasserstein: p (int, default 2)
-  #   betti_curve: norm ('l1' | 'l2' | 'linf', default 'l2')
+    # Distance metric used by scripts/tda_comparison.py
+    # Choices: bottleneck | wasserstein | hausdorff | betti_curve
+    distance: bottleneck
+    # Extra kwargs forwarded to the distance function:
+    #   wasserstein: p (int, default 2)
+    #   betti_curve: norm ('l1' | 'l2' | 'linf', default 'l2')
 
 # hydra:
 #   mode: MULTIRUN

@@ -33,3 +33,28 @@ model-registry:
 # Run the tda signature extraction for all the timm models
 tda-extraction:
     uv run scripts/tda_extraction.py
+
+# Install test dependencies
+test-install:
+    uv sync --extra test
+
+# Run all tests
+test:
+    uv run pytest
+
+# Run tests with coverage
+test-coverage:
+    uv run pytest --cov
+    uv run coverage report
+
+# Run tests matching a pattern
+test-match PATTERN:
+    uv run pytest -k {{PATTERN}}
+
+# Run tests fast (no coverage)
+test-fast:
+    uv run pytest -v -m "not slow"
+
+# Run only slow tests
+test-slow:
+    uv run pytest -v -m "slow"

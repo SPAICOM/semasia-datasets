@@ -2,4 +2,4 @@ name: nkirschi/oxford-flowers
 
 data: image
 extras:
-  - label
+    - label

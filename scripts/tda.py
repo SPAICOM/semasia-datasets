@@ -2,14 +2,15 @@ import logging
 import sys
 from pathlib import Path
 
-sys.path.append(str(Path(sys.path[0]).parent))
-logging.getLogger('httpx').setLevel(logging.WARNING)
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import hydra
 import matplotlib.pyplot as plt
 import numpy as np
 import polars as pl
 from omegaconf import DictConfig
+
+logging.getLogger('httpx').setLevel(logging.WARNING)
 
 RESULTS_DIR = Path('results/tda_signatures')
 OUTPUT_DIR = Path('results/tda_plots')
@@ -20,7 +21,9 @@ _DIM_COLORS = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple']
 def _plot_diagram(ax: plt.Axes, pts: np.ndarray, title: str = '') -> None:
     """Scatter-plot a persistence diagram on *ax*."""
     if pts.size == 0:
-        ax.text(0.5, 0.5, 'empty diagram', ha='center', va='center', transform=ax.transAxes)
+        ax.text(
+            0.5, 0.5, 'empty diagram', ha='center', va='center', transform=ax.transAxes
+        )
         return
 
     dims = sorted({int(d) for d in pts[:, 2]})
@@ -68,14 +71,12 @@ def _plot_images(axes: list, images_nested: list, max_dim: int) -> None:
 )
 def main(cfg: DictConfig) -> None:
     repo_dataset = f'{cfg.repo_id}__{cfg.prefix}{cfg.dataset}'
-    pattern = f'{repo_dataset}__*'
+    pattern = f'{repo_dataset}__*.parquet'
 
-    files = sorted(RESULTS_DIR.glob(pattern))
-    if not files:
+    df = pl.read_parquet(RESULTS_DIR / pattern)
+    if df.is_empty():
         print(f'No files found matching: {RESULTS_DIR / pattern}')
         return
-
-    df = pl.read_parquet(files)
 
     model_pattern: str | None = cfg.get('model') or None
     if model_pattern:
@@ -96,8 +97,10 @@ def main(cfg: DictConfig) -> None:
         out_dir = OUTPUT_DIR / cfg.dataset / model_name
         out_dir.mkdir(parents=True, exist_ok=True)
 
-        pts = np.array(row['persistence_diagram'])   # (n_pts, 3): [birth, death, dim]
-        images_nested = row['persistence_image']      # list[list[list[float]]] (n_dims, n_bins, n_bins)
+        pts = np.array(row['persistence_diagram'])  # (n_pts, 3): [birth, death, dim]
+        images_nested = row[
+            'persistence_image'
+        ]  # list[list[list[float]]] (n_dims, n_bins, n_bins)
 
         # --- persistence diagram ---
         fig_diag, ax_diag = plt.subplots(figsize=(6, 6))

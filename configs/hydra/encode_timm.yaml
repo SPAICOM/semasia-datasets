@@ -1,6 +1,6 @@
 defaults:
-  - _self_
-  - dataset: cifar10
+    - _self_
+    - dataset: cifar10
 
 seed: 42
 encode: true
@@ -9,29 +9,28 @@ models_startwith: null
 parameters_threshold: 1e10
 
 trainer:
-  accelerator: auto
-  devices:
-    - 0
-  strategy: auto
-  logger: false
-  enable_checkpointing: false
-
+    accelerator: auto
+    devices:
+        - 0
+    strategy: auto
+    logger: false
+    enable_checkpointing: false
 
 parquet:
-  max_rows_per_shard: 100_000
+    max_rows_per_shard: 100_000
 
 dataloader:
-  num_workers: 1
-  pin_memory: true
-  batch_size: 8
+    num_workers: 1
+    pin_memory: true
+    batch_size: 8
 
 # --------------------------
 # Hugging Face Hub settings
 # --------------------------
 hf:
-  namespace: spaicom-lab        # 👈 replace with your HF username or org
-  repo_prefix: semantic-        # will create repos like "<namespace>/semantic-cifar10"
-  private: false                # set to true if you want private repos
-  push: false                   # whether to push automatically after export
-  re_push: false                # whether to re push the already present model in HF
-  commit_message: "Add/update parquet shards and configs"
+    namespace: spaicom-lab # 👈 replace with your HF username or org
+    repo_prefix: semantic- # will create repos like "<namespace>/semantic-cifar10"
+    private: false # set to true if you want private repos
+    push: false # whether to push automatically after export
+    re_push: false # whether to re push the already present model in HF
+    commit_message: "Add/update parquet shards and configs"

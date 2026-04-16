@@ -2,5 +2,5 @@ name: uoft-cs/cifar100
 
 data: img
 extras:
-  - fine_label
-  - coarse_label
+    - fine_label
+    - coarse_label

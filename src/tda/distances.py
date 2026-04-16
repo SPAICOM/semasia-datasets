@@ -49,6 +49,7 @@ def _align_dims(
 # Bottleneck distance
 # ---------------------------------------------------------------------------
 
+
 def bottleneck_distance(
     diagram_a: list[list[float]],
     diagram_b: list[list[float]],
@@ -89,6 +90,7 @@ def bottleneck_distance(
 # ---------------------------------------------------------------------------
 # Wasserstein distance
 # ---------------------------------------------------------------------------
+
 
 def wasserstein_distance(
     diagram_a: list[list[float]],
@@ -132,6 +134,7 @@ def wasserstein_distance(
 # Hausdorff distance
 # ---------------------------------------------------------------------------
 
+
 def hausdorff_distance(
     diagram_a: list[list[float]],
     diagram_b: list[list[float]],
@@ -172,12 +175,12 @@ def hausdorff_distance(
             continue
         # min_{b ∈ B} ‖a_i − b‖₂  for each a_i
         diff_ab = a_fin[:, np.newaxis, :] - b_fin[np.newaxis, :, :]  # (|A|, |B|, 2)
-        dist_ab = np.linalg.norm(diff_ab, axis=2)                    # (|A|, |B|)
-        forward = dist_ab.min(axis=1).max()                          # max_a min_b
+        dist_ab = np.linalg.norm(diff_ab, axis=2)  # (|A|, |B|)
+        forward = dist_ab.min(axis=1).max()  # max_a min_b
 
         diff_ba = b_fin[:, np.newaxis, :] - a_fin[np.newaxis, :, :]  # (|B|, |A|, 2)
-        dist_ba = np.linalg.norm(diff_ba, axis=2)                    # (|B|, |A|)
-        backward = dist_ba.min(axis=1).max()                         # max_b min_a
+        dist_ba = np.linalg.norm(diff_ba, axis=2)  # (|B|, |A|)
+        backward = dist_ba.min(axis=1).max()  # max_b min_a
 
         total += float(max(forward, backward))
     return float(total)
@@ -186,6 +189,7 @@ def hausdorff_distance(
 # ---------------------------------------------------------------------------
 # Betti curve distance
 # ---------------------------------------------------------------------------
+
 
 def betti_curve_distance(
     betti_a: list[list[float]],
@@ -232,19 +236,21 @@ def betti_curve_distance(
 
     diff = ca - cb  # (n_dims, n_bins)
 
-    if norm == 'l2':
-        return float(np.sqrt((diff**2).sum(axis=1)).sum() / n_bins)
-    elif norm == 'l1':
-        return float(np.abs(diff).sum(axis=1).sum() / n_bins)
-    elif norm == 'linf':
-        return float(np.abs(diff).max(axis=1).sum())
-    else:
-        raise ValueError(f"Unknown norm {norm!r}. Choices: 'l1', 'l2', 'linf'.")
+    match norm:
+        case 'l2':
+            return float(np.sqrt((diff**2).sum(axis=1)).sum() / n_bins)
+        case 'l1':
+            return float(np.abs(diff).sum(axis=1).sum() / n_bins)
+        case 'linf':
+            return float(np.abs(diff).max(axis=1).sum())
+        case _:
+            raise ValueError(f"Unknown norm {norm!r}. Choices: 'l1', 'l2', 'linf'.")
 
 
 # ---------------------------------------------------------------------------
 # Unified dispatch
 # ---------------------------------------------------------------------------
+
 
 def compute_distance(
     sig_a: dict,
@@ -271,18 +277,25 @@ def compute_distance(
     -------
     float
     """
-    if distance_type == 'bottleneck':
-        return bottleneck_distance(sig_a['persistence_diagram'], sig_b['persistence_diagram'])
-    elif distance_type == 'wasserstein':
-        return wasserstein_distance(
-            sig_a['persistence_diagram'], sig_b['persistence_diagram'], **kwargs
-        )
-    elif distance_type == 'hausdorff':
-        return hausdorff_distance(sig_a['persistence_diagram'], sig_b['persistence_diagram'])
-    elif distance_type == 'betti_curve':
-        return betti_curve_distance(sig_a['betti_curve'], sig_b['betti_curve'], **kwargs)
-    else:
-        raise ValueError(
-            f"Unknown distance_type {distance_type!r}. "
-            f"Choices: 'bottleneck', 'wasserstein', 'hausdorff', 'betti_curve'."
-        )
+    match distance_type:
+        case 'bottleneck':
+            return bottleneck_distance(
+                sig_a['persistence_diagram'], sig_b['persistence_diagram']
+            )
+        case 'wasserstein':
+            return wasserstein_distance(
+                sig_a['persistence_diagram'], sig_b['persistence_diagram'], **kwargs
+            )
+        case 'hausdorff':
+            return hausdorff_distance(
+                sig_a['persistence_diagram'], sig_b['persistence_diagram']
+            )
+        case 'betti_curve':
+            return betti_curve_distance(
+                sig_a['betti_curve'], sig_b['betti_curve'], **kwargs
+            )
+        case _:
+            raise ValueError(
+                f'Unknown distance_type {distance_type!r}. '
+                f"Choices: 'bottleneck', 'wasserstein', 'hausdorff', 'betti_curve'."
+            )

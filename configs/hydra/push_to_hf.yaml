@@ -6,7 +6,7 @@ defaults:
 # Hugging Face Hub settings
 # --------------------------
 hf:
-  namespace: spaicom-lab        # 👈 replace with your HF username or org
-  repo_prefix: semantic-        # will create repos like "<namespace>/semantic-cifar10"
-  private: false                # set to true if you want private repos
-  commit_message: "Add/update parquet shards and configs"
+    namespace: spaicom-lab # 👈 replace with your HF username or org
+    repo_prefix: semantic- # will create repos like "<namespace>/semantic-cifar10"
+    private: false # set to true if you want private repos
+    commit_message: "Add/update parquet shards and configs"

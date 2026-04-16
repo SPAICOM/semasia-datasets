@@ -2,4 +2,4 @@ name: zalando-datasets/fashion_mnist
 
 data: image
 extras:
-  - label
+    - label

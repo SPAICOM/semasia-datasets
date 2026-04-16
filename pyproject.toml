@@ -41,6 +41,13 @@ docstring-code-format = true
 [dependency-groups]
 dev = [
     "rust-just>=1.46.0",
+    "pytest-cov>=6.0.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "slow: tests that take a long time to run (deselect with -m 'not slow')",
 ]
 
 [tool.ruff.lint.per-file-ignores]

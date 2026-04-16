@@ -2,11 +2,10 @@ import logging
 import sys
 from pathlib import Path
 
-sys.path.append(str(Path(sys.path[0]).parent))
-
-logging.getLogger('httpx').setLevel(logging.WARNING)
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import hydra
+import numpy as np
 import polars as pl
 import torch
 from datasets import load_dataset
@@ -14,7 +13,8 @@ from omegaconf import DictConfig
 from tqdm.auto import tqdm
 
 from src import remove_matching
-from src.tda import TDA_KEYS, compute_tda_signature
+from src.objects import LatentSpace
+from src.tda import TDA_KEYS, compute_tda_features
 
 DATASET_SPLITS = {
     'cifar10': {'train', 'test'},
@@ -27,6 +27,8 @@ DATASET_SPLITS = {
     'shvn': {'train', 'test'},
 }
 
+logging.getLogger('httpx').setLevel(logging.WARNING)
+
 
 @hydra.main(
     config_path='../configs/hydra/',
@@ -34,21 +36,17 @@ DATASET_SPLITS = {
     version_base='1.3',
 )
 def main(cfg: DictConfig) -> None:
-    """"""
+    """Extract TDA signatures from latent spaces using LatentSpace for preprocessing."""
 
-    # Define paths
     CURRENT: Path = Path('.')
     RESULTS: Path = CURRENT / 'results/tda_signatures/'
 
-    # Create the results directory that will be populated by parquets
     RESULTS.mkdir(parents=True, exist_ok=True)
 
-    # Variables
     dataset: str = f'{cfg.repo_id}/{cfg.prefix}{cfg.dataset}'
     cache_pattern: str = f'{cfg.repo_id}___{cfg.prefix}{cfg.dataset}'
     hub_pattern: str = f'datasets--{cfg.repo_id}--{cfg.prefix}{cfg.dataset}*'
 
-    # Get all the models from the model-registry
     models: list[str] = (
         pl.read_parquet('hf://datasets/spaicom-lab/model-registry/**/*.parquet')
         .filter(pl.col('latent_dim') < cfg.tda.max_points)
@@ -61,7 +59,6 @@ def main(cfg: DictConfig) -> None:
 
     for model in tqdm(models):
         for split in DATASET_SPLITS[cfg.dataset]:
-            # Instantiate the temp dictionary (TDA columns pre-filled with None)
             temp: dict[str, any] = {
                 'dataset': dataset,
                 'split': split,
@@ -69,9 +66,6 @@ def main(cfg: DictConfig) -> None:
                 **dict.fromkeys(TDA_KEYS),
             }
 
-            # At the first time it will download all the splits
-            # and then load the fist split
-            # From the second split on it will only load it
             try:
                 data = load_dataset(dataset, model, split=split).with_format('torch')
             except Exception as e:
@@ -80,37 +74,50 @@ def main(cfg: DictConfig) -> None:
                 )
                 continue
 
-            # Get the latent in torch format
             latent: torch.Tensor = torch.vstack(list(data['embedding']))
 
-            # Compute TDA signature for this model × dataset × split triplet
-            output_tda: dict[str, list] = compute_tda_signature(
-                latent,
+            extras = None
+            if hasattr(cfg.dataset, 'extras') and cfg.dataset.extras:
+                extra_names = list(cfg.dataset.extras)
+                extras = {
+                    name: np.array(data[name])
+                    for name in extra_names
+                    if name in data.columns
+                }
+
+            ls = LatentSpace(latent, extras=extras, seed=cfg.tda.seed)
+
+            if cfg.tda.max_points > 0 and ls.n_points > cfg.tda.max_points:
+                ls = ls.subsample(cfg.tda.max_points, seed=cfg.tda.seed)
+
+            if cfg.tda.normalize is not None:
+                latent_processed = ls.normalize(cfg.tda.normalize)
+            else:
+                latent_processed = ls.latent
+
+            if cfg.tda.dim_reduction is not None:
+                latent_processed = ls.reduce_dimensions(
+                    cfg.tda.dim_reduction,
+                    cfg.tda.dim_reduction_components,
+                    seed=cfg.tda.seed,
+                )
+
+            output_tda = compute_tda_features(
+                latent_processed,
                 max_dim=cfg.tda.max_dim,
                 simplicial_filter=cfg.tda.simplicial_filter,
                 n_bins=cfg.tda.n_bins,
                 sigma=cfg.tda.sigma,
                 metric=cfg.tda.metric,
-                max_points=cfg.tda.max_points,
-                seed=cfg.tda.seed,
-                normalize=cfg.tda.normalize or None,
-                dim_reduction=cfg.tda.dim_reduction or None,
-                dim_reduction_components=cfg.tda.dim_reduction_components,
             )
 
-            # Dump the parquet file: one row per dataset-split-model triplet
-            (
-                pl.DataFrame(temp | output_tda).write_parquet(
-                    RESULTS
-                    / f'{cfg.repo_id}__{cfg.prefix}{cfg.dataset}__{split}__{model}'
-                )
+            pl.DataFrame(temp | output_tda).write_parquet(
+                RESULTS
+                / f'{cfg.repo_id}__{cfg.prefix}{cfg.dataset}__{split}__{model}.parquet'
             )
 
-        # Clean the cache when a model is done (all splits are done)
-        remove_matching('~/.cache/huggingface/datasets/', f'{cache_pattern}*')
-        remove_matching('~/.cache/huggingface/hub/', hub_pattern)
-
-    return None
+            remove_matching('~/.cache/huggingface/datasets/', f'{cache_pattern}*')
+            remove_matching('~/.cache/huggingface/hub/', hub_pattern)
 
 
 if __name__ == '__main__':
