@@ -609,6 +609,15 @@ h11==0.16.0 \
     # via
     #   httpcore
     #   uvicorn
+hdbscan==0.8.42 \
+    --hash=sha256:31541afa4ce2d42ad828ffd5da1bf40d8212fa8318cc28e58c65ffe719e9083b \
+    --hash=sha256:3bd749a3df39c7e965bd8b2173c3804cdb11ad73d524a5df1201360814293614 \
+    --hash=sha256:7e0f160ee0d5e61d9a2411c44fa41c12849e814899851cab8e17e924487018e1 \
+    --hash=sha256:990b9f9ce14f290eb8bd9343048cb50b890560de99ced4fb31c486cb0c9f0f74 \
+    --hash=sha256:e14d7309c91e1a59f592936555fe4282e66061719225d9cb2d7bf18040bb8b54 \
+    --hash=sha256:f0cc0f279f0f83203277fb5b09422cbfab577fe269e3f71d0082354f65d71cf3 \
+    --hash=sha256:fd9f0d5f65a5aa4437b8f69ff8cb4ae6d42723e543254dca49c62f02192c2791
+    # via semantic-dataset
 hf-xet==1.4.3 ; platform_machine == 'AMD64' or platform_machine == 'aarch64' or platform_machine == 'amd64' or platform_machine == 'arm64' or platform_machine == 'x86_64' \
     --hash=sha256:0392c79b7cf48418cd61478c1a925246cf10639f4cd9d94368d8ca1e8df9ea07 \
     --hash=sha256:1feb0f3abeacee143367c326a128a2e2b60868ec12a36c225afb1d6c5a05e6d2 \
@@ -704,6 +713,7 @@ joblib==1.5.3 \
     --hash=sha256:5fc3c5039fc5ca8c0276333a188bbd59d6b7ab37fe6632daa76bc7f9ec18e713 \
     --hash=sha256:8561a3269e6801106863fd0d6d84bb737be9e7631e33aaed3fb9ce5953688da3
     # via
+    #   hdbscan
     #   persim
     #   pynndescent
     #   scikit-learn
@@ -1244,6 +1254,7 @@ numpy==2.4.4 \
     # via
     #   contourpy
     #   datasets
+    #   hdbscan
     #   kmapper
     #   matplotlib
     #   numba
@@ -1903,6 +1914,7 @@ scikit-learn==1.8.0 \
     --hash=sha256:fb65db5d7531bccf3a4f6bec3462223bea71384e2cda41da0f10b7c292b9e7c4 \
     --hash=sha256:fe1c011a640a9f0791146011dfd3c7d9669785f9fed2b2a5f9e207536cf5c2fd
     # via
+    #   hdbscan
     #   kmapper
     #   persim
     #   pynndescent
@@ -1967,6 +1979,7 @@ scipy==1.17.1 \
     --hash=sha256:f8885db0bc2bffa59d5c1b72fad7a6a92d3e80e7257f967dd81abb553a90d293 \
     --hash=sha256:fcb310ddb270a06114bb64bbe53c94926b943f5b7f0842194d585c65eb4edd76
     # via
+    #   hdbscan
     #   kmapper
     #   pynndescent
     #   ripser

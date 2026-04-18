@@ -1,0 +1,4 @@
+_target_: sklearn.cluster.KMeans
+_partial_: true
+n_init: 10
+max_iter: 300

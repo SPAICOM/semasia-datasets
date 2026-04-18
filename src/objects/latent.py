@@ -13,6 +13,18 @@ if TYPE_CHECKING:
     from sklearn.base import ClusterMixin
 
 NormalizeMethod = Literal['standard', 'minmax', 'l2']
+
+
+def _instantiate_hdbscan(**kwargs):
+    """Instantiate HDBSCAN clusterer (lazy import)."""
+    try:
+        import hdbscan
+
+        return hdbscan.HDBSCAN(**kwargs)
+    except ImportError:
+        raise ImportError('hdbscan package not installed. Run: pip install hdbscan')
+
+
 DimReductionMethod = Literal[
     'pca', 'umap', 'tsne', 'lle', 'isomap', 'prototype_analysis'
 ]
@@ -93,6 +105,7 @@ class LatentSpace:
         self._prototypes: np.ndarray | None = None
         self._F: np.ndarray | None = None
         self._G: np.ndarray | None = None
+        self._prototypes_to_indices: dict[int, np.ndarray] = {}
 
     @property
     def latent(self) -> np.ndarray:
@@ -333,14 +346,15 @@ class LatentSpace:
 
     def compute_prototypes(
         self,
-        n_samples: int,
+        n_samples: int | None = 10,
         clusters: np.ndarray | None = None,
         clusterer: object | None = None,
         clusterer_cls: type[ClusterMixin] | None = None,
         n_clusters: int | None = None,
         clusterer_kwargs: dict | None = None,
         apply_parseval: bool = True,
-    ) -> np.ndarray:
+        return_cluster_indices: bool = False,
+    ) -> np.ndarray | tuple[np.ndarray, dict[int, np.ndarray]]:
         """Compute cluster prototypes with optional Parseval frame.
 
         Results are saved to ``prototypes``, ``F``, and ``G`` attributes.
@@ -357,8 +371,9 @@ class LatentSpace:
 
         Parameters
         ----------
-        n_samples : int
+        n_samples : int | None
             Number of samples per cluster to compute prototype.
+            If None, use all observations in each cluster to compute centroid.
         clusters : np.ndarray, optional
             Precomputed cluster assignments.
         clusterer : object, optional
@@ -371,11 +386,17 @@ class LatentSpace:
             Additional kwargs for clusterer.
         apply_parseval : bool
             Whether to apply Parseval frame to prototypes.
+        return_cluster_indices : bool
+            If True, also return a dict mapping prototype indices to
+            arrays of observation indices that belong to each prototype.
 
         Returns
         -------
         prototypes : np.ndarray, shape (k, n_features)
             Prototype vectors for each cluster.
+        cluster_indices : dict[int, np.ndarray], optional
+            Only returned if ``return_cluster_indices=True``.
+            Maps prototype index to array of observation indices.
         """
         clusterer_kwargs = clusterer_kwargs or {}
 
@@ -413,15 +434,18 @@ class LatentSpace:
         for i, c in enumerate(unique_clusters):
             in_cluster = self._latent[clusters == c]
 
-            if in_cluster.shape[0] < n_samples:
+            if n_samples is not None and in_cluster.shape[0] < n_samples:
                 raise ValueError(
                     f'Cluster {c} has {in_cluster.shape[0]} samples, '
                     f'but n_samples={n_samples}.'
                 )
 
-            rng = np.random.default_rng(self._seed + i)
-            idx = rng.choice(in_cluster.shape[0], size=n_samples, replace=False)
-            prototypes[i] = in_cluster[idx].mean(axis=0)
+            if n_samples is None:
+                prototypes[i] = in_cluster.mean(axis=0)
+            else:
+                rng = np.random.default_rng(self._seed + i)
+                idx = rng.choice(in_cluster.shape[0], size=n_samples, replace=False)
+                prototypes[i] = in_cluster[idx].mean(axis=0)
 
         self._prototypes = prototypes
 
@@ -430,6 +454,13 @@ class LatentSpace:
         else:
             self._F = None
             self._G = None
+
+        self._prototypes_to_indices: dict[int, np.ndarray] = {}
+        if return_cluster_indices:
+            for i, c in enumerate(unique_clusters):
+                obs_indices = np.where(clusters == c)[0]
+                self._prototypes_to_indices[i] = obs_indices
+            return prototypes, self._prototypes_to_indices
 
         return prototypes
 

@@ -1,0 +1,3 @@
+_target_: sklearn.cluster.SpectralClustering
+n_init: 10
+affinity: rbf

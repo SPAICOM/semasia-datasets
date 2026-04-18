@@ -389,6 +389,48 @@ class TestComputePrototypes:
                 clusterer_cls=KMeans,
             )
 
+    def test_compute_prototypes_n_samples_none(self, simple_cloud):
+        from src.objects.latent import LatentSpace
+
+        latent = LatentSpace(simple_cloud, seed=42)
+        prototypes = latent.compute_prototypes(
+            n_samples=None,
+            clusterer_cls=KMeans,
+            n_clusters=3,
+        )
+
+        assert prototypes.shape == (3, 2)
+        assert latent.prototypes is prototypes
+
+    def test_compute_prototypes_n_samples_none_with_indices(self, larger_cloud):
+        from src.objects.latent import LatentSpace
+
+        latent = LatentSpace(larger_cloud, seed=42)
+        prototypes, cluster_indices = latent.compute_prototypes(
+            n_samples=None,
+            clusterer_cls=KMeans,
+            n_clusters=10,
+            return_cluster_indices=True,
+        )
+
+        assert prototypes.shape == (10, 5)
+        assert isinstance(cluster_indices, dict)
+        assert len(cluster_indices) == 10
+        for proto_idx, obs_indices in cluster_indices.items():
+            assert isinstance(proto_idx, int)
+            assert obs_indices.ndim == 1
+
+    def test_compute_prototypes_default_n_samples(self, larger_cloud):
+        from src.objects.latent import LatentSpace
+
+        latent = LatentSpace(larger_cloud, seed=42)
+        prototypes = latent.compute_prototypes(
+            clusterer_cls=KMeans,
+            n_clusters=10,
+        )
+
+        assert prototypes.shape == (10, 5)
+
 
 class TestApplyOperators:
     """Tests for apply_analysis_operator and apply_synthesis_operator."""

@@ -1,0 +1,27 @@
+defaults:
+  - _self_
+  - clustering: kmeans
+
+repo_id: "spaicom-lab"
+prefix: "semantic-"
+dataset: cifar10
+split: train
+
+n_prototypes:
+  - 4
+  - 8
+  - 16
+  - 32
+  - 64
+  - 128
+seed: 42
+
+jaccard_threshold: 0.5
+save_heatmaps: true
+
+metrics:
+  - euclidean
+  - cosine
+  - wasserstein
+  - chamfer
+  - hausdorff

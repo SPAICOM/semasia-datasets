@@ -1,0 +1,3 @@
+_target_: sklearn.cluster.AgglomerativeClustering
+linkage: ward
+metric: euclidean
