@@ -1,4 +1,4 @@
-"""Metrics for comparing latent spaces."""
+"""Metrics for comparing latent spaces (alignment metrics)."""
 
 from __future__ import annotations
 
@@ -28,7 +28,6 @@ def euclidean_distance(a: np.ndarray, b: np.ndarray) -> float:
     if a.size == 0 or b.size == 0:
         raise ValueError('Input arrays cannot be empty')
 
-    # For large point clouds, use sampling to avoid memory issues
     max_points = 5000
     n_a, n_b = a.shape[0], b.shape[0]
 
@@ -51,7 +50,6 @@ def cosine_distance(a: np.ndarray, b: np.ndarray) -> float:
     if a.size == 0 or b.size == 0:
         raise ValueError('Input arrays cannot be empty')
 
-    # For large point clouds, use sampling
     max_points = 5000
     n_a, n_b = a.shape[0], b.shape[0]
     if n_a > max_points or n_b > max_points:
@@ -122,7 +120,6 @@ def sinkhorn_distance(
     max_points = 2000
     n_a, n_b = a.shape[0], b.shape[0]
 
-    # For large point clouds, use sampling
     if n_a > max_points or n_b > max_points:
         rng = np.random.default_rng(42)
         a = a[rng.choice(n_a, min(max_points, n_a), replace=False)]

@@ -22,7 +22,7 @@ from scipy.optimize import linear_sum_assignment
 from tqdm.auto import tqdm
 
 from src import remove_matching
-from src.metrics import (
+from src.metrics.alignment import (
     compute_jaccard_metrics,
     compute_metric,
     jaccard_prototype_similarity,

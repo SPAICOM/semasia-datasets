@@ -34,6 +34,24 @@ model-registry:
 tda-extraction:
     uv run scripts/tda_extraction.py
 
+# Phase 1: Download all model latents (no computation)
+stat-download:
+    uv run scripts/stat_analysis.py download_only=true
+
+# Phase 2: Compute entropy metrics from cached latents
+stat-compute:
+    uv run scripts/stat_analysis.py download_only=false
+
+# Phase 3: Run regression on existing metrics
+stat-regression:
+    uv run scripts/stat_analysis.py regression_only=true
+
+# Run stat analysis (full pipeline)
+stat:
+    just stat-download
+    just stat-compute
+    just stat-regression
+
 # Install test dependencies
 test-install:
     uv sync --extra test
