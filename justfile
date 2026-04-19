@@ -1,4 +1,4 @@
-# # Setup the repo .venv via uv
+# Setup the repo .venv via uv
 setup:
     uv sync
 

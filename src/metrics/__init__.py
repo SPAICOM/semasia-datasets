@@ -1,7 +1,7 @@
 """Metrics for latent space analysis."""
 
 from src.metrics.alignment import (
-    METRIC_NAMES,
+    align_prototypes,
     chamfer_distance,
     compute_jaccard_metrics,
     compute_metric,
@@ -22,20 +22,18 @@ from src.metrics.entropy import (
 )
 
 __all__ = [
-    # alignment metrics
-    'METRIC_NAMES',
-    'compute_metric',
-    'euclidean_distance',
-    'cosine_distance',
-    'mahalanobis_distance',
-    'wasserstein_distance',
-    'sinkhorn_distance',
-    'procrustes_distance',
+    'align_prototypes',
     'chamfer_distance',
+    'compute_jaccard_metrics',
+    'compute_metric',
+    'cosine_distance',
+    'euclidean_distance',
     'hausdorff_distance',
     'jaccard_prototype_similarity',
-    'compute_jaccard_metrics',
-    # entropy metrics
+    'mahalanobis_distance',
+    'procrustes_distance',
+    'sinkhorn_distance',
+    'wasserstein_distance',
     'spectral_entropy',
     'effective_rank',
     'participation_ratio',

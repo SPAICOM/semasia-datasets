@@ -1,4 +1,4 @@
-"""Metrics for comparing latent spaces (alignment metrics)."""
+"""Metrics for comparing latent spaces and aligning prototypes."""
 
 from __future__ import annotations
 
@@ -71,17 +71,7 @@ def mahalanobis_distance(
     b: np.ndarray,
     cov: np.ndarray | None = None,
 ) -> float:
-    """Mahalanobis distance between point clouds.
-
-    Parameters
-    ----------
-    a : np.ndarray, shape (n, d)
-        First point cloud.
-    b : np.ndarray, shape (m, d)
-        Second point cloud.
-    cov : np.ndarray, optional, shape (d, d)
-        Covariance matrix. If None, uses pooled covariance.
-    """
+    """Mahalanobis distance between point clouds."""
     a = np.asarray(a, dtype=np.float32)
     b = np.asarray(b, dtype=np.float32)
 
@@ -148,11 +138,7 @@ def sinkhorn_distance(
 
 
 def procrustes_distance(a: np.ndarray, b: np.ndarray) -> float:
-    """Procrustes distance between point clouds.
-
-    Finds the optimal orthogonal transformation to align two point clouds
-    and returns the residual sum of squared distances.
-    """
+    """Procrustes distance between point clouds."""
     a = np.asarray(a, dtype=np.float32)
     b = np.asarray(b, dtype=np.float32)
 
@@ -218,25 +204,7 @@ def compute_metric(
     method: MetricName | str,
     **kwargs,
 ) -> float:
-    """Compute distance/similarity metric between two point clouds.
-
-    Parameters
-    ----------
-    a : np.ndarray, shape (n, d)
-        First point cloud.
-    b : np.ndarray, shape (m, d)
-        Second point cloud.
-    method : str
-        Metric name. Choices: euclidean, cosine, mahalanobis, wasserstein,
-        sinkhorn, procrustes, chamfer, hausdorff.
-    **kwargs
-        Additional kwargs passed to the specific metric function.
-
-    Returns
-    -------
-    float
-        Distance value.
-    """
+    """Compute distance/similarity metric between two point clouds."""
     match method:
         case 'euclidean':
             return euclidean_distance(a, b)
@@ -274,23 +242,7 @@ def jaccard_prototype_similarity(
     cluster_indices_a: dict[int, np.ndarray],
     cluster_indices_b: dict[int, np.ndarray],
 ) -> np.ndarray:
-    """Compute Jaccard similarity matrix between prototypes.
-
-    For each prototype pair (i, j):
-        J(i,j) = |A_i ∩ B_j| / |A_i ∪ B_j|
-
-    Parameters
-    ----------
-    cluster_indices_a : dict[int, np.ndarray]
-        Dict mapping prototype index to array of observation indices.
-    cluster_indices_b : dict[int, np.ndarray]
-        Dict mapping prototype index to array of observation indices.
-
-    Returns
-    -------
-    similarity_matrix : np.ndarray, shape (n_prototypes_a, n_prototypes_b)
-        Jaccard similarities where 1.0 = perfect match (identical observation sets).
-    """
+    """Compute Jaccard similarity matrix between prototypes."""
     n_proto_a = len(cluster_indices_a)
     n_proto_b = len(cluster_indices_b)
     similarity_matrix = np.empty((n_proto_a, n_proto_b), dtype=np.float32)
@@ -314,24 +266,7 @@ def compute_jaccard_metrics(
     cluster_indices_b: dict[int, np.ndarray],
     threshold: float = 0.5,
 ) -> dict[str, float]:
-    """Compute Jaccard-based metrics for prototype similarity.
-
-    Parameters
-    ----------
-    cluster_indices_a : dict[int, np.ndarray]
-        Dict mapping prototype index to array of observation indices.
-    cluster_indices_b : dict[int, np.ndarray]
-        Dict mapping prototype index to array of observation indices.
-    threshold : float
-        Threshold for "good match" (default: 0.5).
-
-    Returns
-    -------
-    dict[str, float]
-        Dictionary with keys:
-        - 'jaccard_mean': Mean of best-match similarities
-        - 'jaccard_good_match_ratio': Fraction above threshold
-    """
+    """Compute Jaccard-based metrics for prototype similarity."""
     sim_matrix = jaccard_prototype_similarity(cluster_indices_a, cluster_indices_b)
 
     best_matches_a = sim_matrix.max(axis=1)
@@ -345,3 +280,15 @@ def compute_jaccard_metrics(
         'jaccard_mean': jaccard_mean,
         'jaccard_good_match_ratio': float(jaccard_good_match_ratio),
     }
+
+
+def align_prototypes(
+    cluster_indices_a: dict[int, np.ndarray],
+    cluster_indices_b: dict[int, np.ndarray],
+) -> np.ndarray:
+    """Find the permutation that aligns model B's prototypes to model A's."""
+    from scipy.optimize import linear_sum_assignment
+
+    sim_matrix = jaccard_prototype_similarity(cluster_indices_a, cluster_indices_b)
+    _, col_ind = linear_sum_assignment(-sim_matrix)
+    return col_ind

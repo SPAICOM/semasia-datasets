@@ -181,8 +181,9 @@ class TestSubsample:
             seed=42,
         )
 
-        assert subsampled.analysis_operator is None
-        assert subsampled.synthesis_operator is None
+        assert subsampled.analysis_operator is not None
+        assert subsampled.synthesis_operator is not None
+        assert np.allclose(subsampled.analysis_operator, subsampled.prototypes)
 
     def test_subsample_prototypes_custom_clusterer(self, larger_cloud):
         from src.objects.latent import LatentSpace
@@ -336,8 +337,9 @@ class TestComputePrototypes:
             apply_parseval=False,
         )
 
-        assert latent.analysis_operator is None
-        assert latent.synthesis_operator is None
+        assert latent.analysis_operator is not None
+        assert latent.synthesis_operator is not None
+        assert np.allclose(latent.analysis_operator, latent.prototypes)
 
     def test_compute_prototypes_with_parseval(self, larger_cloud):
         from src.objects.latent import LatentSpace
@@ -373,7 +375,11 @@ class TestComputePrototypes:
         with pytest.raises(
             ValueError, match='Provide exactly one of .clusters., .clusterer.'
         ):
-            latent.compute_prototypes(n_samples=5)
+            latent.compute_prototypes(
+                n_samples=5,
+                clusters=np.array([0, 0]),
+                clusterer_cls=KMeans,
+            )
 
     def test_compute_prototypes_error_multiple_modes(self, simple_cloud):
         from src.objects.latent import LatentSpace
@@ -450,13 +456,44 @@ class TestApplyOperators:
 
         assert transformed.shape == (100, 10)
 
+    def test_apply_analysis_operator_with_X(self, larger_cloud):
+        from src.objects.latent import LatentSpace
+
+        latent = LatentSpace(larger_cloud, seed=42)
+        latent.compute_prototypes(
+            n_samples=5,
+            clusterer_cls=KMeans,
+            n_clusters=10,
+            apply_parseval=True,
+        )
+
+        X_new = np.random.randn(50, 5).astype(np.float32)
+        transformed = latent.apply_analysis_operator(X_new)
+
+        assert transformed.shape == (50, 10)
+
+    def test_apply_analysis_operator_with_X_use_whitening(self, larger_cloud):
+        from src.objects.latent import LatentSpace
+
+        latent = LatentSpace(larger_cloud, seed=42)
+        latent.prewhiten()
+        latent.compute_prototypes(
+            n_samples=5,
+            clusterer_cls=KMeans,
+            n_clusters=10,
+            apply_parseval=True,
+        )
+
+        X_new = np.random.randn(50, 5).astype(np.float32)
+        transformed = latent.apply_analysis_operator(X_new, use_whitening=True)
+
+        assert transformed.shape == (50, 5)
+
     def test_apply_analysis_operator_error(self, simple_cloud):
         from src.objects.latent import LatentSpace
 
         latent = LatentSpace(simple_cloud)
-        with pytest.raises(
-            ValueError, match='Run compute_prototypes with apply_parseval=True'
-        ):
+        with pytest.raises(ValueError, match='compute_prototypes'):
             latent.apply_analysis_operator()
 
     def test_apply_synthesis_operator_numpy(self, larger_cloud):
@@ -498,9 +535,7 @@ class TestApplyOperators:
         from src.objects.latent import LatentSpace
 
         latent = LatentSpace(simple_cloud)
-        with pytest.raises(
-            ValueError, match='Run compute_prototypes with apply_parseval=True'
-        ):
+        with pytest.raises(ValueError, match='compute_prototypes'):
             latent.apply_synthesis_operator(np.array([[1, 2]]))
 
     def test_roundtrip_transform(self, larger_cloud):
@@ -517,3 +552,307 @@ class TestApplyOperators:
         F_transformed = latent.apply_analysis_operator()
 
         assert F_transformed.shape == (100, 10)
+
+    def test_set_operators(self, larger_cloud):
+        from src.objects.latent import LatentSpace
+
+        latent = LatentSpace(larger_cloud, seed=42)
+        latent.compute_prototypes(
+            n_samples=5,
+            clusterer_cls=KMeans,
+            n_clusters=10,
+            apply_parseval=False,
+        )
+
+        assert np.allclose(latent.analysis_operator, latent.prototypes)
+
+        latent.set_operators(use_parseval=True)
+        assert not np.allclose(latent.analysis_operator, latent.prototypes)
+
+        latent.set_operators(use_parseval=False)
+        assert np.allclose(latent.analysis_operator, latent.prototypes)
+
+
+class TestNormalizeInplace:
+    """Tests for normalize method with inplace parameter."""
+
+    def test_normalize_inplace_modifies_latent(self, larger_cloud):
+        from src.objects.latent import LatentSpace
+
+        X = larger_cloud.copy()
+        latent = LatentSpace(X)
+        latent.normalize('standard', inplace=True)
+
+        np.testing.assert_array_almost_equal(
+            latent._latent, (X - X.mean(axis=0)) / X.std(axis=0)
+        )
+
+    def test_normalize_inplace_returns_self(self, larger_cloud):
+        from src.objects.latent import LatentSpace
+
+        latent = LatentSpace(larger_cloud)
+        result = latent.normalize('standard', inplace=True)
+
+        assert isinstance(result, LatentSpace)
+        assert result is latent
+
+    def test_normalize_inplace_false_returns_copy(self, larger_cloud):
+        from src.objects.latent import LatentSpace
+
+        latent = LatentSpace(larger_cloud)
+        result = latent.normalize('standard', inplace=False)
+
+        assert isinstance(result, np.ndarray)
+        assert result is not latent._latent
+
+
+class TestPrewhiten:
+    """Tests for prewhiten method."""
+
+    def test_prewhiten_returns_array(self, larger_cloud):
+        from src.objects.latent import LatentSpace
+
+        latent = LatentSpace(larger_cloud)
+        whitened = latent.prewhiten()
+
+        assert isinstance(whitened, np.ndarray)
+        assert whitened.shape == larger_cloud.shape
+
+    def test_prewhiten_inplace_returns_self(self, larger_cloud):
+        from src.objects.latent import LatentSpace
+
+        latent = LatentSpace(larger_cloud)
+        result = latent.prewhiten(inplace=True)
+
+        assert isinstance(result, LatentSpace)
+        assert result is latent
+
+    def test_prewhiten_stores_operators(self, larger_cloud):
+        from src.objects.latent import LatentSpace
+
+        latent = LatentSpace(larger_cloud)
+        latent.prewhiten()
+
+        assert latent._whitening_L is not None
+        assert latent._whitening_mean is not None
+        assert latent._whitening_L.shape == (5, 5)
+        assert latent._whitening_mean.shape == (5,)
+
+    def test_prewhiten_shape_preserved(self, larger_cloud):
+        from src.objects.latent import LatentSpace
+
+        latent = LatentSpace(larger_cloud)
+        whitened = latent.prewhiten()
+
+        assert whitened.shape == larger_cloud.shape
+
+    def test_prewhiten_error_if_already_computed(self, larger_cloud):
+        from src.objects.latent import LatentSpace
+
+        latent = LatentSpace(larger_cloud)
+        latent.prewhiten()
+
+        with pytest.raises(ValueError, match='already computed'):
+            latent.prewhiten()
+
+    def test_prewhiten_features_uncorrelated(self, larger_cloud):
+        from src.objects.latent import LatentSpace
+
+        latent = LatentSpace(larger_cloud)
+        whitened = latent.prewhiten()
+
+        cov = np.cov(whitened.T)
+        np.testing.assert_array_almost_equal(cov, np.eye(5), decimal=5)
+
+
+class TestDewhiten:
+    """Tests for dewhiten method."""
+
+    def test_dewhiten_returns_array(self, larger_cloud):
+        from src.objects.latent import LatentSpace
+
+        latent = LatentSpace(larger_cloud)
+        whitened = latent.prewhiten()
+        dewhitened = latent.dewhiten()
+
+        assert isinstance(dewhitened, np.ndarray)
+        assert dewhitened.shape == larger_cloud.shape
+
+    def test_dewhiten_inplace_returns_self(self, larger_cloud):
+        from src.objects.latent import LatentSpace
+
+        latent = LatentSpace(larger_cloud)
+        latent.prewhiten(inplace=True)
+        result = latent.dewhiten(inplace=True)
+
+        assert isinstance(result, LatentSpace)
+        assert result is latent
+
+    def test_dewhiten_roundtrip(self, larger_cloud):
+        from src.objects.latent import LatentSpace
+
+        latent = LatentSpace(larger_cloud)
+        latent.prewhiten(inplace=True)
+        whitened = latent._latent.copy()
+        dewhitened = latent.dewhiten(inplace=True)
+
+        np.testing.assert_array_almost_equal(
+            dewhitened._latent, larger_cloud, decimal=5
+        )
+
+    def test_dewhiten_error_no_prewhiten(self, larger_cloud):
+        from src.objects.latent import LatentSpace
+
+        latent = LatentSpace(larger_cloud)
+
+        with pytest.raises(ValueError, match='Whitening operators not computed'):
+            latent.dewhiten()
+
+
+class TestApplyWhiteningOperators:
+    """Tests for apply_whitening_operator and apply_dewhitening_operator."""
+
+    def test_apply_whitening_operator_numpy(self, larger_cloud):
+        from src.objects.latent import LatentSpace
+
+        latent = LatentSpace(larger_cloud)
+        latent.prewhiten()
+
+        X = np.random.randn(50, 5).astype(np.float32)
+        result = latent.apply_whitening_operator(X)
+
+        assert isinstance(result, np.ndarray)
+        assert result.shape == (50, 5)
+
+    def test_apply_whitening_operator_torch(self, larger_cloud):
+        from src.objects.latent import LatentSpace
+
+        latent = LatentSpace(larger_cloud)
+        latent.prewhiten()
+
+        X = torch.randn(50, 5)
+        result = latent.apply_whitening_operator(X)
+
+        assert isinstance(result, torch.Tensor)
+        assert result.shape == (50, 5)
+
+    def test_apply_whitening_operator_error(self, larger_cloud):
+        from src.objects.latent import LatentSpace
+
+        latent = LatentSpace(larger_cloud)
+
+        with pytest.raises(ValueError, match='Whitening operators not computed'):
+            latent.apply_whitening_operator(np.array([[1, 2, 3, 4, 5]]))
+
+    def test_apply_dewhitening_operator_numpy(self, larger_cloud):
+        from src.objects.latent import LatentSpace
+
+        latent = LatentSpace(larger_cloud)
+        latent.prewhiten()
+
+        X = np.random.randn(50, 5).astype(np.float32)
+        result = latent.apply_dewhitening_operator(X)
+
+        assert isinstance(result, np.ndarray)
+        assert result.shape == (50, 5)
+
+    def test_apply_dewhitening_operator_torch(self, larger_cloud):
+        from src.objects.latent import LatentSpace
+
+        latent = LatentSpace(larger_cloud)
+        latent.prewhiten()
+
+        X = torch.randn(50, 5)
+        result = latent.apply_dewhitening_operator(X)
+
+        assert isinstance(result, torch.Tensor)
+        assert result.shape == (50, 5)
+
+    def test_apply_dewhitening_operator_error(self, larger_cloud):
+        from src.objects.latent import LatentSpace
+
+        latent = LatentSpace(larger_cloud)
+
+        with pytest.raises(ValueError, match='Whitening operators not computed'):
+            latent.apply_dewhitening_operator(np.array([[1, 2, 3, 4, 5]]))
+
+    def test_apply_whitening_external_data(self, larger_cloud):
+        from src.objects.latent import LatentSpace
+
+        latent = LatentSpace(larger_cloud)
+        latent.prewhiten()
+
+        X_new = np.random.randn(20, 5).astype(np.float32)
+        whitened = latent.apply_whitening_operator(X_new)
+        dewhitened = latent.apply_dewhitening_operator(whitened)
+
+        np.testing.assert_array_almost_equal(dewhitened, X_new, decimal=5)
+
+
+class TestComputePrototypesPrewhiten:
+    """Tests for compute_prototypes with prewhiten parameter."""
+
+    def test_compute_prototypes_prewhiten_true(self, larger_cloud):
+        from src.objects.latent import LatentSpace
+
+        latent = LatentSpace(larger_cloud)
+        prototypes = latent.compute_prototypes(
+            n_clusters=10,
+            n_samples=None,
+            prewhiten=True,
+        )
+
+        assert prototypes.shape == (10, 5)
+        assert latent._whitening_L is not None
+        assert latent._whitening_mean is not None
+
+    def test_compute_prototypes_prewhiten_false_default(self, larger_cloud):
+        from src.objects.latent import LatentSpace
+
+        latent = LatentSpace(larger_cloud)
+        prototypes = latent.compute_prototypes(
+            n_clusters=10,
+            prewhiten=False,
+        )
+
+        assert prototypes.shape == (10, 5)
+        assert latent._whitening_L is None
+
+    def test_compute_prototypes_prewhiten_does_not_modify_latent(self, larger_cloud):
+        from src.objects.latent import LatentSpace
+
+        X_orig = larger_cloud.copy()
+        latent = LatentSpace(larger_cloud)
+        latent.compute_prototypes(n_clusters=10, n_samples=None, prewhiten=True)
+
+        np.testing.assert_array_almost_equal(latent._latent, X_orig)
+
+
+class TestApplyAnalysisOperatorWhitening:
+    """Tests for apply_analysis_operator with use_whitening parameter."""
+
+    def test_apply_analysis_operator_use_whitening_true(self, larger_cloud):
+        from src.objects.latent import LatentSpace
+
+        latent = LatentSpace(larger_cloud)
+        latent.prewhiten()
+        result = latent.apply_analysis_operator(use_whitening=True)
+
+        assert result.shape == (100, 5)
+
+    def test_apply_analysis_operator_use_whitening_false_default(self, larger_cloud):
+        from src.objects.latent import LatentSpace
+
+        latent = LatentSpace(larger_cloud)
+        latent.compute_prototypes(n_clusters=10)
+        result = latent.apply_analysis_operator(use_whitening=False)
+
+        assert result.shape == (100, 10)
+
+    def test_apply_analysis_operator_error_whitening_not_computed(self, larger_cloud):
+        from src.objects.latent import LatentSpace
+
+        latent = LatentSpace(larger_cloud)
+
+        with pytest.raises(ValueError, match='Whitening operators not computed'):
+            latent.apply_analysis_operator(use_whitening=True)
