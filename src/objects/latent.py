@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 import torch
+from scipy.linalg import solve_triangular
 from sklearn.decomposition import PCA
 from sklearn.manifold import Isomap, LocallyLinearEmbedding
 
@@ -106,6 +107,12 @@ class LatentSpace:
         self._F: np.ndarray | None = None
         self._G: np.ndarray | None = None
         self._prototypes_to_indices: dict[int, np.ndarray] = {}
+
+        self._whiten_F: np.ndarray | None = None
+        self._whiten_G: np.ndarray | None = None
+        self._whitening_mean: np.ndarray | None = None
+        self._whitening_L: np.ndarray | None = None
+        self._whitened_latent: np.ndarray | None = None
 
     @property
     def latent(self) -> np.ndarray:
@@ -239,20 +246,188 @@ class LatentSpace:
         new_inst._original_indices = self._original_indices[idx]
         return new_inst
 
-    def normalize(self, method: NormalizeMethod) -> np.ndarray:
+    def normalize(
+        self, method: NormalizeMethod, inplace: bool = False
+    ) -> np.ndarray | LatentSpace:
         """Normalize the point cloud.
 
         Parameters
         ----------
         method : NormalizeMethod
             Normalization method: 'standard', 'minmax', or 'l2'.
+        inplace : bool, default=False
+            If True, modify self._latent in place and return self.
+            If False, return a copy.
 
         Returns
         -------
-        np.ndarray
-            Normalized latent array.
+        np.ndarray | LatentSpace
+            Normalized latent array, or self if inplace=True.
         """
-        return _normalize_point_cloud(self._latent, method)
+        result = _normalize_point_cloud(self._latent, method)
+        if inplace:
+            self._latent = result
+            return self
+        return result
+
+    def prewhiten(self, inplace: bool = False) -> np.ndarray | LatentSpace:
+        """Apply Cholesky whitening to the latent space.
+
+        Whitening decorrelates features and normalizes variance to unity.
+        Uses Cholesky decomposition for numerically stable whitening.
+
+        Parameters
+        ----------
+        inplace : bool, default=False
+            If True, modify self._latent in place and return self.
+            If False, return a copy.
+
+        Returns
+        -------
+        np.ndarray | LatentSpace
+            Whitened latent array, or self if inplace=True.
+
+        Raises
+        ------
+        ValueError
+            If whitening has already been computed.
+        """
+        if self._whitening_L is not None:
+            raise ValueError(
+                'Whitening operators already computed. '
+                'Create a new LatentSpace instance to re-whiten.'
+            )
+
+        X = self._latent
+
+        mean = X.mean(axis=0, keepdims=True)
+        X_centered = X - mean
+
+        C = np.cov(X, rowvar=False)
+
+        eps = 1e-6
+        C = C + eps * np.eye(C.shape[0])
+
+        L = np.linalg.cholesky(C)
+
+        whitened = solve_triangular(L, X_centered.T, lower=True).T
+
+        self._whitening_mean = mean.squeeze()
+        self._whitening_L = L
+
+        if inplace:
+            self._latent = whitened
+            self._whitened_latent = whitened
+            return self
+
+        return whitened
+
+    def dewhiten(self, inplace: bool = False) -> np.ndarray | LatentSpace:
+        """Apply the inverse of Cholesky whitening (dewhitening).
+
+        Parameters
+        ----------
+        inplace : bool, default=False
+            If True, modify self._latent in place and return self.
+
+        Returns
+        -------
+        np.ndarray | LatentSpace
+            Dewhitened latent array, or self if inplace=True.
+
+        Raises
+        ------
+        ValueError
+            If whitening operators have not been computed.
+        """
+        if self._whitening_L is None:
+            raise ValueError('Whitening operators not computed. Run prewhiten() first.')
+
+        if inplace and self._whitened_latent is None:
+            raise ValueError(
+                'No whitened data to dewhiten in place. '
+                'Call prewhiten(inplace=True) first.'
+            )
+
+        if inplace:
+            restored = (
+                self._whitened_latent @ self._whitening_L.T
+            ) + self._whitening_mean
+            self._latent = restored
+            self._whitened_latent = None
+            return self
+
+        whitened = self._whitened_latent
+        if whitened is None:
+            whitened = self._latent
+        return (whitened @ self._whitening_L.T) + self._whitening_mean
+
+    def apply_whitening_operator(
+        self, X: np.ndarray | torch.Tensor
+    ) -> np.ndarray | torch.Tensor:
+        """Apply whitening operator to input data.
+
+        Parameters
+        ----------
+        X : np.ndarray | torch.Tensor, shape (n, n_features)
+            Input data to transform.
+
+        Returns
+        -------
+        np.ndarray | torch.Tensor
+            Whitened data. Output type matches input type.
+
+        Raises
+        ------
+        ValueError
+            If whitening has not been computed.
+        """
+        if self._whitening_L is None:
+            raise ValueError('Whitening operators not computed. Run prewhiten() first.')
+
+        if isinstance(X, torch.Tensor):
+            X_arr = X.detach().float()
+            L = torch.from_numpy(self._whitening_L)
+            X_centered = X_arr - torch.from_numpy(self._whitening_mean)
+            return torch.linalg.solve_triangular(L, X_centered.T, upper=False).T
+        else:
+            X_arr = np.asarray(X, dtype=np.float32)
+            X_centered = X_arr - self._whitening_mean
+            return solve_triangular(
+                self._whitening_L, X_centered.T, lower=True
+            ).T.astype(np.float32)
+
+    def apply_dewhitening_operator(
+        self, X: np.ndarray | torch.Tensor
+    ) -> np.ndarray | torch.Tensor:
+        """Apply dewhitening operator to input data.
+
+        Parameters
+        ----------
+        X : np.ndarray | torch.Tensor, shape (n, n_features)
+            Input data to transform.
+
+        Returns
+        -------
+        np.ndarray | torch.Tensor
+            Dewhitened data. Output type matches input type.
+
+        Raises
+        ------
+        ValueError
+            If whitening has not been computed.
+        """
+        if self._whitening_L is None:
+            raise ValueError('Whitening operators not computed. Run prewhiten() first.')
+
+        if isinstance(X, torch.Tensor):
+            X_arr = X.detach().float()
+            L = torch.from_numpy(self._whitening_L).float()
+            mean = torch.from_numpy(self._whitening_mean).float()
+            return (L @ X_arr.T + mean[:, None]).T
+        else:
+            X_arr = np.asarray(X, dtype=np.float32)
+            return (self._whitening_L @ X_arr.T).T + self._whitening_mean
 
     def reduce_dimensions(
         self,
@@ -354,6 +529,7 @@ class LatentSpace:
         clusterer_kwargs: dict | None = None,
         apply_parseval: bool = True,
         return_cluster_indices: bool = False,
+        prewhiten: bool = False,
     ) -> np.ndarray | tuple[np.ndarray, dict[int, np.ndarray]]:
         """Compute cluster prototypes with optional Parseval frame.
 
@@ -389,6 +565,10 @@ class LatentSpace:
         return_cluster_indices : bool
             If True, also return a dict mapping prototype indices to
             arrays of observation indices that belong to each prototype.
+        prewhiten : bool, default=False
+            If True, apply PCA whitening before clustering and compute
+            prototypes in the whitened space. This does not modify
+            self._latent in place.
 
         Returns
         -------
@@ -399,6 +579,16 @@ class LatentSpace:
             Maps prototype index to array of observation indices.
         """
         clusterer_kwargs = clusterer_kwargs or {}
+
+        if clusters is None and clusterer is None and clusterer_cls is None:
+            from sklearn.cluster import KMeans
+
+            clusterer_cls = KMeans
+
+        latent_for_clustering = self._latent
+        if prewhiten and self._whiten_F is None:
+            whitened = self.prewhiten()
+            latent_for_clustering = whitened
 
         modes = (
             clusters is not None,
@@ -414,7 +604,7 @@ class LatentSpace:
             clusters = np.asarray(clusters)
 
         elif clusterer is not None:
-            clusters = clusterer.fit_predict(self._latent)
+            clusters = clusterer.fit_predict(latent_for_clustering)
 
         else:
             if n_clusters is not None:
@@ -423,7 +613,7 @@ class LatentSpace:
                     clusterer_kwargs.setdefault('random_state', self._seed)
 
             clusterer = clusterer_cls(**clusterer_kwargs)
-            clusters = clusterer.fit_predict(self._latent)
+            clusters = clusterer.fit_predict(latent_for_clustering)
         unique_clusters = np.unique(clusters)
 
         prototypes = np.empty(
@@ -452,8 +642,8 @@ class LatentSpace:
         if apply_parseval:
             self._F, self._G = _parseval_frame(prototypes)
         else:
-            self._F = None
-            self._G = None
+            self._F = prototypes
+            self._G = prototypes.T
 
         self._prototypes_to_indices: dict[int, np.ndarray] = {}
         if return_cluster_indices:
@@ -464,8 +654,98 @@ class LatentSpace:
 
         return prototypes
 
-    def apply_analysis_operator(self) -> np.ndarray:
-        """Apply the Parseval frame analysis operator to self._latent.
+    def set_operators(self, use_parseval: bool = True) -> None:
+        """Set analysis and synthesis operators from existing prototypes.
+
+        Parameters
+        ----------
+        use_parseval : bool
+            If True, compute Parseval frame operators via SVD.
+            If False, set raw operators: F = prototypes, G = F.T.
+        """
+        if self._prototypes is None:
+            raise ValueError(
+                "No prototypes computed. Run compute_prototypes() ' first."
+            )
+
+        if use_parseval:
+            self._F, self._G = _parseval_frame(self._prototypes)
+        else:
+            self._F = self._prototypes
+            self._G = self._prototypes.T
+
+    def compute_artificial_prototypes(
+        self,
+        cluster_indices: dict[int, np.ndarray],
+        n_samples: int | None = None,
+        apply_parseval: bool = True,
+    ) -> np.ndarray:
+        """Compute prototypes using cluster assignments from another model.
+
+        Given cluster assignments produced by a different ``LatentSpace``
+        (same observations, different model), computes prototypes from
+        *this* model's latent space using those external assignments.
+        The Parseval frame operators are updated accordingly.
+
+        Parameters
+        ----------
+        cluster_indices : dict[int, np.ndarray]
+            Cluster assignments from another ``LatentSpace``, mapping
+            prototype index → array of observation indices into the shared
+            dataset.  All indices must be valid for this instance's latent.
+        n_samples : int | None
+            Number of observations per cluster to average when computing
+            each prototype centroid.  ``None`` uses all observations.
+        apply_parseval : bool
+            Whether to recompute the Parseval frame operators ``F`` and
+            ``G`` from the new prototypes.
+
+        Returns
+        -------
+        prototypes : np.ndarray, shape (k, n_features)
+            Prototype vectors computed from this model's latent space
+            using the external cluster structure.
+        """
+        n_proto = len(cluster_indices)
+        prototypes = np.empty((n_proto, self._latent.shape[1]), dtype=np.float32)
+
+        for i, obs_indices in cluster_indices.items():
+            in_cluster = self._latent[obs_indices]
+
+            if n_samples is not None:
+                rng = np.random.default_rng(self._seed + i)
+                size = min(n_samples, len(in_cluster))
+                in_cluster = in_cluster[
+                    rng.choice(len(in_cluster), size=size, replace=False)
+                ]
+
+            prototypes[i] = in_cluster.mean(axis=0)
+
+        self._prototypes = prototypes
+        self._prototypes_to_indices = {
+            i: np.asarray(obs) for i, obs in cluster_indices.items()
+        }
+
+        if apply_parseval:
+            self._F, self._G = _parseval_frame(prototypes)
+        else:
+            self._F = prototypes
+            self._G = prototypes.T
+
+        return prototypes
+
+    def apply_analysis_operator(
+        self, X: np.ndarray | None = None, use_whitening: bool = False
+    ) -> np.ndarray:
+        """Apply the Parseval frame analysis operator.
+
+        Parameters
+        ----------
+        X : np.ndarray, optional
+            Input data to transform. If None, transforms self._latent.
+        use_whitening : bool, default=False
+            If True, use the whitening operator instead of the prototype
+            analysis operator.
 
         Returns
         -------
@@ -475,22 +755,54 @@ class LatentSpace:
         Raises
         ------
         ValueError
-            If prototypes have not been computed yet.
+            If X is provided but prototypes have not been computed (when use_whitening=False).
+        ValueError
+            If X is provided but whitening has not been computed (when use_whitening=True).
+        ValueError
+            If prototypes have not been computed (when use_whitening=False and X is None).
+        ValueError
+            If whitening has not been computed (when use_whitening=True and X is None).
         """
+        if X is not None:
+            X = np.asarray(X, dtype=np.float32)
+            if use_whitening:
+                if self._whitening_L is None:
+                    raise ValueError(
+                        'Whitening operators not computed. Run prewhiten() first.'
+                    )
+                X_centered = X - self._whitening_mean
+                return solve_triangular(
+                    self._whitening_L, X_centered.T, lower=True
+                ).T.astype(np.float32)
+
+            if self._F is None:
+                raise ValueError('Run compute_prototypes() first.')
+            return (X @ self._F.T).astype(np.float32)
+
+        if use_whitening:
+            if self._whitening_L is None:
+                raise ValueError(
+                    'Whitening operators not computed. Run prewhiten() first.'
+                )
+            X_centered = self._latent - self._whitening_mean
+            return solve_triangular(
+                self._whitening_L, X_centered.T, lower=True
+            ).T.astype(np.float32)
+
         if self._F is None:
-            raise ValueError('Run compute_prototypes with apply_parseval=True first.')
+            raise ValueError('Run compute_prototypes() first.')
         return (self._latent @ self._F.T).astype(np.float32)
 
     def apply_synthesis_operator(
         self,
         X: np.ndarray | torch.Tensor,
     ) -> np.ndarray | torch.Tensor:
-        """Apply the Parseval frame synthesis operator G to input data.
+        """Apply the Parseval frame synthesis operator G.
 
         Parameters
         ----------
         X : np.ndarray | torch.Tensor, shape (n, k)
-            Input data to transform.
+            Input data in prototype space to transform to original feature space.
 
         Returns
         -------
