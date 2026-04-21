@@ -16,8 +16,10 @@ import polars as pl
 import statsmodels.formula.api as smf
 import torch
 from datasets import load_dataset
+from joblib import Parallel, delayed
 from omegaconf import DictConfig
 from tqdm.auto import tqdm
+from tqdm_joblib import tqdm_joblib
 
 from src.metrics.entropy import (
     effective_rank,
@@ -129,6 +131,11 @@ def main(cfg: DictConfig) -> None:
     )
     all_models.discard(None)
 
+    limit_models = cfg.get('limit_models')
+    if limit_models is not None:
+        all_models = set(sorted(all_models)[:limit_models])
+        print(f'  Limited to {limit_models} models for testing')
+
     print(f'  Total unique models to process: {len(all_models)}')
 
     download_only = cfg.get('download_only', False)
@@ -151,10 +158,11 @@ def main(cfg: DictConfig) -> None:
         return
 
     print('\n[INFO] Computing metrics for unique models...')
-    model_metrics = {}
-    for model_name in tqdm(sorted(all_models), desc='Computing metrics'):
+    n_jobs = cfg.get('n_jobs')
+
+    def process_model_wrapper(model_name):
         try:
-            model_metrics[model_name] = process_model(
+            return model_name, process_model(
                 dataset=dataset,
                 model_name=model_name,
                 split=split,
@@ -163,7 +171,25 @@ def main(cfg: DictConfig) -> None:
             )
         except Exception as e:
             print(f'Error with {model_name}: {e}')
-            continue
+            return model_name, None
+
+    model_list = sorted(all_models)
+    n_jobs = cfg.get('n_jobs')
+
+    if n_jobs is None or n_jobs == 1:
+        model_metrics = {}
+        for model_name in tqdm(model_list, desc='Computing metrics'):
+            name, metrics = process_model_wrapper(model_name)
+            if metrics is not None:
+                model_metrics[name] = metrics
+    else:
+        with tqdm_joblib(desc='Computing metrics', total=len(model_list)):
+            results = Parallel(n_jobs=n_jobs)(
+                delayed(process_model_wrapper)(name) for name in model_list
+            )
+        model_metrics = {
+            name: metrics for name, metrics in results if metrics is not None
+        }
 
     print(f'  Computed metrics for {len(model_metrics)} models')
 
@@ -176,29 +202,31 @@ def main(cfg: DictConfig) -> None:
         treatment_model = row['treatment_model']
         arch_key = row['arch_key']
 
-        control_metrics = model_metrics.get(control_model)
-        if control_metrics is not None:
-            all_results.append(
-                {
-                    'analysis_type': analysis_type,
-                    'arch_key': arch_key,
-                    'model_name': control_model,
-                    'is_treatment': 0,
-                    **control_metrics,
-                }
-            )
+        # Control model - iterate over all 3 analysis cases
+        control_cases = model_metrics.get(control_model, [])
+        all_results.extend(
+            {
+                'analysis_type': analysis_type,
+                'arch_key': arch_key,
+                'model_name': control_model,
+                'is_treatment': 0,
+                **case_result,
+            }
+            for case_result in control_cases
+        )
 
-        treatment_metrics = model_metrics.get(treatment_model)
-        if treatment_metrics is not None:
-            all_results.append(
-                {
-                    'analysis_type': analysis_type,
-                    'arch_key': arch_key,
-                    'model_name': treatment_model,
-                    'is_treatment': 1,
-                    **treatment_metrics,
-                }
-            )
+        # Treatment model - iterate over all 3 analysis cases
+        treatment_cases = model_metrics.get(treatment_model, [])
+        all_results.extend(
+            {
+                'analysis_type': analysis_type,
+                'arch_key': arch_key,
+                'model_name': treatment_model,
+                'is_treatment': 1,
+                **case_result,
+            }
+            for case_result in treatment_cases
+        )
 
     if all_results:
         df = pl.DataFrame(all_results)
@@ -401,30 +429,8 @@ def load_latent(dataset: str, model: str, split: str) -> np.ndarray:
     return latent.detach().cpu().float().numpy()
 
 
-def process_model(
-    dataset: str,
-    model_name: str,
-    split: str,
-    cfg: DictConfig,
-    clusterer_cls,
-) -> dict | None:
-    """Process a single model: load latent, optionally compute prototypes,
-    compute metrics based on config."""
-    latent = load_latent(dataset, model_name, split)
-
-    if cfg.get('use_prototypes', False):
-        ls = LatentSpace(latent, seed=cfg.seed)
-        ls.compute_prototypes(
-            n_samples=cfg.get('n_samples', 10),
-            clusterer_cls=clusterer_cls,
-            n_clusters=cfg.n_prototypes,
-            apply_parseval=True,
-            return_cluster_indices=True,
-        )
-        data = ls.apply_analysis_operator()
-    else:
-        data = latent
-
+def _compute_metrics(data: np.ndarray, cfg: DictConfig) -> dict:
+    """Compute all metrics for given data."""
     metric_names = cfg.get(
         'metrics',
         [
@@ -443,12 +449,100 @@ def process_model(
     return results
 
 
+def process_model(
+    dataset: str,
+    model_name: str,
+    split: str,
+    cfg: DictConfig,
+    clusterer_cls,
+) -> list[dict]:
+    """Process a single model: compute metrics for all three analysis cases.
+
+    Returns list of results for:
+    1. Raw latent space
+    2. Prototypes + Parseval (no prewhitening)
+    3. Prototypes + Parseval + prewhitening
+    """
+    latent = load_latent(dataset, model_name, split)
+
+    n_clusters = cfg.n_prototypes
+    n_samples = cfg.get('n_samples', 10)
+    seed = cfg.seed
+
+    results_all = []
+
+    # Case 1: Raw latent space
+    results_raw = _compute_metrics(latent, cfg)
+    results_raw.update(
+        {
+            'analysis_case': 'raw',
+            'n_prototypes': 0,
+            'prewhiten': False,
+            'seed': seed,
+        }
+    )
+    results_all.append(results_raw)
+
+    # Case 2: Prototypes + Parseval, NO prewhitening
+    ls1 = LatentSpace(latent, seed=seed)
+    ls1.compute_prototypes(
+        n_samples=n_samples,
+        clusterer_cls=clusterer_cls,
+        n_clusters=n_clusters,
+        apply_parseval=True,
+        return_cluster_indices=False,
+        prewhiten=False,
+    )
+    data_proto = ls1.apply_analysis_operator()
+    results_proto = _compute_metrics(data_proto, cfg)
+    results_proto.update(
+        {
+            'analysis_case': 'proto_no_prewhiten',
+            'n_prototypes': n_clusters,
+            'prewhiten': False,
+            'seed': seed,
+        }
+    )
+    results_all.append(results_proto)
+
+    # Case 3: Prototypes + Parseval + prewhitening
+    ls2 = LatentSpace(latent, seed=seed)
+    ls2.compute_prototypes(
+        n_samples=n_samples,
+        clusterer_cls=clusterer_cls,
+        n_clusters=n_clusters,
+        apply_parseval=True,
+        return_cluster_indices=False,
+        prewhiten=True,
+    )
+    data_whiten = ls2.apply_analysis_operator()
+    results_whiten = _compute_metrics(data_whiten, cfg)
+    results_whiten.update(
+        {
+            'analysis_case': 'proto_prewhiten',
+            'n_prototypes': n_clusters,
+            'prewhiten': True,
+            'seed': seed,
+        }
+    )
+    results_all.append(results_whiten)
+
+    return results_all
+
+
 def run_stat_regression(
     metrics_df: pl.DataFrame, results_dir: Path, outcomes: list
 ) -> None:
-    """Run regression on computed metrics."""
-    for outcome in outcomes:
-        _run_stat_for_outcome(metrics_df, outcome, results_dir)
+    """Run regression on computed metrics for each analysis case."""
+    analysis_cases = metrics_df['analysis_case'].unique().to_list()
+
+    for case in analysis_cases:
+        print(f'\n[REGRESSION] Analysis case: {case}')
+
+        df_case = metrics_df.filter(pl.col('analysis_case') == case)
+
+        for outcome in outcomes:
+            _run_stat_for_outcome(df_case, outcome, results_dir, case)
 
     print(f'\n[COMPLETE] Regression results saved to {results_dir}')
 
@@ -457,6 +551,7 @@ def _run_stat_for_outcome(
     metrics_df: pl.DataFrame,
     outcome: str,
     results_dir: Path,
+    analysis_case: str,
 ) -> None:
     """Run regression for a specific outcome variable."""
     df = metrics_df.to_pandas()
@@ -494,6 +589,7 @@ def _run_stat_for_outcome(
             results.append(
                 {
                     'analysis_type': analysis_type,
+                    'analysis_case': analysis_case,
                     'outcome': outcome,
                     'beta': beta,
                     'se': se,
@@ -511,7 +607,7 @@ def _run_stat_for_outcome(
 
     if results:
         df_out = pl.DataFrame(results)
-        output_path = results_dir / f'stat__{outcome}.parquet'
+        output_path = results_dir / f'stat__{outcome}__{analysis_case}.parquet'
         df_out.write_parquet(output_path)
         print(f'  Saved: {output_path.name}')
 

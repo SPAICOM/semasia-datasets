@@ -35,6 +35,26 @@ tda-extraction:
     uv run scripts/tda_extraction.py
 
 # Phase 1: Download all model latents (no computation)
+compute-download:
+    uv run scripts/compute_metrics.py download_only=true
+
+# Phase 2: Compute metrics (stat + TDA) from cached latents
+compute-compute:
+    uv run scripts/compute_metrics.py download_only=false
+
+# Compute stat metrics only (default)
+compute-metrics DATASET:
+    uv run scripts/compute_metrics.py dataset={{DATASET}}
+
+# Compute stat + TDA metrics
+compute-metrics-tda DATASET:
+    uv run scripts/compute_metrics.py dataset={{DATASET}} compute_tda=true
+
+# Compute metrics with limited models (for testing)
+compute-metrics-test DATASET:
+    uv run scripts/compute_metrics.py dataset={{DATASET}} limit_models=5
+
+# Phase 1: Download all model latents (no computation)
 stat-download:
     uv run scripts/stat_analysis.py download_only=true
 

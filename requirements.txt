@@ -2120,7 +2120,12 @@ tqdm==4.67.3 \
     #   huggingface-hub
     #   lightning
     #   pytorch-lightning
+    #   tqdm-joblib
     #   umap-learn
+tqdm-joblib==0.0.5 \
+    --hash=sha256:34dd63c92e1b88b5118661a41eaf91001cac2687bfe217a4b6a9ab1bbf0f1c64 \
+    --hash=sha256:5948fccca627970cc8340dd56ac49d29222ed110b9ee39fd310b76a1483b471f
+    # via semantic-dataset
 traitlets==5.14.3 \
     --hash=sha256:9ed0579d3502c94b4b3732ac120375cda96f923114522847de4b3bb98b96b6b7 \
     --hash=sha256:b74e89e397b1ed28cc831db7aea759ba6640cb3de13090ca145426688ff1ac4f

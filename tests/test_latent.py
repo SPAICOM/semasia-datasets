@@ -467,7 +467,7 @@ class TestApplyOperators:
             apply_parseval=True,
         )
 
-        X_new = np.random.randn(50, 5).astype(np.float32)
+        X_new = np.random.default_rng().standard_normal((50, 5)).astype(np.float32)
         transformed = latent.apply_analysis_operator(X_new)
 
         assert transformed.shape == (50, 10)
@@ -484,7 +484,7 @@ class TestApplyOperators:
             apply_parseval=True,
         )
 
-        X_new = np.random.randn(50, 5).astype(np.float32)
+        X_new = np.random.default_rng().standard_normal((50, 5)).astype(np.float32)
         transformed = latent.apply_analysis_operator(X_new, use_whitening=True)
 
         assert transformed.shape == (50, 5)
@@ -672,7 +672,7 @@ class TestDewhiten:
         from src.objects.latent import LatentSpace
 
         latent = LatentSpace(larger_cloud)
-        whitened = latent.prewhiten()
+        latent.prewhiten()
         dewhitened = latent.dewhiten()
 
         assert isinstance(dewhitened, np.ndarray)
@@ -693,7 +693,6 @@ class TestDewhiten:
 
         latent = LatentSpace(larger_cloud)
         latent.prewhiten(inplace=True)
-        whitened = latent._latent.copy()
         dewhitened = latent.dewhiten(inplace=True)
 
         np.testing.assert_array_almost_equal(
@@ -718,7 +717,7 @@ class TestApplyWhiteningOperators:
         latent = LatentSpace(larger_cloud)
         latent.prewhiten()
 
-        X = np.random.randn(50, 5).astype(np.float32)
+        X = np.random.default_rng().standard_normal((50, 5)).astype(np.float32)
         result = latent.apply_whitening_operator(X)
 
         assert isinstance(result, np.ndarray)
@@ -750,7 +749,7 @@ class TestApplyWhiteningOperators:
         latent = LatentSpace(larger_cloud)
         latent.prewhiten()
 
-        X = np.random.randn(50, 5).astype(np.float32)
+        X = np.random.default_rng().standard_normal((50, 5)).astype(np.float32)
         result = latent.apply_dewhitening_operator(X)
 
         assert isinstance(result, np.ndarray)
@@ -782,7 +781,7 @@ class TestApplyWhiteningOperators:
         latent = LatentSpace(larger_cloud)
         latent.prewhiten()
 
-        X_new = np.random.randn(20, 5).astype(np.float32)
+        X_new = np.random.default_rng().standard_normal((20, 5)).astype(np.float32)
         whitened = latent.apply_whitening_operator(X_new)
         dewhitened = latent.apply_dewhitening_operator(whitened)
 

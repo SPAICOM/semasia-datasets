@@ -755,13 +755,17 @@ class LatentSpace:
         Raises
         ------
         ValueError
-            If X is provided but prototypes have not been computed (when use_whitening=False).
+            If X is provided but prototypes have not been computed
+            (when use_whitening=False).
         ValueError
-            If X is provided but whitening has not been computed (when use_whitening=True).
+            If X is provided but whitening has not been computed
+            (when use_whitening=True).
         ValueError
-            If prototypes have not been computed (when use_whitening=False and X is None).
+            If prototypes have not been computed
+            (when use_whitening=False and X is None).
         ValueError
-            If whitening has not been computed (when use_whitening=True and X is None).
+            If whitening has not been computed
+            (when use_whitening=True and X is None).
         """
         if X is not None:
             X = np.asarray(X, dtype=np.float32)

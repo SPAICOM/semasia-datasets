@@ -337,9 +337,6 @@ def _(
     la_test = np.concatenate(_la_test_list)
     lb_test = np.concatenate(_lb_test_list)
 
-    test_split_label = (
-        test_split_ui.value if len(dataset_ui.value) > 1 else test_split_ui.value
-    )
     _info = mo.callout(
         mo.md(
             f'**Concatenated ({len(dataset_ui.value)} datasets)**: '

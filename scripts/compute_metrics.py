@@ -1,0 +1,719 @@
+"""Compute metrics for latent embeddings: stat metrics + TDA persistence diagrams.
+
+Usage:
+    python scripts/compute_metrics.py dataset=cifar10
+"""
+
+import logging
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+import hydra
+import numpy as np
+import polars as pl
+import torch
+from datasets import load_dataset
+from joblib import Parallel, delayed
+from omegaconf import DictConfig
+from tqdm.auto import tqdm
+from tqdm_joblib import tqdm_joblib
+
+from src.metrics.entropy import (
+    effective_rank,
+    participation_ratio,
+    spectral_entropy,
+)
+from src.metrics.pointcloud import (
+    anisotropy_ratio,
+    density_estimate,
+    effective_rank_fast,
+    explained_var_ratio_top1,
+    explained_var_ratio_top3,
+    isotropy,
+    mean_distance_to_centroid,
+    n_components_90pct,
+    participation_ratio_fast,
+    std_distance_to_centroid,
+    top_eigenvalue_ratio,
+    total_spread,
+)
+from src.objects import LatentSpace
+from src.tda import compute_tda_features
+
+METRIC_DISPATCH = {
+    'total_spread': total_spread,
+    'mean_distance_to_centroid': mean_distance_to_centroid,
+    'std_distance_to_centroid': std_distance_to_centroid,
+    'effective_rank_fast': effective_rank_fast,
+    'participation_ratio_fast': participation_ratio_fast,
+    'isotropy': isotropy,
+    'anisotropy_ratio': anisotropy_ratio,
+    'density': density_estimate,
+    'n_components_90pct': n_components_90pct,
+    'explained_var_ratio_top1': explained_var_ratio_top1,
+    'explained_var_ratio_top3': explained_var_ratio_top3,
+    'top_eigenvalue_ratio': top_eigenvalue_ratio,
+    'spectral_entropy': spectral_entropy,
+    'effective_rank': effective_rank,
+    'participation_ratio': participation_ratio,
+}
+
+logging.getLogger('httpx').setLevel(logging.WARNING)
+
+DATASET_SPLITS = {
+    'cifar10': {'train', 'test'},
+    'cifar100': {'train', 'test'},
+    'mnist': {'train', 'test'},
+    'fashion_mnist': {'train', 'test'},
+    'imagenet-1k': {'validation', 'test'},
+    'tiny-imagenet': {'train'},
+    'celeba': {'train', 'test'},
+    'svhn': {'train', 'test'},
+}
+
+
+@hydra.main(
+    config_path='../configs/hydra/',
+    config_name='compute_metrics',
+    version_base='1.3',
+)
+def main(cfg: DictConfig) -> None:
+    current: Path = Path('.')
+    results_dir: Path = current / 'results/compute_metrics'
+
+    results_dir.mkdir(parents=True, exist_ok=True)
+
+    dataset: str = f'{cfg.repo_id}/{cfg.prefix}{cfg.dataset}'
+
+    split = cfg.split
+    valid_splits = DATASET_SPLITS.get(cfg.dataset, {'train'})
+    if split not in valid_splits:
+        raise ValueError(f'Invalid split {split!r} for dataset {cfg.dataset}.')
+
+    print('\n[INFO] Loading model registry...')
+    model_df = pl.read_parquet('hf://datasets/spaicom-lab/model-registry/**/*.parquet')
+    model_df = model_df.with_columns(
+        pl.col('model_name').str.split('.').list.first().alias('arch_key')
+    )
+
+    pairs_df = build_pairs(model_df)
+    all_models = set(
+        pairs_df['control_model'].to_list() + pairs_df['treatment_model'].to_list()
+    )
+    all_models.discard(None)
+    print(f'  Models from stat_analysis pairs: {len(all_models)}')
+
+    model_filter = cfg.get('model')
+    if model_filter is not None:
+        model_df = model_df.filter(pl.col('model_name').str.contains(model_filter))
+        all_models = all_models & set(model_df['model_name'].unique().to_list())
+
+    clusterer_cls = hydra.utils.instantiate(cfg.clustering)
+
+    limit_models = cfg.get('limit_models')
+    if limit_models is not None:
+        all_models = set(sorted(all_models)[:limit_models])
+        print(f'  Limited to {limit_models} models for testing')
+
+    output_path = (
+        results_dir / f'{cfg.repo_id}__{cfg.prefix}{cfg.dataset}__{split}.parquet'
+    )
+    output_path_stat = output_path.with_name(output_path.stem + '_stat.parquet')
+    output_path_tda = output_path.with_name(output_path.stem + '_tda.parquet')
+
+    force_recompute = cfg.get('force_recompute', False)
+    compute_stat = cfg.get('compute_stat', True)
+    compute_tda = cfg.get('compute_tda', False)
+
+    if compute_stat and output_path_stat.exists() and not force_recompute:
+        print('\n[INFO] Checking existing stat results for incremental computation...')
+        try:
+            existing_df = pl.read_parquet(output_path_stat)
+            existing_models_stat = set(existing_df['model'].unique().to_list())
+            print(f'  Found {len(existing_models_stat)} existing stat models')
+        except Exception as e:
+            print(f'  Could not read existing stat file: {e}')
+            existing_models_stat = set()
+    else:
+        existing_models_stat = set()
+
+    if compute_tda and output_path_tda.exists() and not force_recompute:
+        print('\n[INFO] Checking existing TDA results for incremental computation...')
+        try:
+            existing_df = pl.read_parquet(output_path_tda)
+            existing_models_tda = set(existing_df['model'].unique().to_list())
+            print(f'  Found {len(existing_models_tda)} existing TDA models')
+        except Exception as e:
+            print(f'  Could not read existing TDA file: {e}')
+            existing_models_tda = set()
+    else:
+        existing_models_tda = set()
+
+    existing_models = existing_models_stat | existing_models_tda
+
+    if existing_models and not force_recompute:
+        settings_cols = [
+            'n_prototypes',
+            'prewhiten',
+            'tda_max_points',
+            'tda_dim_reduction',
+            'tda_dim_reduction_components',
+            'tda_normalize',
+        ]
+
+        settings_changed = False
+        if compute_stat and output_path_stat.exists():
+            try:
+                existing_settings = (
+                    pl.read_parquet(output_path_stat)
+                    .select(settings_cols)
+                    .head(1)
+                    .to_dicts()[0]
+                    if len(pl.read_parquet(output_path_stat)) > 0
+                    else {}
+                )
+                current_settings = {
+                    'n_prototypes': cfg.n_prototypes,
+                    'prewhiten': None,
+                    'tda_max_points': cfg.tda.max_points,
+                    'tda_dim_reduction': cfg.tda.dim_reduction,
+                    'tda_dim_reduction_components': cfg.tda.dim_reduction_components,
+                    'tda_normalize': cfg.tda.normalize,
+                }
+                settings_changed = existing_settings != current_settings
+            except Exception:
+                pass
+        elif compute_tda and output_path_tda.exists():
+            try:
+                existing_settings = (
+                    pl.read_parquet(output_path_tda)
+                    .select(settings_cols)
+                    .head(1)
+                    .to_dicts()[0]
+                    if len(pl.read_parquet(output_path_tda)) > 0
+                    else {}
+                )
+                current_settings = {
+                    'n_prototypes': cfg.n_prototypes,
+                    'prewhiten': None,
+                    'tda_max_points': cfg.tda.max_points,
+                    'tda_dim_reduction': cfg.tda.dim_reduction,
+                    'tda_dim_reduction_components': cfg.tda.dim_reduction_components,
+                    'tda_normalize': cfg.tda.normalize,
+                }
+                settings_changed = existing_settings != current_settings
+            except Exception:
+                pass
+
+        if settings_changed:
+            print('  Settings changed: recomputing all models')
+            all_models_to_process = all_models
+        else:
+            models_to_skip = existing_models & all_models
+            all_models_to_process = all_models - models_to_skip
+            print(f'  Skipping {len(models_to_skip)} already-computed models')
+            print(f'  Computing {len(all_models_to_process)} new models')
+
+        if not all_models_to_process:
+            print('\n[COMPLETE] All models already computed.')
+            print(f'  Stat results: {output_path_stat}')
+            print(f'  TDA results: {output_path_tda}')
+            return
+    else:
+        if force_recompute:
+            print('\n[INFO] Force recompute enabled: recomputing all models')
+        all_models_to_process = all_models
+
+    all_models = all_models_to_process
+    print(f'  Total unique models to process: {len(all_models)}')
+
+    download_only = cfg.get('download_only', False)
+
+    if download_only:
+        print('\n[PHASE 1] Downloading all model latents (no computation)...')
+        for model_name in tqdm(sorted(all_models), desc='Downloading latents'):
+            try:
+                load_latent(dataset, model_name, split)
+            except Exception as e:
+                print(f'Error downloading {model_name}: {e}')
+                continue
+
+        print('\n[COMPLETE] All latents downloaded.')
+        print('  Run again with download_only: false for computation.')
+        return
+
+    print('\n[PHASE 2] Computing metrics from cached latents...')
+
+    n_jobs = cfg.get('n_jobs')
+    compute_stat = cfg.get('compute_stat', True)
+    compute_tda = cfg.get('compute_tda', False)
+
+    def save_model_results(
+        model_name: str,
+        metrics: list,
+        model_df: pl.DataFrame,
+        output_path_stat: Path,
+        output_path_tda: Path,
+    ):
+        """Save results for a single model incrementally to separate parquet files."""
+        if not metrics:
+            return
+
+        model_arch_key = (
+            model_df.filter(pl.col('model_name') == model_name)
+            .select('arch_key')
+            .head(1)
+            .to_dicts()
+        )
+        arch_key = model_arch_key[0]['arch_key'] if model_arch_key else None
+
+        stat_results = []
+        tda_results = []
+
+        for case_result in metrics:
+            result_row = {
+                'arch_key': arch_key,
+                **case_result,
+            }
+            if 'stat_case' in case_result:
+                stat_results.append(result_row)
+            elif 'tda_case' in case_result:
+                tda_results.append(result_row)
+
+        def _save_to_parquet(results: list, output_path: Path, dedup_cols: list):
+            if not results:
+                return
+            new_df = pl.DataFrame(results)
+            try:
+                if output_path.exists():
+                    existing_df = pl.read_parquet(output_path)
+                    combined_df = pl.concat([existing_df, new_df])
+                    combined_df = combined_df.unique(
+                        subset=dedup_cols,
+                        keep='first',
+                    )
+                    combined_df.write_parquet(output_path)
+                else:
+                    new_df.write_parquet(output_path)
+            except Exception as e:
+                print(f'  Error saving to {output_path}: {e}')
+
+        if compute_stat and stat_results:
+            _save_to_parquet(stat_results, output_path_stat, ['model', 'stat_case'])
+        if compute_tda and tda_results:
+            _save_to_parquet(tda_results, output_path_tda, ['model', 'tda_case'])
+
+    def process_model_wrapper(model_name):
+        try:
+            return model_name, process_model(
+                dataset=dataset,
+                model_name=model_name,
+                split=split,
+                cfg=cfg,
+                clusterer_cls=clusterer_cls,
+            )
+        except Exception as e:
+            print(f'Error with {model_name}: {e}')
+            return model_name, None
+
+    model_list = sorted(all_models)
+
+    if n_jobs is None or n_jobs == 1:
+        for model_name in tqdm(model_list, desc='Computing metrics'):
+            name, metrics = process_model_wrapper(model_name)
+            if metrics is not None:
+                save_model_results(
+                    name, metrics, model_df, output_path_stat, output_path_tda
+                )
+    else:
+
+        def process_and_save(model_name):
+            name, metrics = process_model_wrapper(model_name)
+            if metrics is not None:
+                save_model_results(
+                    name, metrics, model_df, output_path_stat, output_path_tda
+                )
+            return name, metrics is not None
+
+        with tqdm_joblib(desc='Computing metrics', total=len(model_list)):
+            Parallel(n_jobs=n_jobs)(
+                delayed(process_and_save)(name) for name in model_list
+            )
+
+    if compute_stat:
+        print(f'\n[COMPLETE] Stat results saved to {output_path_stat}')
+    if compute_tda:
+        print(f'[COMPLETE] TDA results saved to {output_path_tda}')
+
+
+def build_pairs(model_df: pl.DataFrame) -> pl.DataFrame:
+    """Build all analysis pairs with correct constraints."""
+    rows = []
+
+    no_ft = model_df.filter(pl.col('pretrain_ft').is_null())
+    ft_to_1k = model_df.filter(pl.col('pretrain_ft') == 'ImageNet-1K')
+
+    for aug_val in [None] + model_df.filter(pl.col('pretrain_aug').is_not_null())[
+        'pretrain_aug'
+    ].unique().to_list():
+        if aug_val is None:
+            aug_no_ft = no_ft.filter(pl.col('pretrain_aug').is_null())
+        else:
+            aug_no_ft = no_ft.filter(pl.col('pretrain_aug') == aug_val)
+
+        arch_datasets = aug_no_ft.group_by('arch_key').agg(
+            pl.col('model_name').alias('models'),
+            pl.col('pretrain_dataset').alias('datasets'),
+        )
+
+        for row in arch_datasets.iter_rows(named=True):
+            arch_key = row['arch_key']
+            models = row['models']
+            datasets = row['datasets']
+
+            for i, (m1, d1) in enumerate(zip(models, datasets)):
+                for m2, d2 in zip(models[i + 1 :], datasets[i + 1 :]):
+                    rows.append(
+                        {
+                            'analysis_type': 'dataset_change',
+                            'control_model': m1,
+                            'treatment_model': m2,
+                            'arch_key': arch_key,
+                        }
+                    )
+
+    for aug_val in [None] + model_df.filter(pl.col('pretrain_aug').is_not_null())[
+        'pretrain_aug'
+    ].unique().to_list():
+        if aug_val is None:
+            no_ft_filtered = no_ft.filter(pl.col('pretrain_aug').is_null())
+            ft_filtered = ft_to_1k.filter(pl.col('pretrain_aug').is_null())
+        else:
+            no_ft_filtered = no_ft.filter(pl.col('pretrain_aug') == aug_val)
+            ft_filtered = ft_to_1k.filter(pl.col('pretrain_aug') == aug_val)
+
+        pairs_all = ft_filtered.select(
+            ['arch_key', 'model_name', 'pretrain_dataset']
+        ).join(
+            no_ft_filtered.select(['arch_key', 'model_name', 'pretrain_dataset']),
+            on=['arch_key', 'pretrain_dataset'],
+            suffix='_ctrl',
+        )
+
+        pairs = pairs_all.filter(pl.col('pretrain_dataset').is_not_null())
+
+        rows.extend(
+            [
+                {
+                    'analysis_type': 'finetuning_large',
+                    'control_model': row['model_name_ctrl'],
+                    'treatment_model': row['model_name'],
+                    'arch_key': row['arch_key'],
+                }
+                for row in pairs.iter_rows(named=True)
+            ]
+        )
+
+    in1k_no_ft = model_df.filter(
+        (pl.col('pretrain_dataset') == 'ImageNet-1K') & pl.col('pretrain_ft').is_null()
+    )
+
+    for aug_val in [None] + model_df.filter(pl.col('pretrain_aug').is_not_null())[
+        'pretrain_aug'
+    ].unique().to_list():
+        if aug_val is None:
+            in1k_no_ft_aug = in1k_no_ft.filter(pl.col('pretrain_aug').is_null())
+            ft_to_1k_aug = ft_to_1k.filter(pl.col('pretrain_aug').is_null())
+        else:
+            in1k_no_ft_aug = in1k_no_ft.filter(pl.col('pretrain_aug') == aug_val)
+            ft_to_1k_aug = ft_to_1k.filter(pl.col('pretrain_aug') == aug_val)
+
+        pairs = ft_to_1k_aug.select(['arch_key', 'model_name']).join(
+            in1k_no_ft_aug.select(['arch_key', 'model_name']),
+            on='arch_key',
+            suffix='_ctrl',
+        )
+
+        rows.extend(
+            [
+                {
+                    'analysis_type': 'finetuning_final',
+                    'control_model': row['model_name_ctrl'],
+                    'treatment_model': row['model_name'],
+                    'arch_key': row['arch_key'],
+                }
+                for row in pairs.iter_rows(named=True)
+            ]
+        )
+
+    all_with_aug = model_df.filter(pl.col('pretrain_aug').is_not_null())
+    aug_combos = all_with_aug.group_by(
+        ['arch_key', 'pretrain_dataset', 'pretrain_ft']
+    ).agg(
+        pl.col('model_name').alias('aug_models'),
+    )
+    no_aug_models = model_df.filter(pl.col('pretrain_aug').is_null())
+
+    for row in aug_combos.iter_rows(named=True):
+        arch_key = row['arch_key']
+        pretrain_ds = row['pretrain_dataset']
+        pretrain_ft_val = row['pretrain_ft']
+
+        if pretrain_ds is None:
+            if pretrain_ft_val is None:
+                no_aug_matches = no_aug_models.filter(
+                    (pl.col('arch_key') == arch_key)
+                    & (pl.col('pretrain_dataset').is_null())
+                    & (pl.col('pretrain_ft').is_null())
+                )['model_name'].to_list()
+            else:
+                no_aug_matches = no_aug_models.filter(
+                    (pl.col('arch_key') == arch_key)
+                    & (pl.col('pretrain_dataset').is_null())
+                    & (pl.col('pretrain_ft') == pretrain_ft_val)
+                )['model_name'].to_list()
+        else:
+            if pretrain_ft_val is None:
+                no_aug_matches = no_aug_models.filter(
+                    (pl.col('arch_key') == arch_key)
+                    & (pl.col('pretrain_dataset') == pretrain_ds)
+                    & (pl.col('pretrain_ft').is_null())
+                )['model_name'].to_list()
+            else:
+                no_aug_matches = no_aug_models.filter(
+                    (pl.col('arch_key') == arch_key)
+                    & (pl.col('pretrain_dataset') == pretrain_ds)
+                    & (pl.col('pretrain_ft') == pretrain_ft_val)
+                )['model_name'].to_list()
+
+        for aug_model, no_aug_model in [
+            (a, n) for a in row['aug_models'] for n in no_aug_matches
+        ]:
+            rows.append(
+                {
+                    'analysis_type': 'augmentation',
+                    'control_model': no_aug_model,
+                    'treatment_model': aug_model,
+                    'arch_key': arch_key,
+                }
+            )
+
+    return pl.DataFrame(rows)
+
+
+def load_latent(dataset: str, model: str, split: str) -> np.ndarray:
+    """Load latent embeddings from HuggingFace dataset."""
+    data = load_dataset(dataset, model, split=split).with_format('torch')
+    latent: torch.Tensor = torch.vstack(list(data['embedding']))
+    return latent.detach().cpu().float().numpy()
+
+
+def _compute_stat_metrics(data: np.ndarray, cfg: DictConfig) -> dict:
+    """Compute all stat metrics for given data."""
+    metric_names = cfg.get(
+        'metrics',
+        [
+            'effective_rank_fast',
+            'participation_ratio_fast',
+        ],
+    )
+
+    results = {}
+    for name in metric_names:
+        if name in METRIC_DISPATCH:
+            results[name] = METRIC_DISPATCH[name](data)
+        else:
+            print(f'[WARN] Unknown metric: {name}')
+
+    return results
+
+
+def _compute_tda_features(data: np.ndarray, cfg: DictConfig) -> dict:
+    """Compute TDA features from data."""
+    tda_cfg = cfg.tda
+
+    max_points = tda_cfg.get('max_points', 1000)
+    dim_reduction = tda_cfg.get('dim_reduction')
+    dim_reduction_components = tda_cfg.get('dim_reduction_components', 20)
+    normalize = tda_cfg.get('normalize')
+
+    ls = LatentSpace(data, seed=cfg.seed)
+
+    if max_points > 0 and ls.n_points > max_points:
+        ls = ls.subsample(max_points, seed=cfg.seed)
+
+    if normalize is not None and normalize != 'null':
+        latent_processed = ls.normalize(normalize)
+    else:
+        latent_processed = ls.latent
+
+    if dim_reduction is not None and dim_reduction != 'null':
+        latent_processed = ls.reduce_dimensions(
+            dim_reduction,
+            dim_reduction_components,
+            seed=cfg.seed,
+        )
+
+    max_dim = tda_cfg.get('max_dim', 2)
+    simplicial_filter = tda_cfg.get('simplicial_filter', 'VietorisRips')
+    n_bins = tda_cfg.get('n_bins', 100)
+    sigma = tda_cfg.get('sigma', 0.1)
+    metric = tda_cfg.get('metric', 'euclidean')
+
+    result = compute_tda_features(
+        latent_processed,
+        max_dim=max_dim,
+        simplicial_filter=simplicial_filter,
+        n_bins=n_bins,
+        sigma=sigma,
+        metric=metric,
+    )
+
+    result['tda_simplicial_filter'] = simplicial_filter
+    result['tda_max_dim'] = max_dim
+    result['tda_sigma'] = sigma
+    result['tda_metric'] = metric
+    result['tda_n_bins'] = n_bins
+
+    return result
+
+
+def process_model(
+    dataset: str,
+    model_name: str,
+    split: str,
+    cfg: DictConfig,
+    clusterer_cls,
+) -> list[dict]:
+    """Process a single model: compute stat and/or TDA metrics based on config."""
+    compute_stat = cfg.get('compute_stat', True)
+    compute_tda = cfg.get('compute_tda', False)
+
+    latent = load_latent(dataset, model_name, split)
+
+    n_clusters = cfg.n_prototypes
+    n_samples = cfg.get('n_samples', 10)
+    seed = cfg.seed
+
+    tda_cfg = cfg.tda
+    max_points = tda_cfg.get('max_points', 1000)
+    dim_reduction = tda_cfg.get('dim_reduction')
+    dim_reduction_components = tda_cfg.get('dim_reduction_components', 20)
+    normalize = tda_cfg.get('normalize')
+
+    common_cols = {
+        'model': model_name,
+        'split': split,
+        'dataset': dataset,
+    }
+
+    results_all = []
+
+    if compute_stat:
+        results_raw = _compute_stat_metrics(latent, cfg)
+        results_raw.update(
+            {
+                'stat_case': 'raw',
+                'n_prototypes': 0,
+                'prewhiten': False,
+            }
+        )
+        results_raw.update(common_cols)
+        results_all.append(results_raw)
+
+        ls1 = LatentSpace(latent, seed=seed)
+        ls1.compute_prototypes(
+            n_samples=n_samples,
+            clusterer_cls=clusterer_cls,
+            n_clusters=n_clusters,
+            apply_parseval=True,
+            return_cluster_indices=False,
+            prewhiten=False,
+        )
+        data_proto = ls1.apply_analysis_operator()
+        results_proto = _compute_stat_metrics(data_proto, cfg)
+        results_proto.update(
+            {
+                'stat_case': 'proto_no_prewhiten',
+                'n_prototypes': n_clusters,
+                'prewhiten': False,
+            }
+        )
+        results_proto.update(common_cols)
+        results_all.append(results_proto)
+
+        ls2 = LatentSpace(latent, seed=seed)
+        ls2.compute_prototypes(
+            n_samples=n_samples,
+            clusterer_cls=clusterer_cls,
+            n_clusters=n_clusters,
+            apply_parseval=True,
+            return_cluster_indices=False,
+            prewhiten=True,
+        )
+        data_whiten = ls2.apply_analysis_operator()
+        results_whiten = _compute_stat_metrics(data_whiten, cfg)
+        results_whiten.update(
+            {
+                'stat_case': 'proto_prewhiten',
+                'n_prototypes': n_clusters,
+                'prewhiten': True,
+            }
+        )
+        results_whiten.update(common_cols)
+        results_all.append(results_whiten)
+
+    if compute_tda:
+        ls_tda_raw = LatentSpace(latent, seed=seed)
+        tda_raw_result = _compute_tda_features(ls_tda_raw.latent, cfg)
+        results_tda_raw = {
+            'tda_case': 'absolute',
+            'tda_max_points': max_points,
+            'tda_dim_reduction': dim_reduction,
+            'tda_dim_reduction_components': dim_reduction_components,
+            'tda_normalize': normalize,
+        }
+        results_tda_raw.update(tda_raw_result)
+        results_tda_raw.update(common_cols)
+
+        if compute_stat:
+            results_all[0].update(results_tda_raw)
+        else:
+            results_all.append(results_tda_raw)
+
+        ls_tda_proto = LatentSpace(latent, seed=seed)
+        ls_tda_proto.compute_prototypes(
+            n_samples=n_samples,
+            clusterer_cls=clusterer_cls,
+            n_clusters=n_clusters,
+            apply_parseval=True,
+            return_cluster_indices=False,
+            prewhiten=False,
+        )
+        data_tda_proto = ls_tda_proto.apply_analysis_operator()
+        tda_proto_result = _compute_tda_features(data_tda_proto, cfg)
+        results_tda_proto = {
+            'tda_case': 'proto_no_prewhiten',
+            'tda_max_points': max_points,
+            'tda_dim_reduction': dim_reduction,
+            'tda_dim_reduction_components': dim_reduction_components,
+            'tda_normalize': normalize,
+        }
+        results_tda_proto.update(tda_proto_result)
+        results_tda_proto.update(common_cols)
+
+        if compute_stat:
+            if len(results_all) > 1:
+                results_all[1].update(results_tda_proto)
+            else:
+                results_all.append(results_tda_proto)
+        else:
+            results_all.append(results_tda_proto)
+
+    return results_all
+
+
+if __name__ == '__main__':
+    main()

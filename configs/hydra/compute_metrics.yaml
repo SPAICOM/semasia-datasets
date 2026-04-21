@@ -6,16 +6,32 @@ repo_id: "spaicom-lab"
 prefix: "semantic-"
 dataset: cifar10
 split: train
+model: null
 
 seed: 42
 
-n_prototypes: 64
+n_prototypes: 20
 n_samples: null
 
+limit_models: null
+n_jobs: 1
+
 download_only: false
-regression_only: false
-limit_models: null  # Set to int to limit number of models for testing
-n_jobs: 5  # Parallel model processing (set to 1 to disable)
+force_recompute: false
+
+compute_stat: true
+compute_tda: false
+
+tda:
+  max_points: 1000
+  dim_reduction: pca
+  dim_reduction_components: 20
+  normalize: standard
+  max_dim: 2
+  simplicial_filter: VietorisRips
+  n_bins: 100
+  sigma: 0.1
+  metric: euclidean
 
 metrics:
   - total_spread
@@ -33,5 +49,4 @@ metrics:
   - effective_rank
   - participation_ratio
 
-save_heatmaps: true
 save_results: true
