@@ -85,21 +85,21 @@ def main(cfg: DictConfig) -> None:
                     if name in data.columns
                 }
 
-            ls = LatentSpace(latent, extras=extras, seed=cfg.tda.seed)
+            ls = LatentSpace(latent, extras=extras, seed=cfg.seed)
 
             if cfg.tda.max_points > 0 and ls.n_points > cfg.tda.max_points:
-                ls = ls.subsample(cfg.tda.max_points, seed=cfg.tda.seed)
+                ls = ls.subsample(n_points=cfg.preprocess.max_points, compute_prototypes=cfg.preprocess.prototypes.enable, seed=cfg.seed,)
 
             if cfg.tda.normalize is not None:
-                latent_processed = ls.normalize(cfg.tda.normalize)
+                latent_processed = ls.normalize(cfg.preprocess.normalize)
             else:
                 latent_processed = ls.latent
 
             if cfg.tda.dim_reduction is not None:
                 latent_processed = ls.reduce_dimensions(
-                    cfg.tda.dim_reduction,
-                    cfg.tda.dim_reduction_components,
-                    seed=cfg.tda.seed,
+                    cfg.preprocess.dim_reduction,
+                    cfg.preprocess.dim_reduction_components,
+                    seed=cfg.seed,
                 )
 
             output_tda = compute_tda_features(
