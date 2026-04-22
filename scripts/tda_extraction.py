@@ -88,7 +88,11 @@ def main(cfg: DictConfig) -> None:
             ls = LatentSpace(latent, extras=extras, seed=cfg.seed)
 
             if cfg.tda.max_points > 0 and ls.n_points > cfg.tda.max_points:
-                ls = ls.subsample(n_points=cfg.preprocess.max_points, compute_prototypes=cfg.preprocess.prototypes.enable, seed=cfg.seed,)
+                ls = ls.subsample(
+                    n_points=cfg.preprocess.max_points,
+                    compute_prototypes=cfg.preprocess.prototypes.enable,
+                    seed=cfg.seed,
+                )
 
             if cfg.tda.normalize is not None:
                 latent_processed = ls.normalize(cfg.preprocess.normalize)

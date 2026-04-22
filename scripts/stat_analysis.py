@@ -39,6 +39,17 @@ IMAGENET_VARIANTS = [
 
 IMAGENET_DIFFICULTY = {ds: i for i, ds in enumerate(IMAGENET_VARIANTS)}
 
+VIT_SIZE_ORDER = {
+    'tiny': 0,
+    'small': 1,
+    'base': 2,
+    'medium': 3,
+    'large': 4,
+    'huge': 5,
+    'gigantic': 6,
+    'enormous': 7,
+}
+
 
 @hydra.main(
     config_path='../configs/hydra/',
@@ -181,13 +192,15 @@ def build_pairs(model_df: pl.DataFrame) -> pl.DataFrame:
     """Build all analysis pairs with correct constraints.
 
     1. dataset_change: same (arch_key, aug), both no ft, different ds
-       control = harder dataset, treatment = easier dataset
+       control = easier dataset, treatment = harder dataset
     2. large_vs_finetuned: same (arch_key, pretrain_dataset, aug), with/without ft
        control = finetuned to IN-1K, treatment = no finetuning
     3. small_vs_finetuned: in1k no ft vs any large->ft to 1k, same (arch_key, aug)
        control = large->ft to IN-1K, treatment = IN-1K no ft
     4. augmentation: same (arch_key, pretrain_dataset, ft), with/without aug
        control = with augmentation, treatment = no augmentation
+    5. model_scale: same (pretrain_dataset, aug, ft), vit family only
+       control = smaller model, treatment = larger model
 
     Only considers ImageNet variants as pretrain datasets.
     """
@@ -359,13 +372,83 @@ def build_pairs(model_df: pl.DataFrame) -> pl.DataFrame:
                 }
             )
 
+    # 5. MODEL SCALE: same (pretrain_dataset, aug, ft), vit family only
+    #    control = smaller model, treatment = larger model
+    rows.extend(_build_model_scale_pairs(imagenet_df))
+
     return pl.DataFrame(rows)
 
 
+def _build_model_scale_pairs(imagenet_df: pl.DataFrame) -> list[dict]:
+    """Build model scale pairs for ViT family.
+
+    Groups by: pretrain_dataset, pretrain_aug, pretrain_ft
+    Orders by: VIT_SIZE_ORDER (primary), num_parameters (secondary)
+    Creates pairs where smaller = control, larger = treatment
+
+    Only includes models with sizes in VIT_SIZE_ORDER.
+    """
+    vit_df = imagenet_df.filter(pl.col('family') == 'ViT')
+
+    group_cols = ['pretrain_dataset', 'pretrain_aug', 'pretrain_ft']
+    grouped = vit_df.group_by(group_cols).agg(
+        pl.col('model_name').alias('models'),
+        pl.col('size').alias('sizes'),
+        pl.col('num_parameters').alias('params'),
+    )
+
+    rows = []
+    for row in grouped.iter_rows(named=True):
+        models = row['models']
+        sizes = row['sizes']
+        params = row['params']
+
+        valid_indices = []
+        for i in range(len(models)):
+            size_val = sizes[i].lower() if sizes[i] is not None else None
+            if size_val in VIT_SIZE_ORDER:
+                size_idx = VIT_SIZE_ORDER[size_val]
+                param_val = params[i] if params[i] is not None else 0
+                valid_indices.append((i, size_idx, param_val))
+
+        valid_indices.sort(key=lambda x: (x[1], x[2]))
+
+        for i in range(len(valid_indices)):
+            idx1 = valid_indices[i][0]
+            for j in range(i + 1, len(valid_indices)):
+                idx2 = valid_indices[j][0]
+                smaller_model = models[idx1]
+                larger_model = models[idx2]
+                rows.append(
+                    {
+                        'analysis_type': 'model_scale',
+                        'control_model': smaller_model,
+                        'treatment_model': larger_model,
+                        'arch_key': 'vit',
+                    }
+                )
+
+    return rows
+
+
 def run_stat_regression(
-    metrics_df: pl.DataFrame, results_dir: Path, outcomes: list
+    metrics_df: pl.DataFrame,
+    results_dir: Path,
+    outcomes: list,
+    *,
+    standardize: bool = True,
 ) -> None:
-    """Run regression on computed metrics for each analysis case."""
+    """Run regression on computed metrics for each analysis case.
+
+    Parameters
+    ----------
+    metrics_df : raw per-model DataFrame with all stat_cases
+    results_dir : directory for output parquets
+    outcomes : list of metric column names to regress
+    standardize : if True, z-score each metric using control-group
+        mean/std within each stat_case x analysis_type slice before
+        fitting. Beta is then in units of control SDs.
+    """
     stat_cases = metrics_df['stat_case'].unique().to_list()
 
     for case in stat_cases:
@@ -374,9 +457,39 @@ def run_stat_regression(
         df_case = metrics_df.filter(pl.col('stat_case') == case)
 
         for outcome in outcomes:
-            _run_stat_for_outcome(df_case, outcome, results_dir, case)
+            _run_stat_for_outcome(
+                df_case, outcome, results_dir, case, standardize=standardize
+            )
 
     print(f'\n[COMPLETE] Regression results saved to {results_dir}')
+
+
+def _standardize_metric(
+    df: pl.DataFrame,
+    metric: str,
+) -> pl.DataFrame:
+    """Z-score *metric* using control-group stats per stat_case × analysis_type.
+
+    Returns the DataFrame with an added ``{metric}_std`` column plus
+    ``{metric}_control_mean`` and ``{metric}_control_std`` for traceability.
+    """
+    control_stats = (
+        df.filter(pl.col('is_treatment') == 0)
+        .group_by(['stat_case', 'analysis_type'])
+        .agg(
+            pl.col(metric).mean().alias(f'{metric}_control_mean'),
+            pl.col(metric).std().alias(f'{metric}_control_std'),
+        )
+    )
+
+    return df.join(
+        control_stats, on=['stat_case', 'analysis_type'], how='left'
+    ).with_columns(
+        (
+            (pl.col(metric) - pl.col(f'{metric}_control_mean'))
+            / pl.col(f'{metric}_control_std')
+        ).alias(f'{metric}_std')
+    )
 
 
 def _run_stat_for_outcome(
@@ -384,21 +497,29 @@ def _run_stat_for_outcome(
     outcome: str,
     results_dir: Path,
     stat_case: str,
+    *,
+    standardize: bool = True,
 ) -> None:
     """Run regression for a specific outcome variable."""
-    df = metrics_df.to_pandas()
-    results = []
+    if standardize:
+        metrics_df = _standardize_metric(metrics_df, outcome)
+        reg_col = f'{outcome}_std'
+    else:
+        reg_col = outcome
 
-    analysis_types = df['analysis_type'].unique()
+    results = []
+    analysis_types = metrics_df['analysis_type'].unique().to_list()
 
     for analysis_type in analysis_types:
-        subset = df[df['analysis_type'] == analysis_type].copy()
-        if len(subset) < 2:
+        subset_pl = metrics_df.filter(pl.col('analysis_type') == analysis_type)
+        if len(subset_pl) < 2:
             continue
+
+        subset = subset_pl.to_pandas()
 
         try:
             m = smf.ols(
-                f'{outcome} ~ is_treatment + C(arch_key)',
+                f'{reg_col} ~ is_treatment + C(arch_key)',
                 data=subset,
             ).fit(cov_type='HC3')
 
@@ -418,22 +539,29 @@ def _run_stat_for_outcome(
                 else np.nan
             )
 
-            results.append(
-                {
-                    'analysis_type': analysis_type,
-                    'stat_case': stat_case,
-                    'outcome': outcome,
-                    'beta': beta,
-                    'se': se,
-                    't_stat': t_stat,
-                    'p_value': p_value,
-                    'ci_lower': ci_lower,
-                    'ci_upper': ci_upper,
-                    'r_squared': m.rsquared,
-                    'n_obs': int(m.nobs),
-                    'df_resid': m.df_resid,
-                }
-            )
+            row = {
+                'analysis_type': analysis_type,
+                'stat_case': stat_case,
+                'outcome': outcome,
+                'beta': beta,
+                'se': se,
+                't_stat': t_stat,
+                'p_value': p_value,
+                'ci_lower': ci_lower,
+                'ci_upper': ci_upper,
+                'r_squared': m.rsquared,
+                'n_obs': int(m.nobs),
+                'df_resid': m.df_resid,
+                'standardized': standardize,
+            }
+
+            if standardize:
+                ctrl_mean_col = f'{outcome}_control_mean'
+                ctrl_std_col = f'{outcome}_control_std'
+                row['control_mean'] = subset[ctrl_mean_col].iloc[0]
+                row['control_std'] = subset[ctrl_std_col].iloc[0]
+
+            results.append(row)
         except Exception as e:
             print(f'[WARN] stat failed for {analysis_type}/{stat_case}/{outcome}: {e}')
 

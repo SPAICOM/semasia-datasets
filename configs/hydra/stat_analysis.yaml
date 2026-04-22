@@ -9,7 +9,7 @@ metrics:
   - std_distance_to_centroid
   - participation_ratio_fast
   - isotropy
-  - anisotropy_ratio
+  # - anisotropy_ratio
   - density
   - n_components_90pct
   - explained_var_ratio_top1

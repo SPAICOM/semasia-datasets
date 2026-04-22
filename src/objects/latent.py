@@ -7,9 +7,9 @@ from typing import TYPE_CHECKING, Literal
 import numpy as np
 import torch
 from scipy.linalg import solve_triangular
+from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 from sklearn.manifold import Isomap, LocallyLinearEmbedding
-from sklearn.cluster import KMeans
 
 if TYPE_CHECKING:
     from sklearn.base import ClusterMixin
@@ -581,7 +581,6 @@ class LatentSpace:
         clusterer_kwargs = clusterer_kwargs or {}
 
         if clusters is None and clusterer is None and clusterer_cls is None:
-
             clusterer_cls = KMeans
 
         latent_for_clustering = self._latent

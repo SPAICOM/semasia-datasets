@@ -1,0 +1,12 @@
+repo_id: "spaicom-lab"
+prefix: "semantic-"
+dataset: cifar10
+split: train
+
+# Default metric / stat_case / analysis_type for per-metric figures (Figs 2-4)
+metric: effective_rank
+stat_case: raw
+analysis_type: dataset_change
+
+results_dir: results/stat
+output_dir: results/figures

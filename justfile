@@ -58,6 +58,10 @@ compute-metrics-test DATASET:
 stat:
     uv run scripts/stat_analysis.py
 
+# Plot statistical regression results
+stat-plot:
+    uv run scripts/plot_stat.py
+
 # Install test dependencies
 test-install:
     uv sync --extra test

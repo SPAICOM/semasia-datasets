@@ -12,7 +12,8 @@ Usage:
     python scripts/tda_plot.py
     python scripts/tda_plot.py k_edges=30
     python scripts/tda_plot.py k_edges=30 color_by_family=true
-    python scripts/tda_plot.py dataset=cifar10 split=train distance_metric=bottleneck k_edges=50
+    python scripts/tda_plot.py dataset=cifar10 split=train \
+        distance_metric=bottleneck k_edges=50
 """
 
 import sys
@@ -21,7 +22,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import hydra
-import matplotlib.cm as cm
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import numpy as np
@@ -34,10 +34,26 @@ from sklearn.manifold import MDS
 REGISTRY_URL = 'hf://datasets/spaicom-lab/model-registry/**/*.parquet'
 
 FAMILY_PALETTE = [
-    '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
-    '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf',
-    '#aec7e8', '#ffbb78', '#98df8a', '#ff9896', '#c5b0d5',
-    '#c49c94', '#f7b6d2', '#c7c7c7', '#dbdb8d', '#9edae5',
+    '#1f77b4',
+    '#ff7f0e',
+    '#2ca02c',
+    '#d62728',
+    '#9467bd',
+    '#8c564b',
+    '#e377c2',
+    '#7f7f7f',
+    '#bcbd22',
+    '#17becf',
+    '#aec7e8',
+    '#ffbb78',
+    '#98df8a',
+    '#ff9896',
+    '#c5b0d5',
+    '#c49c94',
+    '#f7b6d2',
+    '#c7c7c7',
+    '#dbdb8d',
+    '#9edae5',
 ]
 UNKNOWN_COLOR = '#cccccc'
 DEFAULT_NODE_COLOR = '#4a90d9'
@@ -46,6 +62,7 @@ DEFAULT_NODE_COLOR = '#4a90d9'
 # ---------------------------------------------------------------------------
 # Layout
 # ---------------------------------------------------------------------------
+
 
 def _mds_layout(
     models: list[str],
@@ -74,7 +91,10 @@ def _mds_layout(
         n_init=4,
     ).fit_transform(D)
 
-    return {m: (float(pos_array[i, 0]), float(pos_array[i, 1])) for i, m in enumerate(models)}
+    return {
+        m: (float(pos_array[i, 0]), float(pos_array[i, 1]))
+        for i, m in enumerate(models)
+    }
 
 
 def _circular_layout(models: list[str]) -> dict[str, tuple[float, float]]:
@@ -109,6 +129,7 @@ def compute_layout(
 # Main
 # ---------------------------------------------------------------------------
 
+
 @hydra.main(
     config_path='../configs/hydra/',
     config_name='tda_plot',
@@ -123,7 +144,8 @@ def main(cfg: DictConfig) -> None:
     dist_path = (
         current
         / 'results/tda_distances'
-        / f'{cfg.repo_id}__{cfg.prefix}{cfg.dataset}__{cfg.split}__{cfg.distance_metric}.parquet'
+        / f'{cfg.repo_id}__{cfg.prefix}{cfg.dataset}__{cfg.split}'
+        f'__{cfg.distance_metric}.parquet'
     )
 
     if not dist_path.exists():
@@ -146,7 +168,9 @@ def main(cfg: DictConfig) -> None:
     df_edges = df_all.sort('distance')
     if k is not None and int(k) < len(df_edges):
         df_edges = df_edges.head(int(k))
-        print(f'[INFO] Retaining {len(df_edges)} edges with lowest distance (k_edges={k})')
+        print(
+            f'[INFO] Retaining {len(df_edges)} edges with lowest distance (k_edges={k})'
+        )
     else:
         print(f'[INFO] Retaining all {len(df_edges)} edges')
 
@@ -245,9 +269,10 @@ def main(cfg: DictConfig) -> None:
     xs = [pos[m][0] for m in edge_models]
     ys = [pos[m][1] for m in edge_models]
     ax.scatter(
-        xs, ys,
+        xs,
+        ys,
         c=node_colors,
-        s=cfg.node_size ** 2,
+        s=cfg.node_size**2,
         zorder=2,
         edgecolors='white',
         linewidths=0.8,
@@ -259,7 +284,8 @@ def main(cfg: DictConfig) -> None:
         for m, x, y in zip(edge_models, xs, ys):
             label = m.split('.')[0] if label_mode == 'short' else m
             ax.text(
-                x, y,
+                x,
+                y,
                 label,
                 fontsize=5,
                 ha='center',
