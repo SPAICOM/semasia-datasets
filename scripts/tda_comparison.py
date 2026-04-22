@@ -27,6 +27,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+import random
+
 import hydra
 import polars as pl
 from omegaconf import DictConfig, OmegaConf
@@ -49,15 +51,6 @@ def _load_signatures(dataset_prefix: str) -> pl.DataFrame:
             f'No signature files found matching: {RESULTS_DIR / pattern}\n'
             'Run scripts/tda_extraction.py first.'
         )
-    # Unwrap single-element list columns produced by compute_tda_features
-    for col in (
-        'persistence_diagram',
-        'betti_curve',
-        'persistence_image',
-        'diagram_entropy',
-    ):
-        if col in df.columns:
-            df = df.with_columns(pl.col(col).list.first().alias(col))
     return df
 
 
@@ -65,6 +58,8 @@ def _build_distance_matrix(
     df: pl.DataFrame,
     split: str,
     distance_type: DistanceType,
+    max_pairs: int | None = None,
+    seed: int = 42,
     **distance_kwargs,
 ) -> pl.DataFrame:
     """Compute pairwise distances for a single *split* and return a DataFrame.
@@ -90,6 +85,12 @@ def _build_distance_matrix(
         }
 
     pairs = list(combinations(models, 2))
+    if max_pairs is not None and max_pairs < len(pairs):
+        random.seed(seed)
+        total = len(pairs)
+        pairs = random.sample(pairs, max_pairs)
+        print(f'  [{split}] Sampled {max_pairs} / {total} pairs (seed={seed})')
+
     model_a_col: list[str] = []
     model_b_col: list[str] = []
     dist_col: list[float] = []
@@ -126,8 +127,12 @@ def main(cfg: DictConfig) -> None:
     # Pull comparison-specific overrides (injected via CLI or defaults)
     comp_cfg = OmegaConf.to_container(cfg.get('comparison', {}), resolve=True)
     distance_type: DistanceType = comp_cfg.get('distance', 'bottleneck')
+    max_pairs: int | None = comp_cfg.get('max_pairs')
+    seed: int = comp_cfg.get('seed', 42)
     # Extra kwargs forwarded to the distance function (e.g. p=1 for Wasserstein)
-    distance_kwargs: dict = {k: v for k, v in comp_cfg.items() if k != 'distance'}
+    distance_kwargs: dict = {
+        k: v for k, v in comp_cfg.items() if k not in ('distance', 'max_pairs', 'seed')
+    }
 
     valid = ('bottleneck', 'wasserstein', 'hausdorff', 'betti_curve')
     if distance_type not in valid:
@@ -147,13 +152,16 @@ def main(cfg: DictConfig) -> None:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     for split in splits:
-        dist_df = _build_distance_matrix(df, split, distance_type, **distance_kwargs)
+        dist_df = _build_distance_matrix(
+            df, split, distance_type, max_pairs=max_pairs, seed=seed, **distance_kwargs
+        )
         if dist_df.is_empty():
             continue
 
         out_path = OUTPUT_DIR / f'{dataset_prefix}__{split}__{distance_type}.parquet'
         dist_df.write_parquet(out_path)
         print(f'  Saved {len(dist_df)} pairs → {out_path}')
+        print(dist_df.sort('distance').head(10))
 
 
 if __name__ == '__main__':

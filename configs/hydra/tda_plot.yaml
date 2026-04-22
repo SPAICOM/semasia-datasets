@@ -1,0 +1,55 @@
+defaults:
+    - _self_
+
+repo_id: "spaicom-lab"
+prefix: "semantic-"
+dataset: cifar10
+split: train
+distance_metric: bottleneck
+
+# ---------------------------------------------------------------------------
+# Graph filtering
+# ---------------------------------------------------------------------------
+# Keep only the k edges with the lowest distance. Set to null to retain all.
+k_edges: 50
+
+# ---------------------------------------------------------------------------
+# Node coloring
+# ---------------------------------------------------------------------------
+# If true, load the model registry from HuggingFace and color each node by
+# its architectural family (e.g. ViT, ResNet, ConvNeXt, …).
+# If false, all nodes share the same default color.
+color_by_family: true
+
+# Column from the model registry to use for node grouping.
+# Choices: family | macro_family
+family_column: family
+
+# ---------------------------------------------------------------------------
+# Layout
+# ---------------------------------------------------------------------------
+# Algorithm used to position nodes in 2-D space.
+# Choices:
+#   mds      – Multidimensional Scaling on the pairwise distance matrix.
+#              Semantically meaningful: nearby nodes share similar topology.
+#   circular – Nodes arranged on a circle (fast, no distance info used).
+#   random   – Random positions (useful for very large graphs).
+layout: kamada_kawai
+layout_seed: 42
+
+# ---------------------------------------------------------------------------
+# Figure styling
+# ---------------------------------------------------------------------------
+fig_height: 800
+node_size: 12
+edge_width: 1.5
+# Label mode for node text shown directly on the plot.
+# Choices: short (first token before '.') | full | none
+node_label: short
+
+# ---------------------------------------------------------------------------
+# Output
+# ---------------------------------------------------------------------------
+output_dir: results/plots
+# Open the figure in the default browser after saving.
+show: false

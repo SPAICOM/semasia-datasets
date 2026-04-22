@@ -4,7 +4,7 @@ defaults:
 repo_id: "spaicom-lab"
 prefix: "semantic-"
 dataset: cifar10
-model: null # set to a specific model name to filter, or leave null to plot all
+model: mobilenet # set to a specific model name to filter, or leave null to plot all
 
 tda:
     # Maximum homological dimension (inclusive): 0, 1, …, max_dim are computed
@@ -18,14 +18,12 @@ tda:
     sigma: 0.1
     # ripser metric passed to ripser.ripser() — e.g. euclidean, cosine
     metric: euclidean
-    # Landmark subsample size. Vietoris-Rips overflows for large clouds;
-    # keep ≤ 1000. Set to -1 to disable (only for small point clouds).
-    max_points: 1000
     # Random seed for the landmark subsample and stochastic dim-reduction methods
     seed: 42
 
-    # --- Preprocessing flags ---------------------------------------------------
 
+# --- Preprocessing flags ---------------------------------------------------
+preprocess:
     # Normalise each point cloud before applying TDA.
     # Choices: standard | minmax | l2 | null (no normalisation)
     #   standard : zero mean, unit std per feature
@@ -44,9 +42,11 @@ tda:
     #   isomap : Isomap (geodesic distance-based)
     #   prototype_analysis : cluster-based dim reduction via Parseval frame
     dim_reduction: pca
-
     # Target number of dimensions for the reduction step (ignored if null above)
-    dim_reduction_components: 2
+    dim_reduction_components: 20
+
+    # Landmark subsample size
+    max_points: 1000
 
     # --- Prototype-based subsampling -------------------------------------------
     # If enabled, uses prototype computation instead of random sampling.
@@ -66,6 +66,11 @@ comparison:
     # Distance metric used by scripts/tda_comparison.py
     # Choices: bottleneck | wasserstein | hausdorff | betti_curve
     distance: bottleneck
+    # Maximum number of randomly sampled model pairs to evaluate.
+    # Set to null to compute all C(n, 2) pairs.
+    max_pairs: 23
+    # Random seed for pair sampling (ignored when max_pairs is null).
+    seed: 42
     # Extra kwargs forwarded to the distance function:
     #   wasserstein: p (int, default 2)
     #   betti_curve: norm ('l1' | 'l2' | 'linf', default 'l2')

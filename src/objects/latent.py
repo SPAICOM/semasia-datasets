@@ -9,6 +9,7 @@ import torch
 from scipy.linalg import solve_triangular
 from sklearn.decomposition import PCA
 from sklearn.manifold import Isomap, LocallyLinearEmbedding
+from sklearn.cluster import KMeans
 
 if TYPE_CHECKING:
     from sklearn.base import ClusterMixin
@@ -208,9 +209,8 @@ class LatentSpace:
         torch.manual_seed(seed)
 
         if compute_prototypes:
+            # default clustering class
             if clusterer_cls is None:
-                from sklearn.cluster import KMeans
-
                 clusterer_cls = KMeans
 
             prototypes = self.compute_prototypes(
@@ -581,7 +581,6 @@ class LatentSpace:
         clusterer_kwargs = clusterer_kwargs or {}
 
         if clusters is None and clusterer is None and clusterer_cls is None:
-            from sklearn.cluster import KMeans
 
             clusterer_cls = KMeans
 
