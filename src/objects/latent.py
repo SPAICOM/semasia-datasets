@@ -672,7 +672,7 @@ class LatentSpace:
             self._F = self._prototypes
             self._G = self._prototypes.T
 
-    def compute_artificial_prototypes(
+    def compute_injected_prototypes(
         self,
         cluster_indices: dict[int, np.ndarray],
         n_samples: int | None = None,
@@ -701,8 +701,8 @@ class LatentSpace:
         Returns
         -------
         prototypes : np.ndarray, shape (k, n_features)
-            Prototype vectors computed from this model's latent space
-            using the external cluster structure.
+            Injected prototype vectors computed from this model's latent
+            space using the external cluster structure.
         """
         n_proto = len(cluster_indices)
         prototypes = np.empty((n_proto, self._latent.shape[1]), dtype=np.float32)

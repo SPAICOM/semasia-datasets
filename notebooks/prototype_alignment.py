@@ -757,12 +757,12 @@ def _(
 ):
     import plotly.graph_objects as _go3
 
-    # Artificial prototypes: fit on alignment split using model A's cluster structure,
+    # Injected prototypes: fit on alignment split using model A's cluster structure,
     # then apply the resulting operator to the test split
     _ls_b_art = LatentSpace(lb_align, seed=42)
     if prewhiten_ui.value:
         _ls_b_art.prewhiten(inplace=True)
-    _ls_b_art.compute_artificial_prototypes(cluster_indices_a)
+    _ls_b_art.compute_injected_prototypes(cluster_indices_a)
 
     # Transform test data: prewhiten first (if enabled), then apply prototype operator
     if prewhiten_ui.value:
@@ -783,7 +783,7 @@ def _(
     _Xa3, _Xb3 = _a_proto_art[_idx3], _b_proto_art[_idx3]
 
     _method3 = scatter_method_ui.value
-    with mo.status.spinner(title=f'Running {_method3} on artificial prototype space…'):
+    with mo.status.spinner(title=f'Running {_method3} on injected prototype space…'):
         _X_cat3 = np.vstack([_Xa3, _Xb3])
         if _method3 == 'PCA':
             from sklearn.decomposition import PCA as _PCA3
@@ -822,7 +822,7 @@ def _(
             y=_X2b3[:, 1],
             mode='markers',
             marker=dict(size=5, opacity=0.7, symbol='cross', color='#EF553B'),
-            name=f'{model_b_ui.value} (artificial)',
+            name=f'{model_b_ui.value} (injected)',
         )
     )
 
@@ -860,7 +860,7 @@ def _(
     mo.vstack(
         [
             mo.md(
-                f"#### Prototype space · artificial prototypes (B uses A's cluster structure) "
+                f"#### Prototype space · injected prototypes (B uses A's cluster structure) "
                 f'· test split · {_n3:,} samples · MSE: {_mse_art:.4f}'
             ),
             mo.ui.plotly(_fig3),
