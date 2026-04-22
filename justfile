@@ -54,23 +54,9 @@ compute-metrics-tda DATASET:
 compute-metrics-test DATASET:
     uv run scripts/compute_metrics.py dataset={{DATASET}} limit_models=5
 
-# Phase 1: Download all model latents (no computation)
-stat-download:
-    uv run scripts/stat_analysis.py download_only=true
-
-# Phase 2: Compute entropy metrics from cached latents
-stat-compute:
-    uv run scripts/stat_analysis.py download_only=false
-
-# Phase 3: Run regression on existing metrics
-stat-regression:
-    uv run scripts/stat_analysis.py regression_only=true
-
-# Run stat analysis (full pipeline)
+# Run stat analysis (loads precomputed metrics, runs regression)
 stat:
-    just stat-download
-    just stat-compute
-    just stat-regression
+    uv run scripts/stat_analysis.py
 
 # Install test dependencies
 test-install:
