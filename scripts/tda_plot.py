@@ -21,88 +21,20 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import hydra
-import matplotlib.cm as cm
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
-import numpy as np
 import polars as pl
-from matplotlib.collections import LineCollection
-from matplotlib.colors import Normalize
 from omegaconf import DictConfig
-from sklearn.manifold import MDS
+
+from src.plotting.tda import (
+    DEFAULT_NODE_COLOR,
+    FAMILY_PALETTE,
+    UNKNOWN_COLOR,
+    compute_layout,
+    plot_tda_distance_graph,
+)
 
 REGISTRY_URL = 'hf://datasets/spaicom-lab/model-registry/**/*.parquet'
-
-FAMILY_PALETTE = [
-    '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
-    '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf',
-    '#aec7e8', '#ffbb78', '#98df8a', '#ff9896', '#c5b0d5',
-    '#c49c94', '#f7b6d2', '#c7c7c7', '#dbdb8d', '#9edae5',
-]
-UNKNOWN_COLOR = '#cccccc'
-DEFAULT_NODE_COLOR = '#4a90d9'
-
-
-# ---------------------------------------------------------------------------
-# Layout
-# ---------------------------------------------------------------------------
-
-def _mds_layout(
-    models: list[str],
-    df: pl.DataFrame,
-    seed: int,
-) -> dict[str, tuple[float, float]]:
-    n = len(models)
-    idx = {m: i for i, m in enumerate(models)}
-
-    dist_max = float(df['distance'].max())
-    D = np.full((n, n), dist_max, dtype=float)
-    np.fill_diagonal(D, 0.0)
-
-    for row in df.iter_rows(named=True):
-        i = idx.get(row['model_a'])
-        j = idx.get(row['model_b'])
-        if i is not None and j is not None:
-            D[i, j] = row['distance']
-            D[j, i] = row['distance']
-
-    pos_array = MDS(
-        n_components=2,
-        dissimilarity='precomputed',
-        random_state=seed,
-        normalized_stress='auto',
-        n_init=4,
-    ).fit_transform(D)
-
-    return {m: (float(pos_array[i, 0]), float(pos_array[i, 1])) for i, m in enumerate(models)}
-
-
-def _circular_layout(models: list[str]) -> dict[str, tuple[float, float]]:
-    angles = np.linspace(0, 2 * np.pi, len(models), endpoint=False)
-    return {m: (float(np.cos(a)), float(np.sin(a))) for m, a in zip(models, angles)}
-
-
-def _random_layout(models: list[str], seed: int) -> dict[str, tuple[float, float]]:
-    rng = np.random.default_rng(seed)
-    coords = rng.uniform(-1, 1, size=(len(models), 2))
-    return {m: (float(coords[i, 0]), float(coords[i, 1])) for i, m in enumerate(models)}
-
-
-def compute_layout(
-    name: str,
-    models: list[str],
-    df: pl.DataFrame,
-    seed: int,
-) -> dict[str, tuple[float, float]]:
-    if name == 'mds':
-        return _mds_layout(models, df, seed)
-    elif name == 'circular':
-        return _circular_layout(models)
-    elif name == 'random':
-        return _random_layout(models, seed)
-    else:
-        print(f'[WARN] Unknown layout {name!r}, falling back to mds')
-        return _mds_layout(models, df, seed)
 
 
 # ---------------------------------------------------------------------------
@@ -205,87 +137,27 @@ def main(cfg: DictConfig) -> None:
     # Draw
     # ------------------------------------------------------------------
     dpi = 150
-    fig_w = cfg.fig_height / dpi * (16 / 9)  # widescreen aspect
+    fig_w = cfg.fig_height / dpi * (16 / 9)
     fig_h = cfg.fig_height / dpi
     fig, ax = plt.subplots(figsize=(fig_w, fig_h), dpi=dpi)
-    ax.set_aspect('equal')
-    ax.axis('off')
 
-    distances = df_edges['distance'].to_numpy()
-    d_min, d_max = float(distances.min()), float(distances.max())
-    norm = Normalize(vmin=d_min, vmax=d_max)
-    cmap = plt.get_cmap('coolwarm')  # blue (low) → red (high)
-
-    # Build LineCollection — much faster than drawing one segment at a time
-    segments = []
-    edge_values = []
-    for row in df_edges.iter_rows(named=True):
-        x0, y0 = pos[row['model_a']]
-        x1, y1 = pos[row['model_b']]
-        segments.append([(x0, y0), (x1, y1)])
-        edge_values.append(row['distance'])
-
-    lc = LineCollection(
-        segments,
-        cmap=cmap,
-        norm=norm,
-        linewidths=cfg.edge_width,
-        alpha=0.7,
-        zorder=1,
+    plot_tda_distance_graph(
+        fig=fig,
+        ax=ax,
+        df_edges=df_edges,
+        pos=pos,
+        models=edge_models,
+        node_colors=node_colors,
+        edge_width=cfg.edge_width,
+        node_size=cfg.node_size,
+        node_label=cfg.get('node_label', 'short'),
+        family_handles=family_handles if family_handles else None,
+        distance_label=f'{cfg.distance_metric} distance',
+        title=(
+            f'TDA Model Distance Graph  ·  {cfg.dataset} / {cfg.split}  ·  '
+            f'{cfg.distance_metric}  ·  top {len(df_edges)} edges'
+        ),
     )
-    lc.set_array(np.array(edge_values))
-    ax.add_collection(lc)
-
-    # Colorbar for edges
-    cbar = fig.colorbar(lc, ax=ax, fraction=0.025, pad=0.02)
-    cbar.set_label(f'{cfg.distance_metric} distance', fontsize=9)
-    cbar.ax.tick_params(labelsize=7)
-
-    # Nodes
-    xs = [pos[m][0] for m in edge_models]
-    ys = [pos[m][1] for m in edge_models]
-    ax.scatter(
-        xs, ys,
-        c=node_colors,
-        s=cfg.node_size ** 2,
-        zorder=2,
-        edgecolors='white',
-        linewidths=0.8,
-    )
-
-    # Node labels
-    label_mode = cfg.get('node_label', 'short')
-    if label_mode != 'none':
-        for m, x, y in zip(edge_models, xs, ys):
-            label = m.split('.')[0] if label_mode == 'short' else m
-            ax.text(
-                x, y,
-                label,
-                fontsize=5,
-                ha='center',
-                va='bottom',
-                clip_on=True,
-            )
-
-    # Family legend
-    if family_handles:
-        ax.legend(
-            handles=family_handles,
-            title=cfg.get('family_column', 'family').replace('_', ' ').title(),
-            fontsize=7,
-            title_fontsize=8,
-            loc='upper left',
-            framealpha=0.85,
-            markerscale=1.2,
-        )
-
-    ax.set_title(
-        f'TDA Model Distance Graph  ·  {cfg.dataset} / {cfg.split}  ·  '
-        f'{cfg.distance_metric}  ·  top {len(df_edges)} edges',
-        fontsize=11,
-        pad=10,
-    )
-    ax.autoscale()
     fig.tight_layout()
 
     # ------------------------------------------------------------------

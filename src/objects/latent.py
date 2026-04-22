@@ -4,12 +4,18 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Literal
 
+import matplotlib.pyplot as plt
+import networkx as nx
 import numpy as np
+import scipy.sparse as sp
 import torch
 from scipy.linalg import solve_triangular
 from sklearn.decomposition import PCA
-from sklearn.manifold import Isomap, LocallyLinearEmbedding
+from sklearn.manifold import Isomap, LocallyLinearEmbedding, TSNE
 from sklearn.cluster import KMeans
+import umap
+
+from src.tsp import build_knn_graph, compute_laplacian, compute_eigenvectors, LaplacianType
 
 if TYPE_CHECKING:
     from sklearn.base import ClusterMixin
@@ -28,8 +34,10 @@ def _instantiate_hdbscan(**kwargs):
 
 
 DimReductionMethod = Literal[
-    'pca', 'umap', 'tsne', 'lle', 'isomap', 'prototype_analysis'
+    'pca', 'umap', 'tsne', 'lle', 'isomap', 'prototype_analysis', 'eigen_laplacian'
 ]
+
+GraphLayout = Literal['kamada_kawai', 'spectral']
 
 
 def _normalize_point_cloud(X: np.ndarray, method: NormalizeMethod) -> np.ndarray:
@@ -115,6 +123,12 @@ class LatentSpace:
         self._whitening_L: np.ndarray | None = None
         self._whitened_latent: np.ndarray | None = None
 
+        self._pc_method: str | None = None
+        self._pc_embedding: np.ndarray | None = None
+        self._pc_axes: np.ndarray | None = None
+
+        self._knn_graph: sp.csr_matrix | None = None
+
     @property
     def latent(self) -> np.ndarray:
         """Returns the latent data array."""
@@ -159,6 +173,20 @@ class LatentSpace:
     def synthesis_operator(self) -> np.ndarray | None:
         """Returns Parseval frame synthesis operator if computed."""
         return self._G
+
+    @property
+    def pc_embedding(self) -> np.ndarray | None:
+        """Returns cached principal-component scores ``(n_points, n_components)``."""
+        return self._pc_embedding
+
+    @property
+    def pc_axes(self) -> np.ndarray | None:
+        """Returns principal-component loading axes ``(n_components, n_features)``.
+
+        Only available for linear methods (``'pca'``, ``'prototype_analysis'``);
+        ``None`` for non-linear reductions.
+        """
+        return self._pc_axes
 
     def subsample(
         self,
@@ -470,7 +498,6 @@ class LatentSpace:
                     .astype(np.float32)
                 )
             case 'umap':
-                import umap
 
                 return (
                     umap.UMAP(
@@ -480,7 +507,6 @@ class LatentSpace:
                     .astype(np.float32)
                 )
             case 'tsne':
-                from sklearn.manifold import TSNE
 
                 return (
                     TSNE(n_components=n_components, random_state=rng.integers(2**31))
@@ -504,7 +530,6 @@ class LatentSpace:
                 )
             case 'prototype_analysis':
                 if prototype_clusterer_cls is None:
-                    from sklearn.cluster import KMeans
 
                     prototype_clusterer_cls = KMeans
 
@@ -518,6 +543,334 @@ class LatentSpace:
                 return self.apply_analysis_operator()
             case _:
                 raise ValueError(f'Unknown dim_reduction method {method!r}')
+
+    @property
+    def knn_graph(self) -> sp.csr_matrix | None:
+        """Returns the cached KNN graph if built."""
+        return self._knn_graph
+
+    def build_knn_graph(
+        self,
+        k: int,
+        metric: str = 'euclidean',
+        weighted: bool = False,
+        mutual: bool = False,
+    ) -> sp.csr_matrix:
+        """Build and cache a KNN graph from the latent space.
+
+        Parameters
+        ----------
+        k : int
+            Number of nearest neighbours per point.
+        metric : str
+            Distance metric.
+        weighted : bool
+            If True, use Gaussian-kernel edge weights.
+        mutual : bool
+            If True, keep only mutual nearest-neighbour edges.
+
+        Returns
+        -------
+        sp.csr_matrix, shape (n_points, n_points)
+            Symmetric sparse adjacency matrix.
+        """
+        self._knn_graph = build_knn_graph(
+            self._latent, k=k, metric=metric, weighted=weighted, mutual=mutual
+        )
+        return self._knn_graph
+
+    def plot_knn_graph(
+        self,
+        layout: GraphLayout | np.ndarray = 'kamada_kawai',
+        laplacian_normalization: LaplacianType = 'symmetric',
+        node_color: str | np.ndarray | None = None,
+        node_size: float = 20.0,
+        edge_alpha: float = 0.4,
+        edge_width: float = 0.5,
+        cmap: str = 'tab10',
+        figsize: tuple[float, float] = (7.0, 7.0),
+        ax: plt.Axes | None = None,
+        title: str | None = None,
+    ) -> tuple[plt.Figure, plt.Axes]:
+        """Draw the cached KNN graph.
+
+        Parameters
+        ----------
+        layout : {'kamada_kawai', 'spectral'} or np.ndarray
+            Node placement strategy:
+
+            - ``'kamada_kawai'``: energy-minimisation layout via NetworkX.
+            - ``'spectral'``: 2-D coordinates from the 2nd and 3rd smallest
+              Laplacian eigenvectors (Fiedler vector and the next one).
+            - ``np.ndarray``, shape ``(n_points, 2)``: fixed external
+              coordinates passed directly.
+        laplacian_normalization : LaplacianType, default='symmetric'
+            Laplacian variant used only when ``layout='spectral'``.
+        node_color : str, np.ndarray, or None
+            Colour specification for nodes:
+
+            - ``str``: key into ``self.extras`` — the corresponding array is
+              used as per-node scalar/label values.
+            - ``np.ndarray``, shape ``(n_points,)``: per-node scalar or
+              integer values mapped through *cmap*.
+            - ``None``: uniform colour (matplotlib default).
+        node_size : float, default=20.0
+            Marker size for nodes.
+        edge_alpha : float, default=0.4
+            Transparency of edges.
+        edge_width : float, default=0.5
+            Line width of edges.
+        cmap : str, default='tab10'
+            Matplotlib colormap applied when *node_color* is an array.
+        figsize : (float, float), default=(7.0, 7.0)
+            Figure size in inches. Ignored when *ax* is provided.
+        ax : plt.Axes, optional
+            Existing axes to draw on. A new figure is created when ``None``.
+        title : str, optional
+            Axes title. Auto-generated from the layout name when ``None``.
+
+        Returns
+        -------
+        fig : plt.Figure
+        ax : plt.Axes
+
+        Raises
+        ------
+        ValueError
+            If no KNN graph has been built yet (call ``build_knn_graph`` first).
+        ValueError
+            If *layout* is an array whose shape does not match ``(n_points, 2)``.
+        """
+        if self._knn_graph is None:
+            raise ValueError('No KNN graph found. Call build_knn_graph() first.')
+
+        G = nx.from_scipy_sparse_array(self._knn_graph)
+
+        if isinstance(layout, np.ndarray):
+            coords = np.asarray(layout, dtype=np.float32)
+            if coords.shape != (self.n_points, 2):
+                raise ValueError(
+                    f'External layout must have shape (n_points, 2) = '
+                    f'({self.n_points}, 2), got {coords.shape}.'
+                )
+            pos = {i: coords[i] for i in range(self.n_points)}
+            layout_name = 'external'
+
+        elif layout == 'kamada_kawai':
+            pos = nx.kamada_kawai_layout(G)
+            layout_name = 'Kamada–Kawai'
+
+        elif layout == 'spectral':
+            laplacian = compute_laplacian(self._knn_graph, normalization=laplacian_normalization)
+            _, eigvecs = compute_eigenvectors(laplacian, k=3)
+            # columns 1 and 2: skip the trivial constant eigenvector
+            coords = eigvecs[:, 1:3].astype(np.float64)
+            pos = {i: coords[i] for i in range(self.n_points)}
+            layout_name = f'spectral ({laplacian_normalization})'
+
+        else:
+            raise ValueError(
+                f'Unknown layout {layout!r}. '
+                "Choices: 'kamada_kawai', 'spectral', or an (n_points, 2) array."
+            )
+
+        # resolve node colours
+        color_values: np.ndarray | str | None = None
+        if isinstance(node_color, str):
+            if node_color not in self._extras:
+                raise ValueError(
+                    f'Key {node_color!r} not found in extras. '
+                    f'Available: {list(self._extras.keys())}.'
+                )
+            color_values = self._extras[node_color]
+        elif isinstance(node_color, np.ndarray):
+            color_values = node_color
+
+        if ax is None:
+            fig, ax = plt.subplots(figsize=figsize)
+        else:
+            fig = ax.get_figure()
+
+        nx.draw_networkx_edges(
+            G, pos, ax=ax,
+            alpha=edge_alpha,
+            width=edge_width,
+            edge_color='gray',
+        )
+
+        if color_values is not None:
+            nc = nx.draw_networkx_nodes(
+                G, pos, ax=ax,
+                node_size=node_size,
+                node_color=color_values,
+                cmap=cmap,
+            )
+            fig.colorbar(nc, ax=ax, fraction=0.03, pad=0.02)
+        else:
+            nx.draw_networkx_nodes(
+                G, pos, ax=ax,
+                node_size=node_size,
+            )
+
+        ax.set_axis_off()
+        ax.set_title(title if title is not None else f'KNN graph — {layout_name} layout', fontsize=10)
+        fig.tight_layout()
+        return fig, ax
+
+    def compute_principal_components(
+        self,
+        method: DimReductionMethod,
+        n_components: int,
+        k: int | None = None,
+        seed: int | None = None,
+        prototype_n_samples: int = 10,
+        prototype_clusterer_cls: type[ClusterMixin] | None = None,
+        prototype_clusterer_kwargs: dict | None = None,
+        knn_k: int = 10,
+        laplacian_normalization: LaplacianType = 'symmetric',
+        knn_metric: str = 'euclidean',
+        knn_weighted: bool = False,
+        knn_mutual: bool = False,
+    ) -> np.ndarray:
+        """Compute, cache, and return the leading principal-component axes.
+
+        Fits the chosen dimensionality-reduction model on ``self._latent`` and
+        stores two attributes:
+
+        * :attr:`pc_embedding` — projected scores, shape ``(n_points, n_components)``.
+        * :attr:`pc_axes` — component directions in the original feature space,
+          shape ``(n_components, n_features)``.  Available only for linear methods
+          (``'pca'``, ``'prototype_analysis'``); ``None`` for non-linear ones.
+
+        Parameters
+        ----------
+        method : DimReductionMethod
+            Reduction algorithm.  Choices: ``'pca'``, ``'umap'``, ``'tsne'``,
+            ``'lle'``, ``'isomap'``, ``'prototype_analysis'``,
+            ``'eigen_laplacian'``.
+        n_components : int
+            Total number of components to compute.
+        k : int, optional
+            Number of leading axes to return.  Defaults to *n_components*.
+        seed : int, optional
+            Random seed.  Falls back to the instance seed when omitted.
+        prototype_n_samples : int, default=10
+            Samples per cluster for ``'prototype_analysis'``.
+        prototype_clusterer_cls : type[ClusterMixin], optional
+            Clustering class for ``'prototype_analysis'``.  Defaults to KMeans.
+        prototype_clusterer_kwargs : dict, optional
+            Extra kwargs for the clusterer.
+        knn_k : int, default=10
+            Number of nearest neighbours for ``'eigen_laplacian'``.
+        laplacian_normalization : LaplacianType, default='symmetric'
+            Laplacian variant for ``'eigen_laplacian'``.
+        knn_metric : str, default='euclidean'
+            Distance metric for KNN graph construction.
+        knn_weighted : bool, default=False
+            Use Gaussian-kernel edge weights in the KNN graph.
+        knn_mutual : bool, default=False
+            Keep only mutual nearest-neighbour edges.
+
+        Returns
+        -------
+        np.ndarray, shape (k, n_features)
+            The first *k* principal-component axes (loading vectors) for linear
+            methods.  For non-linear methods and ``'eigen_laplacian'``, where a
+            feature-space direction is undefined, returns the embedding score
+            vectors transposed, shape ``(k, n_points)``.
+        """
+        if seed is None:
+            seed = self._seed
+        rng = np.random.default_rng(seed)
+        n_components = min(n_components, self._latent.shape[1], self._latent.shape[0])
+        k_eff = min(k if k is not None else n_components, n_components)
+
+        axes: np.ndarray | None = None
+
+        match method:
+            case 'pca':
+                pca = PCA(
+                    n_components=n_components,
+                    random_state=rng.integers(2**31),
+                )
+                embedding = pca.fit_transform(self._latent).astype(np.float32)
+                axes = pca.components_.astype(np.float32)
+
+            case 'umap':
+                embedding = (
+                    umap.UMAP(
+                        n_components=n_components,
+                        random_state=rng.integers(2**31),
+                    )
+                    .fit_transform(self._latent)
+                    .astype(np.float32)
+                )
+
+            case 'tsne':
+                embedding = (
+                    TSNE(
+                        n_components=n_components,
+                        random_state=rng.integers(2**31),
+                    )
+                    .fit_transform(self._latent)
+                    .astype(np.float32)
+                )
+
+            case 'lle':
+                embedding = (
+                    LocallyLinearEmbedding(
+                        n_components=n_components,
+                        random_state=rng.integers(2**31),
+                    )
+                    .fit_transform(self._latent)
+                    .astype(np.float32)
+                )
+
+            case 'isomap':
+                embedding = (
+                    Isomap(n_components=n_components)
+                    .fit_transform(self._latent)
+                    .astype(np.float32)
+                )
+
+            case 'prototype_analysis':
+                if prototype_clusterer_cls is None:
+                    prototype_clusterer_cls = KMeans
+
+                self.compute_prototypes(
+                    n_samples=prototype_n_samples,
+                    clusterer_cls=prototype_clusterer_cls,
+                    n_clusters=n_components,
+                    clusterer_kwargs=prototype_clusterer_kwargs,
+                    apply_parseval=True,
+                )
+                embedding = self.apply_analysis_operator()
+                axes = self._F.astype(np.float32) if self._F is not None else None
+
+            case 'eigen_laplacian':
+                self.build_knn_graph(
+                    k=knn_k,
+                    metric=knn_metric,
+                    weighted=knn_weighted,
+                    mutual=knn_mutual,
+                )
+                laplacian = compute_laplacian(
+                    self._knn_graph, normalization=laplacian_normalization
+                )
+                _, eigvecs = compute_eigenvectors(laplacian, k=n_components)
+                embedding = eigvecs.astype(np.float32)
+
+            case _:
+                raise ValueError(f'Unknown dim_reduction method {method!r}')
+
+        self._pc_method = method
+        self._pc_embedding = embedding
+        self._pc_axes = axes
+
+        if axes is not None:
+            return axes[:k_eff]
+        # non-linear methods: return embedding score vectors as rows
+        return embedding[:, :k_eff].T
 
     def compute_prototypes(
         self,

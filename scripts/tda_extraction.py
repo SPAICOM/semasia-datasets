@@ -43,13 +43,14 @@ def main(cfg: DictConfig) -> None:
 
     RESULTS.mkdir(parents=True, exist_ok=True)
 
-    dataset: str = f'{cfg.repo_id}/{cfg.prefix}{cfg.dataset}'
-    cache_pattern: str = f'{cfg.repo_id}___{cfg.prefix}{cfg.dataset}'
-    hub_pattern: str = f'datasets--{cfg.repo_id}--{cfg.prefix}{cfg.dataset}*'
+    dataset_id: str = cfg.dataset.name.split('/')[-1]
+    dataset: str = f'{cfg.repo_id}/{cfg.prefix}{dataset_id}'
+    cache_pattern: str = f'{cfg.repo_id}___{cfg.prefix}{dataset_id}'
+    hub_pattern: str = f'datasets--{cfg.repo_id}--{cfg.prefix}{dataset_id}*'
 
     models: list[str] = (
         pl.read_parquet('hf://datasets/spaicom-lab/model-registry/**/*.parquet')
-        .filter(pl.col('latent_dim') < cfg.tda.max_points)
+        .filter(pl.col('latent_dim') < cfg.preprocess.max_latent)
         .filter((cfg.model is None) | pl.col('model_name').str.contains(cfg.model))
         .select('model_name')
         .unique()
@@ -58,66 +59,71 @@ def main(cfg: DictConfig) -> None:
     )
 
     for model in tqdm(models):
-        for split in DATASET_SPLITS[cfg.dataset]:
-            temp: dict[str, any] = {
-                'dataset': dataset,
-                'split': split,
-                'model': model,
-                **dict.fromkeys(TDA_KEYS),
-            }
+        for split in DATASET_SPLITS[dataset_id]:
 
-            try:
-                data = load_dataset(dataset, model, split=split).with_format('torch')
-            except Exception as e:
-                print(
-                    f"Error loading dataset for model '{model}', split '{split}': {e}"
-                )
-                continue
-
-            latent: torch.Tensor = torch.vstack(list(data['embedding']))
-
-            extras = None
-            if hasattr(cfg.dataset, 'extras') and cfg.dataset.extras:
-                extra_names = list(cfg.dataset.extras)
-                extras = {
-                    name: np.array(data[name])
-                    for name in extra_names
-                    if name in data.columns
+            if split in cfg.splits:
+                temp: dict[str, any] = {
+                    'dataset': dataset,
+                    'split': split,
+                    'model': model,
+                    **dict.fromkeys(TDA_KEYS),
                 }
 
-            ls = LatentSpace(latent, extras=extras, seed=cfg.seed)
+                try:
+                    data = load_dataset(dataset, model, split=split).with_format('torch')
+                except Exception as e:
+                    print(
+                        f"Error loading dataset for model '{model}', split '{split}': {e}"
+                    )
+                    continue
 
-            if cfg.tda.max_points > 0 and ls.n_points > cfg.tda.max_points:
-                ls = ls.subsample(n_points=cfg.preprocess.max_points, compute_prototypes=cfg.preprocess.prototypes.enable, seed=cfg.seed,)
+                latent: torch.Tensor = torch.vstack(list(data['embedding']))
 
-            if cfg.tda.normalize is not None:
-                latent_processed = ls.normalize(cfg.preprocess.normalize)
-            else:
-                latent_processed = ls.latent
+                extras = None
+                if hasattr(cfg.dataset, 'extras') and cfg.dataset.extras:
+                    extra_names = list(cfg.dataset.extras)
+                    extras = {
+                        name: np.array(data[name])
+                        for name in extra_names
+                        if name in data.column_names
+                    }
 
-            if cfg.tda.dim_reduction is not None:
-                latent_processed = ls.reduce_dimensions(
-                    cfg.preprocess.dim_reduction,
-                    cfg.preprocess.dim_reduction_components,
-                    seed=cfg.seed,
+                ls = LatentSpace(latent, extras=extras, seed=cfg.seed)
+
+                if (cfg.preprocess.max_points > 0) and (ls.n_points > cfg.preprocess.max_points):
+                    ls = ls.subsample(n_points=cfg.preprocess.max_points,
+                                      compute_prototypes=cfg.preprocess.prototypes.enable,
+                                      n_samples=cfg.preprocess.prototypes.n_samples,
+                                      seed=cfg.seed,)
+
+                if cfg.preprocess.normalize is not None:
+                    latent_processed = ls.normalize(cfg.preprocess.normalize)
+                else:
+                    latent_processed = ls.latent
+
+                if cfg.preprocess.dim_reduction is not None:
+                    latent_processed = ls.reduce_dimensions(
+                        cfg.preprocess.dim_reduction,
+                        cfg.preprocess.dim_reduction_components,
+                        seed=cfg.seed,
+                    )
+
+                output_tda = compute_tda_features(
+                    latent_processed,
+                    max_dim=cfg.tda.max_dim,
+                    simplicial_filter=cfg.tda.simplicial_filter,
+                    n_bins=cfg.tda.n_bins,
+                    sigma=cfg.tda.sigma,
+                    metric=cfg.tda.metric,
                 )
 
-            output_tda = compute_tda_features(
-                latent_processed,
-                max_dim=cfg.tda.max_dim,
-                simplicial_filter=cfg.tda.simplicial_filter,
-                n_bins=cfg.tda.n_bins,
-                sigma=cfg.tda.sigma,
-                metric=cfg.tda.metric,
-            )
+                pl.DataFrame(temp | output_tda).write_parquet(
+                    RESULTS
+                    / f'{cfg.repo_id}__{cfg.prefix}{dataset_id}__{split}__{model}.parquet'
+                )
 
-            pl.DataFrame(temp | output_tda).write_parquet(
-                RESULTS
-                / f'{cfg.repo_id}__{cfg.prefix}{cfg.dataset}__{split}__{model}.parquet'
-            )
-
-            remove_matching('~/.cache/huggingface/datasets/', f'{cache_pattern}*')
-            remove_matching('~/.cache/huggingface/hub/', hub_pattern)
+                remove_matching('~/.cache/huggingface/datasets/', f'{cache_pattern}*')
+                remove_matching('~/.cache/huggingface/hub/', hub_pattern)
 
 
 if __name__ == '__main__':
