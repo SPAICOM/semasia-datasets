@@ -22,6 +22,15 @@ force_recompute: false
 compute_stat: true
 compute_tda: false
 
+stat_cases:
+  - raw
+  # - proto_no_prewhiten
+  # - proto_prewhiten
+
+tda_cases:
+  - absolute
+  # - proto_no_prewhiten
+
 tda:
   max_points: 1000
   dim_reduction: pca

@@ -438,6 +438,8 @@ def process_model(
     """Process a single model: compute stat and/or TDA metrics based on config."""
     compute_stat = cfg.get('compute_stat', True)
     compute_tda = cfg.get('compute_tda', False)
+    stat_cases = cfg.get('stat_cases', ['raw', 'proto_no_prewhiten', 'proto_prewhiten'])
+    tda_cases = cfg.get('tda_cases', ['absolute', 'proto_no_prewhiten'])
 
     latent = load_latent(dataset, model_name, split)
 
@@ -460,105 +462,104 @@ def process_model(
     results_all = []
 
     if compute_stat:
-        results_raw = _compute_stat_metrics(latent, cfg)
-        results_raw.update(
-            {
-                'stat_case': 'raw',
-                'n_prototypes': 0,
-                'prewhiten': False,
-            }
-        )
-        results_raw.update(common_cols)
-        results_all.append(results_raw)
+        for stat_case in stat_cases:
+            if stat_case == 'raw':
+                results_case = _compute_stat_metrics(latent, cfg)
+                results_case.update(
+                    {
+                        'stat_case': 'raw',
+                        'n_prototypes': 0,
+                        'prewhiten': False,
+                    }
+                )
+            elif stat_case == 'proto_no_prewhiten':
+                ls = LatentSpace(latent, seed=seed)
+                ls.compute_prototypes(
+                    n_samples=n_samples,
+                    clusterer_cls=clusterer_cls,
+                    n_clusters=n_clusters,
+                    apply_parseval=True,
+                    return_cluster_indices=False,
+                    prewhiten=False,
+                )
+                data_proto = ls.apply_analysis_operator()
+                results_case = _compute_stat_metrics(data_proto, cfg)
+                results_case.update(
+                    {
+                        'stat_case': 'proto_no_prewhiten',
+                        'n_prototypes': n_clusters,
+                        'prewhiten': False,
+                    }
+                )
+            elif stat_case == 'proto_prewhiten':
+                ls = LatentSpace(latent, seed=seed)
+                ls.compute_prototypes(
+                    n_samples=n_samples,
+                    clusterer_cls=clusterer_cls,
+                    n_clusters=n_clusters,
+                    apply_parseval=True,
+                    return_cluster_indices=False,
+                    prewhiten=True,
+                )
+                data_proto = ls.apply_analysis_operator()
+                results_case = _compute_stat_metrics(data_proto, cfg)
+                results_case.update(
+                    {
+                        'stat_case': 'proto_prewhiten',
+                        'n_prototypes': n_clusters,
+                        'prewhiten': True,
+                    }
+                )
+            else:
+                continue
 
-        ls1 = LatentSpace(latent, seed=seed)
-        ls1.compute_prototypes(
-            n_samples=n_samples,
-            clusterer_cls=clusterer_cls,
-            n_clusters=n_clusters,
-            apply_parseval=True,
-            return_cluster_indices=False,
-            prewhiten=False,
-        )
-        data_proto = ls1.apply_analysis_operator()
-        results_proto = _compute_stat_metrics(data_proto, cfg)
-        results_proto.update(
-            {
-                'stat_case': 'proto_no_prewhiten',
-                'n_prototypes': n_clusters,
-                'prewhiten': False,
-            }
-        )
-        results_proto.update(common_cols)
-        results_all.append(results_proto)
-
-        ls2 = LatentSpace(latent, seed=seed)
-        ls2.compute_prototypes(
-            n_samples=n_samples,
-            clusterer_cls=clusterer_cls,
-            n_clusters=n_clusters,
-            apply_parseval=True,
-            return_cluster_indices=False,
-            prewhiten=True,
-        )
-        data_whiten = ls2.apply_analysis_operator()
-        results_whiten = _compute_stat_metrics(data_whiten, cfg)
-        results_whiten.update(
-            {
-                'stat_case': 'proto_prewhiten',
-                'n_prototypes': n_clusters,
-                'prewhiten': True,
-            }
-        )
-        results_whiten.update(common_cols)
-        results_all.append(results_whiten)
+            results_case.update(common_cols)
+            results_all.append(results_case)
 
     if compute_tda:
-        ls_tda_raw = LatentSpace(latent, seed=seed)
-        tda_raw_result = _compute_tda_features(ls_tda_raw.latent, cfg)
-        results_tda_raw = {
-            'tda_case': 'absolute',
-            'tda_max_points': max_points,
-            'tda_dim_reduction': dim_reduction,
-            'tda_dim_reduction_components': dim_reduction_components,
-            'tda_normalize': normalize,
-        }
-        results_tda_raw.update(tda_raw_result)
-        results_tda_raw.update(common_cols)
-
-        if compute_stat:
-            results_all[0].update(results_tda_raw)
-        else:
-            results_all.append(results_tda_raw)
-
-        ls_tda_proto = LatentSpace(latent, seed=seed)
-        ls_tda_proto.compute_prototypes(
-            n_samples=n_samples,
-            clusterer_cls=clusterer_cls,
-            n_clusters=n_clusters,
-            apply_parseval=True,
-            return_cluster_indices=False,
-            prewhiten=False,
-        )
-        data_tda_proto = ls_tda_proto.apply_analysis_operator()
-        tda_proto_result = _compute_tda_features(data_tda_proto, cfg)
-        results_tda_proto = {
-            'tda_case': 'proto_no_prewhiten',
-            'tda_max_points': max_points,
-            'tda_dim_reduction': dim_reduction,
-            'tda_dim_reduction_components': dim_reduction_components,
-            'tda_normalize': normalize,
-        }
-        results_tda_proto.update(tda_proto_result)
-        results_tda_proto.update(common_cols)
-
-        if compute_stat:
-            if len(results_all) > 1:
-                results_all[1].update(results_tda_proto)
+        tda_idx = 0
+        for tda_case in tda_cases:
+            if tda_case == 'absolute':
+                ls_tda = LatentSpace(latent, seed=seed)
+                tda_result = _compute_tda_features(ls_tda.latent, cfg)
+                results_tda = {
+                    'tda_case': 'absolute',
+                    'tda_max_points': max_points,
+                    'tda_dim_reduction': dim_reduction,
+                    'tda_dim_reduction_components': dim_reduction_components,
+                    'tda_normalize': normalize,
+                }
+            elif tda_case == 'proto_no_prewhiten':
+                ls_tda = LatentSpace(latent, seed=seed)
+                ls_tda.compute_prototypes(
+                    n_samples=n_samples,
+                    clusterer_cls=clusterer_cls,
+                    n_clusters=n_clusters,
+                    apply_parseval=True,
+                    return_cluster_indices=False,
+                    prewhiten=False,
+                )
+                data_tda = ls_tda.apply_analysis_operator()
+                tda_result = _compute_tda_features(data_tda, cfg)
+                results_tda = {
+                    'tda_case': 'proto_no_prewhiten',
+                    'tda_max_points': max_points,
+                    'tda_dim_reduction': dim_reduction,
+                    'tda_dim_reduction_components': dim_reduction_components,
+                    'tda_normalize': normalize,
+                }
             else:
-                results_all.append(results_tda_proto)
-        else:
-            results_all.append(results_tda_proto)
+                continue
+
+            results_tda.update(tda_result)
+            results_tda.update(common_cols)
+
+            if compute_stat and tda_idx < len(results_all):
+                results_all[tda_idx].update(results_tda)
+            else:
+                results_all.append(results_tda)
+
+            tda_idx += 1
 
     return results_all
 

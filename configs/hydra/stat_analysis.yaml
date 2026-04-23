@@ -3,6 +3,11 @@ prefix: "semantic-"
 dataset: cifar10
 split: train
 
+stat_cases:
+  - raw
+  # - proto_no_prewhiten
+  # - proto_prewhiten
+
 metrics:
   - total_spread
   - mean_distance_to_centroid

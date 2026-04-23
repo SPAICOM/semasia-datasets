@@ -50,6 +50,57 @@ VIT_SIZE_ORDER = {
     'enormous': 7,
 }
 
+SIZE_ORDER = {
+    'xxsmall': 0,
+    'xsmall': 1,
+    'tiny': 2,
+    'small': 3,
+    'base': 4,
+    'medium': 5,
+    'large': 6,
+    'xlarge': 7,
+    'huge': 8,
+    'gigantic': 9,
+    'enormous': 10,
+}
+
+FAMILY_SIZE_ORDERS = {
+    'ViT': {
+        'tiny': 0,
+        'small': 1,
+        'base': 2,
+        'medium': 3,
+        'large': 4,
+        'huge': 5,
+        'gigantic': 6,
+        'enormous': 7,
+    },
+    'ConvNeXt': {
+        'tiny': 4,
+        'small': 5,
+        'base': 6,
+        'large': 7,
+        'xlarge': 8,
+        'huge': 9,
+    },
+    'Swin': {'tiny': 0, 'small': 1, 'base': 2, 'large': 3},
+    'DeiT': {'tiny': 0, 'small': 1, 'base': 2, 'medium': 3, 'large': 4, 'huge': 5},
+    'MaxViT': {'tiny': 0, 'small': 1, 'base': 2, 'large': 3, 'xlarge': 4},
+    'MobileNet': {
+        'small': 3,
+        'medium': 4,
+        'large': 5,
+    },
+    'MobileViT': {
+        'xxsmall': 0,
+        'xsmall': 1,
+        'small': 2,
+        'medium': 3,
+        'large': 4,
+        'xlarge': 5,
+    },
+}
+
 
 @hydra.main(
     config_path='../configs/hydra/',
@@ -185,7 +236,8 @@ def main(cfg: DictConfig) -> None:
     print(df.head(10))
 
     outcomes = cfg.get('metrics', ['effective_rank_fast', 'participation_ratio_fast'])
-    run_stat_regression(df, results_dir, outcomes)
+    stat_cases = cfg.get('stat_cases', None)
+    run_stat_regression(df, results_dir, outcomes, stat_cases)
 
 
 def build_pairs(model_df: pl.DataFrame) -> pl.DataFrame:
@@ -380,53 +432,64 @@ def build_pairs(model_df: pl.DataFrame) -> pl.DataFrame:
 
 
 def _build_model_scale_pairs(imagenet_df: pl.DataFrame) -> list[dict]:
-    """Build model scale pairs for ViT family.
+    """Build model scale pairs for multiple architecture families.
 
-    Groups by: pretrain_dataset, pretrain_aug, pretrain_ft
-    Orders by: VIT_SIZE_ORDER (primary), num_parameters (secondary)
-    Creates pairs where smaller = control, larger = treatment
+    For each family in FAMILY_SIZE_ORDERS:
+        1. Filter to that family
+        2. Group by (pretrain_dataset, pretrain_aug, pretrain_ft)
+        3. Order by size (primary), num_parameters (secondary)
+        4. Create pairs: smaller = control, larger = treatment
 
-    Only includes models with sizes in VIT_SIZE_ORDER.
+    arch_key is set to lowercase family name for regression control.
     """
-    vit_df = imagenet_df.filter(pl.col('family') == 'ViT')
-
-    group_cols = ['pretrain_dataset', 'pretrain_aug', 'pretrain_ft']
-    grouped = vit_df.group_by(group_cols).agg(
-        pl.col('model_name').alias('models'),
-        pl.col('size').alias('sizes'),
-        pl.col('num_parameters').alias('params'),
-    )
-
     rows = []
-    for row in grouped.iter_rows(named=True):
-        models = row['models']
-        sizes = row['sizes']
-        params = row['params']
 
-        valid_indices = []
-        for i in range(len(models)):
-            size_val = sizes[i].lower() if sizes[i] is not None else None
-            if size_val in VIT_SIZE_ORDER:
-                size_idx = VIT_SIZE_ORDER[size_val]
+    for family, family_order in FAMILY_SIZE_ORDERS.items():
+        # Filter to one family first (ensures consistent group definitions)
+        family_df = imagenet_df.filter(pl.col('family') == family)
+
+        if len(family_df) == 0:
+            continue
+
+        group_cols = ['pretrain_dataset', 'pretrain_aug', 'pretrain_ft']
+        grouped = family_df.group_by(group_cols).agg(
+            pl.col('model_name').alias('models'),
+            pl.col('size').alias('sizes'),
+            pl.col('num_parameters').alias('params'),
+        )
+
+        for row in grouped.iter_rows(named=True):
+            models = row['models']
+            sizes = row['sizes']
+            params = row['params']
+
+            valid_indices = []
+            for i in range(len(models)):
+                size_val = sizes[i].lower() if sizes[i] is not None else None
+
+                if size_val not in family_order:
+                    continue
+
+                size_idx = family_order[size_val]
                 param_val = params[i] if params[i] is not None else 0
                 valid_indices.append((i, size_idx, param_val))
 
-        valid_indices.sort(key=lambda x: (x[1], x[2]))
+            valid_indices.sort(key=lambda x: (x[1], x[2]))
 
-        for i in range(len(valid_indices)):
-            idx1 = valid_indices[i][0]
-            for j in range(i + 1, len(valid_indices)):
-                idx2 = valid_indices[j][0]
-                smaller_model = models[idx1]
-                larger_model = models[idx2]
-                rows.append(
-                    {
-                        'analysis_type': 'model_scale',
-                        'control_model': smaller_model,
-                        'treatment_model': larger_model,
-                        'arch_key': 'vit',
-                    }
-                )
+            for i in range(len(valid_indices)):
+                idx1 = valid_indices[i][0]
+                for j in range(i + 1, len(valid_indices)):
+                    idx2 = valid_indices[j][0]
+                    smaller_model = models[idx1]
+                    larger_model = models[idx2]
+                    rows.append(
+                        {
+                            'analysis_type': 'model_scale',
+                            'control_model': smaller_model,
+                            'treatment_model': larger_model,
+                            'arch_key': family.lower(),
+                        }
+                    )
 
     return rows
 
@@ -435,6 +498,7 @@ def run_stat_regression(
     metrics_df: pl.DataFrame,
     results_dir: Path,
     outcomes: list,
+    stat_cases: list | None = None,
     *,
     standardize: bool = True,
 ) -> None:
@@ -445,16 +509,23 @@ def run_stat_regression(
     metrics_df : raw per-model DataFrame with all stat_cases
     results_dir : directory for output parquets
     outcomes : list of metric column names to regress
+    stat_cases : list of stat_cases to process (e.g., ['raw', 'proto_no_prewhiten']).
+        If None, uses all stat_cases present in metrics_df.
     standardize : if True, z-score each metric using control-group
         mean/std within each stat_case x analysis_type slice before
         fitting. Beta is then in units of control SDs.
     """
-    stat_cases = metrics_df['stat_case'].unique().to_list()
+    if stat_cases is None:
+        stat_cases = metrics_df['stat_case'].unique().to_list()
 
     for case in stat_cases:
         print(f'\n[REGRESSION] Stat case: {case}')
 
         df_case = metrics_df.filter(pl.col('stat_case') == case)
+
+        if len(df_case) == 0:
+            print(f'  [WARN] No data for stat_case {case}, skipping')
+            continue
 
         for outcome in outcomes:
             _run_stat_for_outcome(
