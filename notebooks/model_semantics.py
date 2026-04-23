@@ -322,6 +322,7 @@ def _(
     orig_datasets: dict,
     plt,
     scatter_chart,
+    selected_datasets,
     show_images,
 ):
     _pts = scatter_chart.value
@@ -336,14 +337,24 @@ def _(
         ),
     )
 
-    # read global_idx and orig_idx directly from customdata embedded in each point
+    _ds_offsets: dict = {}
+    for _i, (_info_ds, _) in enumerate(all_sample_info):
+        if _info_ds not in _ds_offsets:
+            _ds_offsets[_info_ds] = _i
+
     _images_by_ds: dict = {}
     for _pt in _pts[:10]:
-        _cd = _pt.get('customdata')
-        if not _cd:
+        _curve = _pt.get('curveNumber')
+        _point_idx = _pt.get('pointIndex')
+        if _curve is None or _point_idx is None:
             continue
-        _global = int(_cd[0])
-        _ds_name, _orig_idx = all_sample_info[_global]
+        if _curve >= len(selected_datasets):
+            continue
+        _ds_name = selected_datasets[_curve]
+        _global = _ds_offsets.get(_ds_name, 0) + _point_idx
+        if _global >= len(all_sample_info):
+            continue
+        _, _orig_idx = all_sample_info[_global]
         if _ds_name not in _images_by_ds:
             _images_by_ds[_ds_name] = []
         _images_by_ds[_ds_name].append(_orig_idx)
@@ -375,6 +386,39 @@ def _(
         [
             mo.md(f'**Selected {len(_pts)} point(s)** — showing up to 10 images:'),
             mo.image(_buf.getvalue()),
+        ]
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(X2d, all_sample_info, mo, model_ui, y_ds):
+    import io as _io
+
+    import polars as _pl
+
+    scatter_df = _pl.DataFrame(
+        {
+            'dataset': list(y_ds),
+            'orig_idx': [int(oi) for _, oi in all_sample_info],
+            'comp_1': X2d[:, 0].tolist(),
+            'comp_2': X2d[:, 1].tolist(),
+        }
+    )
+
+    _buf = _io.BytesIO()
+    scatter_df.write_parquet(_buf)
+
+    mo.vstack(
+        [
+            mo.md(f'**Scatter data** — {len(scatter_df):,} rows'),
+            mo.download(
+                data=_buf.getvalue(),
+                filename=f'scatter_{model_ui.value}.parquet',
+                mimetype='application/octet-stream',
+                label='Download parquet',
+            ),
+            mo.ui.table(scatter_df.head(10)),
         ]
     )
     return

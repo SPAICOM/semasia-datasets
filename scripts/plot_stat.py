@@ -32,9 +32,11 @@ def main(cfg: DictConfig) -> None:
     output_dir = Path(cfg.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # --- Figure 1: Forest plots (all stat_cases) ---
+    stat_cases = cfg.get('stat_cases', ['raw', 'proto_no_prewhiten', 'proto_prewhiten'])
+
+    # --- Figure 1: Forest plots ---
     print('\n[Figure 1] Forest plots...')
-    plot_forest(results_dir, output_dir)
+    plot_forest(results_dir, output_dir, stat_cases=stat_cases)
 
     # --- Load raw data for Figures 2–4 ---
     raw_path = (

@@ -86,3 +86,7 @@ test-fast:
 # Run only slow tests
 test-slow:
     uv run pytest -v -m "slow"
+
+# Run marimo notebooks
+marimo:
+    uv run marimo edit .

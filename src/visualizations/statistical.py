@@ -123,6 +123,7 @@ def _fit_ols(df_pd, metric: str):
 def plot_forest(
     results_dir: str | Path,
     output_dir: str | Path,
+    stat_cases: list | None = None,
 ) -> list[Path]:
     """Forest plots of regression coefficients, one figure per stat_case.
 
@@ -130,11 +131,15 @@ def plot_forest(
     ----------
     results_dir : path to ``results/stat/``
     output_dir : path to save figures
+    stat_cases : list of stat_cases to plot. If None, uses all cases present.
 
     Returns
     -------
     List of saved figure paths.
     """
+    if stat_cases is None:
+        stat_cases = STAT_CASE_ORDER
+
     _apply_style()
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -152,7 +157,7 @@ def plot_forest(
     )
     saved = []
 
-    for case in STAT_CASE_ORDER:
+    for case in stat_cases:
         df_case = reg.filter(pl.col('stat_case_parsed') == case)
         if df_case.is_empty():
             continue

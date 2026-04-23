@@ -1,7 +1,12 @@
 repo_id: "spaicom-lab"
 prefix: "semantic-"
-dataset: cifar10
+dataset: mnist
 split: train
+
+stat_cases:
+  - raw
+  # - proto_no_prewhiten
+  # - proto_prewhiten
 
 # Default metric / stat_case / analysis_type for per-metric figures (Figs 2-4)
 metric: effective_rank

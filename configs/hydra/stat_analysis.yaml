@@ -1,6 +1,6 @@
 repo_id: "spaicom-lab"
 prefix: "semantic-"
-dataset: cifar10
+dataset: mnist
 split: train
 
 stat_cases:
