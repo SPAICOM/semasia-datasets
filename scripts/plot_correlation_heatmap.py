@@ -8,7 +8,7 @@ import polars as pl
 import torch
 from datasets import load_dataset
 
-from src.objects import LatentSpace
+from src.objects import AlignmentProblem, LatentSpace
 from src.objects.latent import DimReductionMethod
 from src.plotting.latent import plot_pc_correlation_heatmap
 
@@ -62,6 +62,7 @@ def main(
     method: DimReductionMethod,
     n_components: int = 50,
     k: int | None = None,
+    n_anchors: int | None = None,
     output_path: str | None = None,
     repo_id: str = 'spaicom-lab',
     prefix: str = 'semantic-',
@@ -76,6 +77,14 @@ def main(
     latent_a = _load_latent(model_a, full_dataset)
     latent_b = _load_latent(model_b, full_dataset)
 
+    if n_anchors is not None:
+        print(f'Aligning via relative representation (n_anchors={n_anchors}) ...')
+        latent_a, latent_b = AlignmentProblem(latent_a, latent_b).align(
+            'relative',
+            strategy='prototype',
+            n_anchors=n_anchors,
+        )
+
     fig, ax = plot_pc_correlation_heatmap(
         latent_a=latent_a,
         latent_b=latent_b,
@@ -85,6 +94,13 @@ def main(
         label_a=model_a,
         label_b=model_b,
     )
+
+    if n_anchors is not None:
+        ax.set_title(
+            ax.get_title().replace('PC correlation', f'PC correlation (relative, {n_anchors} anchors)'),
+            fontsize=10,
+            pad=8,
+        )
 
     if output_path:
         fig.savefig(output_path, dpi=150, bbox_inches='tight')
@@ -139,6 +155,16 @@ if __name__ == '__main__':
         help='Number of leading components to plot (default: n_components)',
     )
     parser.add_argument(
+        '--n-anchors',
+        type=int,
+        default=None,
+        help=(
+            'If set, align both spaces via anchor-relative representation '
+            'before computing PCs (uses AlignmentProblem with proto anchors). '
+            'Example: --n-anchors 64'
+        ),
+    )
+    parser.add_argument(
         '--output', type=str, default=None, help='Output file path for the plot'
     )
 
@@ -150,6 +176,7 @@ if __name__ == '__main__':
         method=args.method,
         n_components=args.n_components,
         k=args.k,
+        n_anchors=args.n_anchors,
         output_path=args.output,
         repo_id=args.repo_id,
         prefix=args.prefix,

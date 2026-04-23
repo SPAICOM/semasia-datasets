@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Literal
 
 import matplotlib.pyplot as plt
-import networkx as nx
 import numpy as np
 import scipy.sparse as sp
 import torch
@@ -15,7 +14,9 @@ from sklearn.manifold import Isomap, LocallyLinearEmbedding, TSNE
 from sklearn.cluster import KMeans
 import umap
 
-from src.tsp import build_knn_graph, compute_laplacian, compute_eigenvectors, LaplacianType
+from src.tsp import LaplacianType
+from src.objects.anchor import Anchor, AnchorStrategy
+from src.objects.graph import Graph
 
 if TYPE_CHECKING:
     from sklearn.base import ClusterMixin
@@ -127,7 +128,8 @@ class LatentSpace:
         self._pc_embedding: np.ndarray | None = None
         self._pc_axes: np.ndarray | None = None
 
-        self._knn_graph: sp.csr_matrix | None = None
+        self._knn_graph: Graph | None = None
+        self._anchor: Anchor | None = None
 
     @property
     def latent(self) -> np.ndarray:
@@ -545,9 +547,14 @@ class LatentSpace:
                 raise ValueError(f'Unknown dim_reduction method {method!r}')
 
     @property
-    def knn_graph(self) -> sp.csr_matrix | None:
+    def knn_graph(self) -> Graph | None:
         """Returns the cached KNN graph if built."""
         return self._knn_graph
+
+    @property
+    def anchor(self) -> Anchor | None:
+        """Returns the cached Anchor object if computed."""
+        return self._anchor
 
     def build_knn_graph(
         self,
@@ -555,7 +562,7 @@ class LatentSpace:
         metric: str = 'euclidean',
         weighted: bool = False,
         mutual: bool = False,
-    ) -> sp.csr_matrix:
+    ) -> Graph:
         """Build and cache a KNN graph from the latent space.
 
         Parameters
@@ -571,10 +578,10 @@ class LatentSpace:
 
         Returns
         -------
-        sp.csr_matrix, shape (n_points, n_points)
-            Symmetric sparse adjacency matrix.
+        Graph
+            Graph object wrapping the KNN adjacency matrix.
         """
-        self._knn_graph = build_knn_graph(
+        self._knn_graph = Graph.from_point_cloud(
             self._latent, k=k, metric=metric, weighted=weighted, mutual=mutual
         )
         return self._knn_graph
@@ -644,38 +651,8 @@ class LatentSpace:
         if self._knn_graph is None:
             raise ValueError('No KNN graph found. Call build_knn_graph() first.')
 
-        G = nx.from_scipy_sparse_array(self._knn_graph)
-
-        if isinstance(layout, np.ndarray):
-            coords = np.asarray(layout, dtype=np.float32)
-            if coords.shape != (self.n_points, 2):
-                raise ValueError(
-                    f'External layout must have shape (n_points, 2) = '
-                    f'({self.n_points}, 2), got {coords.shape}.'
-                )
-            pos = {i: coords[i] for i in range(self.n_points)}
-            layout_name = 'external'
-
-        elif layout == 'kamada_kawai':
-            pos = nx.kamada_kawai_layout(G)
-            layout_name = 'Kamada–Kawai'
-
-        elif layout == 'spectral':
-            laplacian = compute_laplacian(self._knn_graph, normalization=laplacian_normalization)
-            _, eigvecs = compute_eigenvectors(laplacian, k=3)
-            # columns 1 and 2: skip the trivial constant eigenvector
-            coords = eigvecs[:, 1:3].astype(np.float64)
-            pos = {i: coords[i] for i in range(self.n_points)}
-            layout_name = f'spectral ({laplacian_normalization})'
-
-        else:
-            raise ValueError(
-                f'Unknown layout {layout!r}. '
-                "Choices: 'kamada_kawai', 'spectral', or an (n_points, 2) array."
-            )
-
-        # resolve node colours
-        color_values: np.ndarray | str | None = None
+        # Resolve node colour: extras key → array
+        color_values: np.ndarray | None = None
         if isinstance(node_color, str):
             if node_color not in self._extras:
                 raise ValueError(
@@ -686,36 +663,18 @@ class LatentSpace:
         elif isinstance(node_color, np.ndarray):
             color_values = node_color
 
-        if ax is None:
-            fig, ax = plt.subplots(figsize=figsize)
-        else:
-            fig = ax.get_figure()
-
-        nx.draw_networkx_edges(
-            G, pos, ax=ax,
-            alpha=edge_alpha,
-            width=edge_width,
-            edge_color='gray',
+        return self._knn_graph.plot(
+            layout=layout,
+            laplacian_normalization=laplacian_normalization,
+            node_color=color_values,
+            node_size=node_size,
+            edge_alpha=edge_alpha,
+            edge_width=edge_width,
+            cmap=cmap,
+            figsize=figsize,
+            ax=ax,
+            title=title,
         )
-
-        if color_values is not None:
-            nc = nx.draw_networkx_nodes(
-                G, pos, ax=ax,
-                node_size=node_size,
-                node_color=color_values,
-                cmap=cmap,
-            )
-            fig.colorbar(nc, ax=ax, fraction=0.03, pad=0.02)
-        else:
-            nx.draw_networkx_nodes(
-                G, pos, ax=ax,
-                node_size=node_size,
-            )
-
-        ax.set_axis_off()
-        ax.set_title(title if title is not None else f'KNN graph — {layout_name} layout', fontsize=10)
-        fig.tight_layout()
-        return fig, ax
 
     def compute_principal_components(
         self,
@@ -854,10 +813,9 @@ class LatentSpace:
                     weighted=knn_weighted,
                     mutual=knn_mutual,
                 )
-                laplacian = compute_laplacian(
-                    self._knn_graph, normalization=laplacian_normalization
+                _, eigvecs = self._knn_graph.compute_eigenvectors(
+                    k=n_components, normalization=laplacian_normalization
                 )
-                _, eigvecs = compute_eigenvectors(laplacian, k=n_components)
                 embedding = eigvecs.astype(np.float32)
 
             case _:
@@ -931,65 +889,27 @@ class LatentSpace:
             Only returned if ``return_cluster_indices=True``.
             Maps prototype index to array of observation indices.
         """
-        clusterer_kwargs = clusterer_kwargs or {}
-
-        if clusters is None and clusterer is None and clusterer_cls is None:
-
-            clusterer_cls = KMeans
-
         latent_for_clustering = self._latent
         if prewhiten and self._whiten_F is None:
             whitened = self.prewhiten()
             latent_for_clustering = whitened
 
-        modes = (
-            clusters is not None,
-            clusterer is not None,
-            clusterer_cls is not None,
-        )
-        if sum(modes) != 1:
-            raise ValueError(
-                'Provide exactly one of `clusters`, `clusterer`, or `clusterer_cls`.'
-            )
-
-        if clusters is not None:
-            clusters = np.asarray(clusters)
-
-        elif clusterer is not None:
-            clusters = clusterer.fit_predict(latent_for_clustering)
-
-        else:
-            if n_clusters is not None:
-                clusterer_kwargs.setdefault('n_clusters', n_clusters)
-                if self._seed is not None:
-                    clusterer_kwargs.setdefault('random_state', self._seed)
-
-            clusterer = clusterer_cls(**clusterer_kwargs)
-            clusters = clusterer.fit_predict(latent_for_clustering)
-        unique_clusters = np.unique(clusters)
-
-        prototypes = np.empty(
-            (unique_clusters.shape[0], self._latent.shape[1]),
-            dtype=np.float32,
+        anchor = Anchor(latent_for_clustering, strategy='prototype', seed=self._seed)
+        anchor.fit(
+            n_anchors=n_clusters,
+            n_samples=n_samples,
+            clusters=clusters,
+            clusterer=clusterer,
+            clusterer_cls=clusterer_cls,
+            clusterer_kwargs=clusterer_kwargs,
+            # centroids always in original (non-whitened) space
+            centroid_data=self._latent,
         )
 
-        for i, c in enumerate(unique_clusters):
-            in_cluster = self._latent[clusters == c]
-
-            if n_samples is not None and in_cluster.shape[0] < n_samples:
-                raise ValueError(
-                    f'Cluster {c} has {in_cluster.shape[0]} samples, '
-                    f'but n_samples={n_samples}.'
-                )
-
-            if n_samples is None:
-                prototypes[i] = in_cluster.mean(axis=0)
-            else:
-                rng = np.random.default_rng(self._seed + i)
-                idx = rng.choice(in_cluster.shape[0], size=n_samples, replace=False)
-                prototypes[i] = in_cluster[idx].mean(axis=0)
-
+        prototypes = anchor.get_anchors()
+        self._anchor = anchor
         self._prototypes = prototypes
+        self._prototypes_to_indices = anchor.cluster_indices
 
         if apply_parseval:
             self._F, self._G = _parseval_frame(prototypes)
@@ -997,14 +917,75 @@ class LatentSpace:
             self._F = prototypes
             self._G = prototypes.T
 
-        self._prototypes_to_indices: dict[int, np.ndarray] = {}
         if return_cluster_indices:
-            for i, c in enumerate(unique_clusters):
-                obs_indices = np.where(clusters == c)[0]
-                self._prototypes_to_indices[i] = obs_indices
             return prototypes, self._prototypes_to_indices
 
         return prototypes
+
+    def get_relative(
+        self,
+        strategy: AnchorStrategy = 'prototype',
+        n_anchors: int | None = None,
+        clusterer_cls: type[ClusterMixin] | None = None,
+        clusterer_kwargs: dict | None = None,
+        n_samples: int | None = 10,
+        apply_parseval: bool = True,
+        force_recompute: bool = False,
+    ) -> LatentSpace:
+        """Project the latent space into anchor-relative coordinates.
+
+        Each point is expressed as its projection onto the anchor directions
+        (analysis operator), yielding an ``(n_points, k)`` representation
+        where ``k`` is the number of anchors.  This is the *relative
+        representation* of the latent space with respect to the chosen anchors.
+
+        If the analysis operator ``F`` has already been computed and
+        ``force_recompute=False``, the existing anchors are reused and anchor
+        parameters are ignored (a warning is emitted).
+
+        Parameters
+        ----------
+        strategy : AnchorStrategy, default='prototype'
+            Anchor selection strategy.
+        n_anchors : int, optional
+            Number of anchors (clusters).  Ignored when operators are cached.
+        clusterer_cls : type[ClusterMixin], optional
+            Clustering class.  Defaults to ``KMeans``.
+        clusterer_kwargs : dict, optional
+            Extra kwargs for the clusterer.
+        n_samples : int | None, default=10
+            Observations per cluster used for centroid estimation.
+        apply_parseval : bool, default=True
+            Whether to orthonormalise the anchor frame via SVD.
+        force_recompute : bool, default=False
+            If True, recompute anchors even when ``F`` is already set.
+
+        Returns
+        -------
+        LatentSpace
+            New instance whose latent data are the relative coordinates,
+            shape ``(n_points, k)``.
+        """
+        import warnings
+
+        if self._F is not None and not force_recompute:
+            warnings.warn(
+                'Reusing cached analysis operator F. '
+                'Pass force_recompute=True or call compute_prototypes() first '
+                'to use different anchor parameters.',
+                stacklevel=2,
+            )
+        else:
+            self.compute_prototypes(
+                n_samples=n_samples,
+                clusterer_cls=clusterer_cls,
+                n_clusters=n_anchors,
+                clusterer_kwargs=clusterer_kwargs,
+                apply_parseval=apply_parseval,
+            )
+
+        relative = self.apply_analysis_operator()
+        return LatentSpace(relative, extras=self._extras, seed=self._seed)
 
     def set_operators(self, use_parseval: bool = True) -> None:
         """Set analysis and synthesis operators from existing prototypes.

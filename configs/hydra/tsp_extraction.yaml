@@ -1,0 +1,48 @@
+defaults:
+    - _self_
+    - dataset: cifar10
+
+repo_id: "spaicom-lab"
+prefix: "semantic-"
+model: null # set to a specific model name to filter, or leave null to run all
+splits: [train]
+seed: 42
+
+graph:
+    # Number of nearest neighbours per point (self excluded)
+    k: 10
+    # Distance metric passed to sklearn NearestNeighbors
+    metric: euclidean
+    # If true, edge weights are Gaussian-kernel similarities; otherwise binary
+    weighted: false
+    # If true, keep only mutual (intersection) KNN edges
+    mutual: false
+    # Laplacian normalisation used for eigengap: unnormalized | symmetric | random_walk
+    laplacian_normalization: symmetric
+    # Position at which the spectral gap is measured (λ_k - λ_{k-1})
+    eigengap_k: 1
+
+# --- Preprocessing flags ---------------------------------------------------
+preprocess:
+    # Normalise each point cloud before building the graph.
+    # Choices: standard | minmax | l2 | null (no normalisation)
+    normalize: standard
+
+    # Reduce the embedding dimension before graph construction.
+    # Choices: pca | umap | tsne | lle | isomap | prototype_analysis | null
+    dim_reduction: pca
+    # Target number of dimensions for the reduction step (ignored if null above)
+    dim_reduction_components: 50
+
+    # Maximum latent dimension of models to include (filter on model registry)
+    max_latent: 1000
+    # Landmark subsample size (0 = no subsampling)
+    max_points: 1000
+
+    # --- Prototype-based subsampling -------------------------------------------
+    prototypes:
+        enable: true
+        n_samples: null
+        clusterer_cls: KMeans
+        clusterer_kwargs: {}
+        apply_parseval: true
