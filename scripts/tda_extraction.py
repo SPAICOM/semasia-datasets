@@ -61,21 +61,23 @@ def main(cfg: DictConfig) -> None:
     for model in tqdm(models):
         for split in DATASET_SPLITS[dataset_id]:
 
-            if split in cfg.splits:
-                temp: dict[str, any] = {
-                    'dataset': dataset,
-                    'split': split,
-                    'model': model,
-                    **dict.fromkeys(TDA_KEYS),
-                }
+            if split not in cfg.splits:
+                continue
 
-                try:
-                    data = load_dataset(dataset, model, split=split).with_format('torch')
-                except Exception as e:
-                    print(
-                        f"Error loading dataset for model '{model}', split '{split}': {e}"
-                    )
-                    continue
+            out_path = RESULTS / f'{cfg.repo_id}__{cfg.prefix}{dataset_id}__{split}__{model}.parquet'
+            if out_path.exists():
+                print(f"Skipping model '{model}', split '{split}': signature already exists")
+                continue
+
+            temp: dict[str, any] = {
+                'dataset': dataset,
+                'split': split,
+                'model': model,
+                **dict.fromkeys(TDA_KEYS),
+            }
+
+            try:
+                data = load_dataset(dataset, model, split=split).with_format('torch')
 
                 latent: torch.Tensor = torch.vstack(list(data['embedding']))
 
@@ -117,13 +119,13 @@ def main(cfg: DictConfig) -> None:
                     metric=cfg.tda.metric,
                 )
 
-                pl.DataFrame(temp | output_tda).write_parquet(
-                    RESULTS
-                    / f'{cfg.repo_id}__{cfg.prefix}{dataset_id}__{split}__{model}.parquet'
-                )
+                pl.DataFrame(temp | output_tda).write_parquet(out_path)
 
                 remove_matching('~/.cache/huggingface/datasets/', f'{cache_pattern}*')
                 remove_matching('~/.cache/huggingface/hub/', hub_pattern)
+
+            except Exception as e:
+                print(f"Error processing model '{model}', split '{split}': {e}")
 
 
 if __name__ == '__main__':

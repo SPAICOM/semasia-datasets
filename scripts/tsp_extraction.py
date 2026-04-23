@@ -75,7 +75,6 @@ def main(cfg: DictConfig) -> None:
 
     models: list[str] = (
         pl.read_parquet('hf://datasets/spaicom-lab/model-registry/**/*.parquet')
-        .filter(pl.col('latent_dim') < cfg.preprocess.max_latent)
         .filter((cfg.model is None) | pl.col('model_name').str.contains(cfg.model))
         .select('model_name')
         .unique()
@@ -85,8 +84,12 @@ def main(cfg: DictConfig) -> None:
 
     for model in tqdm(models):
         for split in DATASET_SPLITS[dataset_id]:
-
             if split not in cfg.splits:
+                continue
+
+            out_path = RESULTS / f'{cfg.repo_id}__{cfg.prefix}{dataset_id}__{split}__{model}.parquet'
+            if out_path.exists():
+                print(f"Skipping model '{model}', split '{split}': signature already exists")
                 continue
 
             temp: dict[str, any] = {
@@ -98,60 +101,59 @@ def main(cfg: DictConfig) -> None:
 
             try:
                 data = load_dataset(dataset, model, split=split).with_format('torch')
+
+                latent: torch.Tensor = torch.vstack(list(data['embedding']))
+
+                extras = None
+                if hasattr(cfg.dataset, 'extras') and cfg.dataset.extras:
+                    extra_names = list(cfg.dataset.extras)
+                    extras = {
+                        name: np.array(data[name])
+                        for name in extra_names
+                        if name in data.column_names
+                    }
+
+                ls = LatentSpace(latent, extras=extras, seed=cfg.seed)
+
+                if (cfg.preprocess.max_points > 0) and (
+                    ls.n_points > cfg.preprocess.max_points
+                ):
+                    ls = ls.subsample(
+                        n_points=cfg.preprocess.max_points,
+                        compute_prototypes=cfg.preprocess.prototypes.enable,
+                        n_samples=cfg.preprocess.prototypes.n_samples,
+                        seed=cfg.seed,
+                    )
+
+                if cfg.preprocess.normalize is not None:
+                    latent_processed = ls.normalize(cfg.preprocess.normalize)
+                else:
+                    latent_processed = ls.latent
+
+                if cfg.preprocess.dim_reduction is not None:
+                    latent_processed = ls.reduce_dimensions(
+                        cfg.preprocess.dim_reduction,
+                        cfg.preprocess.dim_reduction_components,
+                        seed=cfg.seed,
+                    )
+
+                graph = Graph.from_point_cloud(
+                    latent_processed,
+                    k=cfg.graph.k,
+                    metric=cfg.graph.metric,
+                    weighted=cfg.graph.weighted,
+                    mutual=cfg.graph.mutual,
+                )
+                graph.compute_laplacian(cfg.graph.laplacian_normalization)
+                raw_metrics = graph.compute_metrics(eigengap_k=cfg.graph.eigengap_k)
+
+                pl.DataFrame(temp | _serialize_metrics(raw_metrics)).write_parquet(out_path)
+
+                remove_matching('~/.cache/huggingface/datasets/', f'{cache_pattern}*')
+                remove_matching('~/.cache/huggingface/hub/', hub_pattern)
+
             except Exception as e:
-                print(f"Error loading dataset for model '{model}', split '{split}': {e}")
-                continue
-
-            latent: torch.Tensor = torch.vstack(list(data['embedding']))
-
-            extras = None
-            if hasattr(cfg.dataset, 'extras') and cfg.dataset.extras:
-                extra_names = list(cfg.dataset.extras)
-                extras = {
-                    name: np.array(data[name])
-                    for name in extra_names
-                    if name in data.column_names
-                }
-
-            ls = LatentSpace(latent, extras=extras, seed=cfg.seed)
-
-            if (cfg.preprocess.max_points > 0) and (ls.n_points > cfg.preprocess.max_points):
-                ls = ls.subsample(
-                    n_points=cfg.preprocess.max_points,
-                    compute_prototypes=cfg.preprocess.prototypes.enable,
-                    n_samples=cfg.preprocess.prototypes.n_samples,
-                    seed=cfg.seed,
-                )
-
-            if cfg.preprocess.normalize is not None:
-                latent_processed = ls.normalize(cfg.preprocess.normalize)
-            else:
-                latent_processed = ls.latent
-
-            if cfg.preprocess.dim_reduction is not None:
-                latent_processed = ls.reduce_dimensions(
-                    cfg.preprocess.dim_reduction,
-                    cfg.preprocess.dim_reduction_components,
-                    seed=cfg.seed,
-                )
-
-            graph = Graph.from_point_cloud(
-                latent_processed,
-                k=cfg.graph.k,
-                metric=cfg.graph.metric,
-                weighted=cfg.graph.weighted,
-                mutual=cfg.graph.mutual,
-            )
-            graph.compute_laplacian(cfg.graph.laplacian_normalization)
-            raw_metrics = graph.compute_metrics(eigengap_k=cfg.graph.eigengap_k)
-
-            pl.DataFrame(temp | _serialize_metrics(raw_metrics)).write_parquet(
-                RESULTS
-                / f'{cfg.repo_id}__{cfg.prefix}{dataset_id}__{split}__{model}.parquet'
-            )
-
-            remove_matching('~/.cache/huggingface/datasets/', f'{cache_pattern}*')
-            remove_matching('~/.cache/huggingface/hub/', hub_pattern)
+                print(f"Error processing model '{model}', split '{split}': {e}")
 
 
 if __name__ == '__main__':

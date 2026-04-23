@@ -28,21 +28,14 @@ preprocess:
     # Choices: standard | minmax | l2 | null (no normalisation)
     normalize: standard
 
-    # Reduce the embedding dimension before graph construction.
-    # Choices: pca | umap | tsne | lle | isomap | prototype_analysis | null
-    dim_reduction: pca
-    # Target number of dimensions for the reduction step (ignored if null above)
-    dim_reduction_components: 50
-
-    # Maximum latent dimension of models to include (filter on model registry)
-    max_latent: 1000
-    # Landmark subsample size (0 = no subsampling)
-    max_points: 1000
+    dim_reduction: null
+    dim_reduction_components: null
+    max_points: 10000
 
     # --- Prototype-based subsampling -------------------------------------------
     prototypes:
-        enable: true
+        enable: false
         n_samples: null
-        clusterer_cls: KMeans
-        clusterer_kwargs: {}
-        apply_parseval: true
+        clusterer_cls: null
+        clusterer_kwargs: null
+        apply_parseval: null

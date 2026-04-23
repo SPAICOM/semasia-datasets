@@ -34,6 +34,9 @@ model-registry:
 tda-extraction:
     uv run scripts/tda_extraction.py
 
+tsp-extraction:
+    uv run scripts/tsp_extraction.py
+
 # Phase 1: Download all model latents (no computation)
 compute-download:
     uv run scripts/compute_metrics.py download_only=true
