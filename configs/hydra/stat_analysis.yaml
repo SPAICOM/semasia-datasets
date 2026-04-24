@@ -3,10 +3,18 @@ prefix: "semantic-"
 dataset: mnist
 split: train
 
+compute_probing: true
+
 stat_cases:
   - raw
   # - proto_no_prewhiten
   # - proto_prewhiten
+
+probing_outcomes:
+  - probing_accuracy
+  - probing_recall
+  - probing_precision
+  - probing_f1
 
 metrics:
   - total_spread

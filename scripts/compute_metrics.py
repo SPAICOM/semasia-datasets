@@ -14,9 +14,17 @@ import hydra
 import numpy as np
 import polars as pl
 import torch
+import torch.nn as nn
 from datasets import load_dataset
 from joblib import Parallel, delayed
 from omegaconf import DictConfig
+from sklearn.metrics import (
+    accuracy_score,
+    f1_score,
+    precision_score,
+    recall_score,
+)
+from torch.utils.data import DataLoader, TensorDataset
 from tqdm.auto import tqdm
 from tqdm_joblib import tqdm_joblib
 
@@ -44,6 +52,27 @@ from src.metrics.pointcloud import (
 )
 from src.objects import LatentSpace
 from src.tda import compute_tda_features
+
+
+def get_label_column(base_dataset: str) -> str:
+    """Get the label column name from dataset config."""
+    from pathlib import Path
+
+    import yaml
+
+    config_path = (
+        Path(__file__).parent.parent
+        / 'configs'
+        / 'hydra'
+        / 'dataset'
+        / f'{base_dataset}.yaml'
+    )
+    if config_path.exists():
+        config = yaml.safe_load(config_path.read_text())
+        extras = config.get('extras', ['label'])
+        return extras[0] if extras else 'label'
+    return 'label'
+
 
 METRIC_DISPATCH = {
     'total_spread': total_spread,
@@ -125,10 +154,12 @@ def main(cfg: DictConfig) -> None:
     )
     output_path_stat = output_path.with_name(output_path.stem + '_stat.parquet')
     output_path_tda = output_path.with_name(output_path.stem + '_tda.parquet')
+    output_path_probing = output_path.with_name(output_path.stem + '_probing.parquet')
 
     force_recompute = cfg.get('force_recompute', False)
     compute_stat = cfg.get('compute_stat', True)
     compute_tda = cfg.get('compute_tda', False)
+    compute_probing = cfg.get('compute_probing', False)
 
     if compute_stat and output_path_stat.exists() and not force_recompute:
         print('\n[INFO] Checking existing stat results for incremental computation...')
@@ -154,7 +185,26 @@ def main(cfg: DictConfig) -> None:
     else:
         existing_models_tda = set()
 
-    existing_models = existing_models_stat | existing_models_tda
+    # Probing check
+    if compute_probing and output_path_probing.exists() and not force_recompute:
+        print('\n[INFO] Checking existing probing results...')
+        try:
+            existing_df = pl.read_parquet(output_path_probing)
+            existing_models_probing = set(existing_df['model'].unique().to_list())
+            print(f'  Found {len(existing_models_probing)} existing probing models')
+        except Exception as e:
+            print(f'  Could not read probing: {e}')
+            existing_models_probing = set()
+    else:
+        existing_models_probing = set()
+
+    # Fix skip logic - if compute_probing is enabled, only check probing file
+    if compute_probing:
+        existing_models = (
+            existing_models_probing if output_path_probing.exists() else set()
+        )
+    else:
+        existing_models = existing_models_stat | existing_models_tda
 
     if existing_models and not force_recompute:
         settings_cols = [
@@ -252,6 +302,7 @@ def main(cfg: DictConfig) -> None:
     n_jobs = cfg.get('n_jobs')
     compute_stat = cfg.get('compute_stat', True)
     compute_tda = cfg.get('compute_tda', False)
+    compute_probing = cfg.get('compute_probing', False)
 
     def save_model_results(
         model_name: str,
@@ -259,6 +310,7 @@ def main(cfg: DictConfig) -> None:
         model_df: pl.DataFrame,
         output_path_stat: Path,
         output_path_tda: Path,
+        output_path_probing: Path,
     ):
         """Save results for a single model incrementally to separate parquet files."""
         if not metrics:
@@ -274,6 +326,7 @@ def main(cfg: DictConfig) -> None:
 
         stat_results = []
         tda_results = []
+        probing_results = []
 
         for case_result in metrics:
             result_row = {
@@ -284,6 +337,8 @@ def main(cfg: DictConfig) -> None:
                 stat_results.append(result_row)
             elif 'tda_case' in case_result:
                 tda_results.append(result_row)
+            elif 'probing_case' in case_result:
+                probing_results.append(result_row)
 
         def _save_to_parquet(results: list, output_path: Path, dedup_cols: list):
             if not results:
@@ -307,6 +362,10 @@ def main(cfg: DictConfig) -> None:
             _save_to_parquet(stat_results, output_path_stat, ['model', 'stat_case'])
         if compute_tda and tda_results:
             _save_to_parquet(tda_results, output_path_tda, ['model', 'tda_case'])
+        if compute_probing and probing_results:
+            _save_to_parquet(
+                probing_results, output_path_probing, ['model', 'probing_case']
+            )
 
     def process_model_wrapper(model_name):
         try:
@@ -323,12 +382,20 @@ def main(cfg: DictConfig) -> None:
 
     model_list = sorted(all_models)
 
+    probe_method = cfg.get('probing_method', 'autodiff')
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    print(f'[INFO] Probing using device: {device}, method: {probe_method}')
     if n_jobs is None or n_jobs == 1:
         for model_name in tqdm(model_list, desc='Computing metrics'):
             name, metrics = process_model_wrapper(model_name)
             if metrics is not None:
                 save_model_results(
-                    name, metrics, model_df, output_path_stat, output_path_tda
+                    name,
+                    metrics,
+                    model_df,
+                    output_path_stat,
+                    output_path_tda,
+                    output_path_probing,
                 )
     else:
 
@@ -336,7 +403,12 @@ def main(cfg: DictConfig) -> None:
             name, metrics = process_model_wrapper(model_name)
             if metrics is not None:
                 save_model_results(
-                    name, metrics, model_df, output_path_stat, output_path_tda
+                    name,
+                    metrics,
+                    model_df,
+                    output_path_stat,
+                    output_path_tda,
+                    output_path_probing,
                 )
             return name, metrics is not None
 
@@ -349,6 +421,8 @@ def main(cfg: DictConfig) -> None:
         print(f'\n[COMPLETE] Stat results saved to {output_path_stat}')
     if compute_tda:
         print(f'[COMPLETE] TDA results saved to {output_path_tda}')
+    if compute_probing:
+        print(f'[COMPLETE] Probing results saved to {output_path_probing}')
 
 
 def load_latent(dataset: str, model: str, split: str) -> np.ndarray:
@@ -356,6 +430,83 @@ def load_latent(dataset: str, model: str, split: str) -> np.ndarray:
     data = load_dataset(dataset, model, split=split).with_format('torch')
     latent: torch.Tensor = torch.vstack(list(data['embedding']))
     return latent.detach().cpu().float().numpy()
+
+
+def load_latent_with_labels(
+    dataset: str,
+    model: str,
+    split: str,
+    label_col: str,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Load latent embeddings and labels from HuggingFace dataset."""
+    data = load_dataset(dataset, model, split=split).with_format('torch')
+    latent: torch.Tensor = torch.vstack(list(data['embedding']))
+    labels: np.ndarray = np.array(data[label_col])
+    return latent.detach().cpu().float().numpy(), labels
+
+
+def _compute_probing_metrics(
+    X_train: np.ndarray,
+    y_train: np.ndarray,
+    X_test: np.ndarray,
+    y_test: np.ndarray,
+    seed: int,
+    batch_size: int = 256,
+    epochs: int = 100,
+    lr: float = 0.001,
+    method: str = 'autodiff',
+) -> dict:
+    """Compute linear probing metrics using PyTorch linear layer."""
+    n_classes = len(np.unique(y_train))
+    n_features = X_train.shape[1]
+
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+    if method == 'lstsq':
+        X_t = torch.tensor(X_train, dtype=torch.float32).to(device)
+        y_t = torch.tensor(y_train, dtype=torch.long).to(device)
+        Y_onehot = torch.nn.functional.one_hot(y_t, n_classes).float()
+
+        W = torch.linalg.lstsq(X_t, Y_onehot).solution
+
+        X_test_t = torch.tensor(X_test, dtype=torch.float32).to(device)
+        y_pred = (X_test_t @ W).argmax(dim=1).cpu().numpy()
+    else:
+        train_ds = TensorDataset(
+            torch.tensor(X_train, dtype=torch.float32),
+            torch.tensor(y_train, dtype=torch.long),
+        )
+        train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True)
+
+        model = nn.Linear(n_features, n_classes).to(device)
+        optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+        criterion = nn.CrossEntropyLoss()
+
+        model.train()
+        for epoch in range(epochs):
+            for X_batch, y_batch in train_loader:
+                X_batch = X_batch.to(device)
+                y_batch = y_batch.to(device)
+                optimizer.zero_grad()
+                loss = criterion(model(X_batch), y_batch)
+                loss.backward()
+                optimizer.step()
+
+        model.eval()
+        with torch.no_grad():
+            X_test_t = torch.tensor(X_test, dtype=torch.float32).to(device)
+            y_pred = model(X_test_t).argmax(dim=1).cpu().numpy()
+
+    return {
+        'probing_accuracy': accuracy_score(y_test, y_pred),
+        'probing_recall': recall_score(
+            y_test, y_pred, average='macro', zero_division=0
+        ),
+        'probing_precision': precision_score(
+            y_test, y_pred, average='macro', zero_division=0
+        ),
+        'probing_f1': f1_score(y_test, y_pred, average='macro', zero_division=0),
+    }
 
 
 def _compute_stat_metrics(data: np.ndarray, cfg: DictConfig) -> dict:
@@ -560,6 +711,49 @@ def process_model(
                 results_all.append(results_tda)
 
             tda_idx += 1
+
+    compute_probing = cfg.get('compute_probing', False)
+    if compute_probing:
+        probe_test_split = cfg.get('probe_test_split', 'test')
+        probe_batch_size = cfg.get('probing_batch_size', 256)
+        probe_epochs = cfg.get('probing_epochs', 100)
+        probe_lr = cfg.get('probing_lr', 0.001)
+        probe_method = cfg.get('probing_method', 'autodiff')
+        label_col = get_label_column(cfg.dataset)
+        valid_splits = DATASET_SPLITS.get(cfg.dataset, {'train'})
+        if probe_test_split not in valid_splits:
+            if 'validation' in valid_splits:
+                probe_test_split = 'validation'
+            else:
+                probe_test_split = list(valid_splits)[0]
+        X_train, y_train = load_latent_with_labels(
+            dataset, model_name, 'train', label_col
+        )
+        X_test, y_test = load_latent_with_labels(
+            dataset, model_name, probe_test_split, label_col
+        )
+        probe_result = _compute_probing_metrics(
+            X_train,
+            y_train,
+            X_test,
+            y_test,
+            seed,
+            batch_size=probe_batch_size,
+            epochs=probe_epochs,
+            lr=probe_lr,
+            method=probe_method,
+        )
+        probe_result.update(
+            {
+                'probing_case': 'raw',
+                'probing_method': probe_method,
+                'label_column': label_col,
+                'train_split': 'train',
+                'test_split': probe_test_split,
+            }
+        )
+        probe_result.update(common_cols)
+        results_all.append(probe_result)
 
     return results_all
 

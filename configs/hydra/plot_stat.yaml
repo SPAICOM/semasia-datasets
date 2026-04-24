@@ -13,5 +13,8 @@ metric: effective_rank
 stat_case: raw
 analysis_type: dataset_change
 
+# Optional: filter metrics to plot (null = all metrics)
+metrics: null
+
 results_dir: results/stat
 output_dir: results/figures

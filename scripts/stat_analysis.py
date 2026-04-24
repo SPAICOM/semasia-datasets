@@ -143,6 +143,30 @@ def main(cfg: DictConfig) -> None:
     metrics_df = pl.read_parquet(metrics_path)
     print(f'  Loaded {len(metrics_df)} metric rows')
 
+    # Add probing metrics if enabled
+    if cfg.get('compute_probing', False):
+        probing_path = (
+            Path('results/compute_metrics')
+            / f'{cfg.repo_id}__{cfg.prefix}{cfg.dataset}__{split}_probing.parquet'
+        )
+        if probing_path.exists():
+            probing_df = pl.read_parquet(probing_path)
+            print(f'  Loaded {len(probing_df)} probing rows')
+
+            probing_metrics = probing_df.select(
+                [
+                    'model',
+                    'probing_accuracy',
+                    'probing_recall',
+                    'probing_precision',
+                    'probing_f1',
+                ]
+            )
+            metrics_df = metrics_df.join(probing_metrics, on='model', how='left')
+            print(f'  Merged metrics: {len(metrics_df)} rows')
+        else:
+            print(f'  [WARN] Probing file not found: {probing_path}')
+
     available_models = set(metrics_df['model'].unique().to_list())
     print(f'  Available models in metrics: {len(available_models)}')
 
@@ -236,6 +260,17 @@ def main(cfg: DictConfig) -> None:
     print(df.head(10))
 
     outcomes = cfg.get('metrics', ['effective_rank_fast', 'participation_ratio_fast'])
+    if cfg.get('compute_probing', False):
+        probing_outcomes = cfg.get(
+            'probing_outcomes',
+            [
+                'probing_accuracy',
+                'probing_recall',
+                'probing_precision',
+                'probing_f1',
+            ],
+        )
+        outcomes.extend(probing_outcomes)
     stat_cases = cfg.get('stat_cases', None)
     run_stat_regression(df, results_dir, outcomes, stat_cases)
 

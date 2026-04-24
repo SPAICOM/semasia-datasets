@@ -51,6 +51,10 @@ METRIC_LABELS = {
     'explained_var_ratio_top1': 'Expl. Var. Ratio (top-1)',
     'explained_var_ratio_top3': 'Expl. Var. Ratio (top-3)',
     'top_eigenvalue_ratio': 'Top Eigenvalue Ratio',
+    'probing_accuracy': 'Probing Accuracy',
+    'probing_recall': 'Probing Recall',
+    'probing_precision': 'Probing Precision',
+    'probing_f1': 'Probing F1',
 }
 METRIC_ORDER = list(METRIC_LABELS.keys())
 ANALYSIS_ORDER = [
@@ -124,6 +128,7 @@ def plot_forest(
     results_dir: str | Path,
     output_dir: str | Path,
     stat_cases: list | None = None,
+    metrics: list | None = None,
 ) -> list[Path]:
     """Forest plots of regression coefficients, one figure per stat_case.
 
@@ -132,6 +137,7 @@ def plot_forest(
     results_dir : path to ``results/stat/``
     output_dir : path to save figures
     stat_cases : list of stat_cases to plot. If None, uses all cases present.
+    metrics : list of metrics to plot. If None, uses all metrics present.
 
     Returns
     -------
@@ -159,6 +165,11 @@ def plot_forest(
 
     for case in stat_cases:
         df_case = reg.filter(pl.col('stat_case_parsed') == case)
+        if df_case.is_empty():
+            continue
+
+        if metrics is not None:
+            df_case = df_case.filter(pl.col('metric').is_in(metrics))
         if df_case.is_empty():
             continue
 

@@ -21,6 +21,14 @@ force_recompute: false
 
 compute_stat: true
 compute_tda: false
+compute_probing: true
+
+probing_method: lstsq
+
+probing_test_split: test
+probing_batch_size: 256
+probing_epochs: 100
+probing_lr: 0.001
 
 stat_cases:
   - raw
