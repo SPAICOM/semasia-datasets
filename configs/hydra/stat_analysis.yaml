@@ -3,8 +3,8 @@ prefix: "semantic-"
 datasets:
   - cifar10
   - mnist
-  - fashion-mnist
   - oxford-flowers
+  - fashion_mnist
 split: train
 
 compute_probing: true
