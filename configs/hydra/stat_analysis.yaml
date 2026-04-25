@@ -1,14 +1,16 @@
 repo_id: "spaicom-lab"
 prefix: "semantic-"
-dataset: mnist
+datasets:
+  - cifar10
+  - mnist
+  - fashion-mnist
+  - oxford-flowers
 split: train
 
 compute_probing: true
 
 stat_cases:
   - raw
-  # - proto_no_prewhiten
-  # - proto_prewhiten
 
 probing_outcomes:
   - probing_accuracy
@@ -22,7 +24,6 @@ metrics:
   - std_distance_to_centroid
   - participation_ratio_fast
   - isotropy
-  # - anisotropy_ratio
   - density
   - n_components_90pct
   - explained_var_ratio_top1
@@ -31,5 +32,10 @@ metrics:
   - spectral_entropy
   - effective_rank
   - participation_ratio
+
+regression_types:
+  - pooled
+  - within
+  - interaction
 
 save_results: true

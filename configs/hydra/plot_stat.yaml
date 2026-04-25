@@ -1,20 +1,5 @@
-repo_id: "spaicom-lab"
-prefix: "semantic-"
-dataset: mnist
-split: train
-
 stat_cases:
   - raw
-  # - proto_no_prewhiten
-  # - proto_prewhiten
-
-# Default metric / stat_case / analysis_type for per-metric figures (Figs 2-4)
-metric: effective_rank
-stat_case: raw
-analysis_type: dataset_change
-
-# Optional: filter metrics to plot (null = all metrics)
-metrics: null
 
 results_dir: results/stat
 output_dir: results/figures

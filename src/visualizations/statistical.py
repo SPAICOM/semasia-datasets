@@ -22,6 +22,7 @@ STYLE_PATH = (
 )
 DPI = 150
 ACCENT_COLOR = '#c44e52'
+MARGINAL_COLOR = '#f0a500'
 MUTED_COLOR = '#8c8c8c'
 PALETTE_TREATMENT = {'0': '#7ea6c9', '1': '#c44e52'}
 ANALYSIS_LABELS = {
@@ -65,6 +66,15 @@ ANALYSIS_ORDER = [
     'model_scale',
 ]
 STAT_CASE_ORDER = ['raw', 'proto_no_prewhiten', 'proto_prewhiten']
+DATASET_LABELS = {
+    'cifar10': 'CIFAR-10',
+    'mnist': 'MNIST',
+    'cifar100': 'CIFAR-100',
+    'fashion_mnist': 'Fashion-MNIST',
+    'tiny_imagenet': 'Tiny-ImageNet',
+    'svhn': 'SVHN',
+    'celeba': 'CelebA',
+}
 
 
 def _apply_style() -> None:
@@ -94,29 +104,84 @@ def _tex(s: str) -> str:
 
 
 def load_regression_results(results_dir: str | Path) -> pl.DataFrame:
-    """Load all regression parquets and concatenate into one DataFrame."""
+    """Load all regression parquets and concatenate into one DataFrame.
+
+    Filename convention: stat__*{metric}__{stat_case}[___reg_type|__dataset].parquet.
+    The stat_case is always immediately after the last "__" before the trailing tag.
+
+    Examples:
+        stat__effective_rank__raw.parquet              (legacy, no regression_type)
+        stat__effective_rank__raw___pooled.parquet
+        stat__effective_rank__raw___interaction.parquet
+        stat__effective_rank__raw__cifar10.parquet      (within-dataset)
+    """
     results_dir = Path(results_dir)
     frames = []
     for f in sorted(results_dir.glob('stat__*__*.parquet')):
-        stem = f.stem  # e.g. stat__effective_rank__raw
-        parts = stem.split('__')
-        # parts = ['stat', metric..., stat_case]
-        stat_case = parts[-1]
-        metric = '__'.join(parts[1:-1])
-        df = pl.read_parquet(f).with_columns(
+        stem = f.stem  # e.g. "stat__effective_rank__raw___pooled"
+        # Parse filename: stat__{metric}__{stat_case}[___type|__dataset]
+        # The last "__" separates {stat_case}[___type__dataset] from {metric}
+        # But metric may contain "__", so find the SECOND-TO-LAST "__".
+        last_sep = stem.rfind('__')
+        second_last_sep = stem[:last_sep].rfind('__')
+
+        if second_last_sep < 4:  # "stat__" is 4 chars
+            continue
+
+        stat_case_with_tag = stem[last_sep + 2 :]  # e.g. "raw___pooled", "raw__cifar10"
+        tag_sep_3 = stat_case_with_tag.rfind('___')
+
+        if tag_sep_3 != -1:
+            stat_case = stat_case_with_tag[:tag_sep_3]
+            reg_type = stat_case_with_tag[tag_sep_3 + 3 :]
+        else:
+            tag_sep_2 = stat_case_with_tag.rfind('__')
+            if tag_sep_2 != -1:
+                stat_case = stat_case_with_tag[:tag_sep_2]
+                reg_type = stat_case_with_tag[tag_sep_2 + 2 :]
+            elif stat_case_with_tag in ('pooled', 'interaction'):
+                stat_case = 'raw'
+                reg_type = stat_case_with_tag
+            else:
+                stat_case = stem[second_last_sep + 2 : last_sep]
+                reg_type = 'within'
+
+        metric = stem[6:second_last_sep]
+
+        df = pl.read_parquet(f)
+        if 'regression_type' not in df.columns:
+            df = df.with_columns(pl.lit(reg_type).alias('regression_type'))
+        df = df.with_columns(
             pl.lit(metric).alias('metric'),
             pl.lit(stat_case).alias('stat_case_parsed'),
         )
         frames.append(df)
-    return pl.concat(frames)
+
+    if not frames:
+        return pl.DataFrame()
+
+    all_cols = set()
+    for df in frames:
+        all_cols.update(df.columns)
+
+    normalized = []
+    for df in frames:
+        missing = all_cols - set(df.columns)
+        if missing:
+            for c in missing:
+                df = df.with_columns(pl.lit('').cast(pl.Utf8).alias(c))
+        df = df.select(sorted(all_cols))
+        for c in all_cols:
+            if df.schema[c] in (pl.Utf8, pl.String):
+                df = df.with_columns(pl.col(c).cast(pl.Utf8))
+        normalized.append(df)
+    return pl.concat(normalized)
 
 
-def _fit_ols(df_pd, metric: str):
+def _fit_ols(df_pd, metric: str, extra_formula: str = ''):
     """Fit OLS with HC3 robust SEs. Returns the fitted model."""
-    return smf.ols(
-        f'{metric} ~ is_treatment + C(arch_key)',
-        data=df_pd,
-    ).fit(cov_type='HC3')
+    formula = f'{metric} ~ is_treatment{extra_formula}'
+    return smf.ols(formula, data=df_pd).fit(cov_type='HC3')
 
 
 # ---------------------------------------------------------------------------
@@ -129,8 +194,12 @@ def plot_forest(
     output_dir: str | Path,
     stat_cases: list | None = None,
     metrics: list | None = None,
+    regression_type: str | None = None,
 ) -> list[Path]:
-    """Forest plots of regression coefficients, one figure per stat_case.
+    """Forest plots of regression coefficients.
+
+    - regression_type='pooled' or 'interaction': one figure per stat_case
+    - regression_type='within': one figure per stat_case per dataset
 
     Parameters
     ----------
@@ -138,6 +207,7 @@ def plot_forest(
     output_dir : path to save figures
     stat_cases : list of stat_cases to plot. If None, uses all cases present.
     metrics : list of metrics to plot. If None, uses all metrics present.
+    regression_type : one of 'pooled', 'within', 'interaction'
 
     Returns
     -------
@@ -151,6 +221,16 @@ def plot_forest(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     reg = load_regression_results(results_dir)
+    if reg.is_empty():
+        print('[WARN] No regression results found.')
+        return []
+
+    if regression_type is not None:
+        reg = reg.filter(pl.col('regression_type') == regression_type)
+        if reg.is_empty():
+            print(f'[WARN] No data for regression_type={regression_type}.')
+            return []
+
     is_standardized = (
         'standardized' in reg.columns
         and reg['standardized'].drop_nulls().to_list()
@@ -161,109 +241,148 @@ def plot_forest(
         if is_standardized
         else r'$\beta$ (treatment effect)'
     )
+
     saved = []
+    reg_type_labels = {
+        'pooled': 'Pooled (dataset control)',
+        'interaction': 'Interaction',
+        'within': 'Within-dataset',
+    }
 
     for case in stat_cases:
         df_case = reg.filter(pl.col('stat_case_parsed') == case)
         if df_case.is_empty():
             continue
-
         if metrics is not None:
             df_case = df_case.filter(pl.col('metric').is_in(metrics))
         if df_case.is_empty():
             continue
 
-        n_analyses = len(ANALYSIS_ORDER)
-        fig, axes = plt.subplots(
-            1,
-            n_analyses,
-            figsize=(4.5 * n_analyses, 6),
-            sharey=True,
-            layout='constrained',
-        )
-        fig.suptitle(
-            f'Treatment Effect Coefficients — {STAT_CASE_LABELS.get(case, case)}',
-            fontsize=13,
-            fontweight='bold',
-            y=1.02,
-        )
+        if regression_type == 'within':
+            datasets = sorted(df_case['dataset'].unique().to_list())
+        else:
+            datasets = [None]
 
-        for ax, analysis in zip(axes, ANALYSIS_ORDER):
-            df_a = df_case.filter(pl.col('analysis_type') == analysis).to_pandas()
+        for dataset in datasets:
+            df_plot = (
+                df_case.filter(pl.col('dataset') == dataset) if dataset else df_case
+            )
 
-            # Order metrics consistently
-            df_a['metric'] = pl.Series(df_a['metric']).cast(pl.Categorical)
-            present = [m for m in METRIC_ORDER if m in df_a['metric'].values]
-            df_a = df_a.set_index('metric').loc[present].reset_index()
+            n_analyses = len(ANALYSIS_ORDER)
+            fig, axes = plt.subplots(
+                1,
+                n_analyses,
+                figsize=(4.5 * n_analyses, 6),
+                sharey=True,
+                layout='constrained',
+            )
+            fig.suptitle(
+                f'Treatment Effect Coefficients — {STAT_CASE_LABELS.get(case, case)}',
+                fontsize=13,
+                fontweight='bold',
+                y=1.02,
+            )
 
-            y_pos = np.arange(len(df_a))
-            colors = [
-                ACCENT_COLOR if p < 0.05 else MUTED_COLOR for p in df_a['p_value']
+            for ax, analysis in zip(axes, ANALYSIS_ORDER):
+                df_a = df_plot.filter(pl.col('analysis_type') == analysis).to_pandas()
+
+                if df_a.empty:
+                    ax.set_visible(False)
+                    continue
+
+                df_a['metric_cat'] = pl.Series(df_a['metric']).cast(pl.Categorical)
+                present = [m for m in METRIC_ORDER if m in df_a['metric'].values]
+                df_a = df_a.set_index('metric').loc[present].reset_index()
+
+                y_pos = np.arange(len(df_a))
+                colors = [
+                    ACCENT_COLOR
+                    if p < 0.05
+                    else MARGINAL_COLOR
+                    if p < 0.10
+                    else MUTED_COLOR
+                    for p in df_a['p_value']
+                ]
+
+                ax.hlines(
+                    y_pos,
+                    df_a['ci_lower'],
+                    df_a['ci_upper'],
+                    colors=colors,
+                    linewidth=2.5,
+                    zorder=1,
+                )
+                ax.scatter(
+                    df_a['beta'],
+                    y_pos,
+                    c=colors,
+                    s=80,
+                    zorder=2,
+                    edgecolors='white',
+                    linewidths=0.8,
+                )
+                ax.axvline(0, color='black', linewidth=0.8, linestyle='--', alpha=0.5)
+
+                labels = [METRIC_LABELS.get(m, m) for m in df_a['metric']]
+                ax.set_yticks(y_pos)
+                ax.set_yticklabels(labels)
+                ax.invert_yaxis()
+
+                title = ANALYSIS_LABELS.get(analysis, analysis)
+                if dataset:
+                    ds_label = DATASET_LABELS.get(dataset, dataset)
+                    title = f'{title}\n({ds_label})'
+                rt_label = reg_type_labels.get(regression_type, regression_type)
+                title = f'{title}\n({rt_label})'
+                ax.set_title(title, fontsize=10)
+                ax.set_xlabel(x_label)
+
+            from matplotlib.lines import Line2D
+
+            legend_elements = [
+                Line2D(
+                    [0],
+                    [0],
+                    marker='o',
+                    color='w',
+                    markerfacecolor=ACCENT_COLOR,
+                    markersize=8,
+                    label=r'$p < 0.05$',
+                ),
+                Line2D(
+                    [0],
+                    [0],
+                    marker='o',
+                    color='w',
+                    markerfacecolor=MARGINAL_COLOR,
+                    markersize=8,
+                    label=r'$0.05 \leq p < 0.10$',
+                ),
+                Line2D(
+                    [0],
+                    [0],
+                    marker='o',
+                    color='w',
+                    markerfacecolor=MUTED_COLOR,
+                    markersize=8,
+                    label=r'$p \geq 0.10$',
+                ),
             ]
-
-            ax.hlines(
-                y_pos,
-                df_a['ci_lower'],
-                df_a['ci_upper'],
-                colors=colors,
-                linewidth=1.5,
-                zorder=1,
+            fig.legend(
+                handles=legend_elements,
+                loc='lower center',
+                ncol=3,
+                frameon=False,
+                fontsize=9,
+                bbox_to_anchor=(0.5, -0.04),
             )
-            ax.scatter(
-                df_a['beta'],
-                y_pos,
-                c=colors,
-                s=40,
-                zorder=2,
-                edgecolors='white',
-                linewidths=0.5,
-            )
-            ax.axvline(0, color='black', linewidth=0.8, linestyle='--', alpha=0.5)
 
-            labels = [METRIC_LABELS.get(m, m) for m in df_a['metric']]
-            ax.set_yticks(y_pos)
-            ax.set_yticklabels(labels)
-            ax.invert_yaxis()
-            ax.set_title(ANALYSIS_LABELS.get(analysis, analysis), fontsize=11)
-            ax.set_xlabel(x_label)
-
-        # Legend
-        from matplotlib.lines import Line2D
-
-        legend_elements = [
-            Line2D(
-                [0],
-                [0],
-                marker='o',
-                color='w',
-                markerfacecolor=ACCENT_COLOR,
-                markersize=8,
-                label=r'$p < 0.05$',
-            ),
-            Line2D(
-                [0],
-                [0],
-                marker='o',
-                color='w',
-                markerfacecolor=MUTED_COLOR,
-                markersize=8,
-                label=r'$p \geq 0.05$',
-            ),
-        ]
-        fig.legend(
-            handles=legend_elements,
-            loc='lower center',
-            ncol=2,
-            frameon=False,
-            fontsize=10,
-            bbox_to_anchor=(0.5, -0.04),
-        )
-
-        path = output_dir / f'forest__{case}.png'
-        fig.savefig(path, bbox_inches='tight')
-        plt.close(fig)
-        saved.append(path)
-        print(f'  Saved: {path}')
+            tag = f'__{dataset}' if dataset else f'__{regression_type}'
+            path = output_dir / f'forest__{case}{tag}.png'
+            fig.savefig(path, bbox_inches='tight')
+            plt.close(fig)
+            saved.append(path)
+            print(f'  Saved: {path.name}')
 
     return saved
 
@@ -280,7 +399,7 @@ def plot_group_means(
     analysis_type: str,
     output_dir: str | Path,
 ) -> Path:
-    """Control vs treatment means per architecture, faceted by arch_key.
+    """Control vs treatment means per architecture, faceted by arch_key and dataset.
 
     Parameters
     ----------
@@ -304,6 +423,8 @@ def plot_group_means(
 
     subset['group'] = subset['is_treatment'].map({0: 'Control', 1: 'Treatment'})
 
+    has_dataset = 'dataset' in subset.columns
+
     archs = sorted(subset['arch_key'].unique())
     n_archs = len(archs)
     ncols = min(6, n_archs)
@@ -319,17 +440,23 @@ def plot_group_means(
         axes = np.array([axes])
     axes = axes.flatten()
 
+    datasets = sorted(subset['dataset'].unique()) if has_dataset else [None]
     palette = {'Control': '#7ea6c9', 'Treatment': ACCENT_COLOR}
+    if has_dataset and len(datasets) > 1:
+        dataset_palette = {
+            ds: sns.color_palette('tab10')[i] for i, ds in enumerate(datasets)
+        }
 
     for i, arch in enumerate(archs):
         ax = axes[i]
         arch_data = subset[subset['arch_key'] == arch]
+        hue = 'dataset' if has_dataset and len(datasets) > 1 else 'group'
         sns.pointplot(
             data=arch_data,
             x='group',
             y=metric,
-            hue='group',
-            palette=palette,
+            hue=hue,
+            palette=dataset_palette if hue == 'dataset' else palette,
             dodge=False,
             errorbar=('ci', 95),
             capsize=0.15,
@@ -341,7 +468,6 @@ def plot_group_means(
         ax.set_ylabel('')
         ax.tick_params(labelsize=7)
 
-    # Hide unused axes
     for j in range(n_archs, len(axes)):
         axes[j].set_visible(False)
 
@@ -374,8 +500,10 @@ def plot_partial_regression(
     stat_case: str,
     analysis_type: str,
     output_dir: str | Path,
+    extra_formula: str = '',
+    regression_type: str | None = None,
 ) -> Path:
-    """Partial regression plot for the treatment effect after removing arch variance.
+    """Partial regression plot for the treatment effect after removing covariates.
 
     Parameters
     ----------
@@ -384,6 +512,9 @@ def plot_partial_regression(
     stat_case : representation space
     analysis_type : comparison type
     output_dir : path to save the figure
+    extra_formula : extra RHS terms for the regression formula
+        (e.g., ' + C(dataset) + C(arch_key)' for pooled)
+    regression_type : label for the title (e.g., 'pooled', 'within')
 
     Returns
     -------
@@ -397,16 +528,15 @@ def plot_partial_regression(
         (pl.col('stat_case') == stat_case) & (pl.col('analysis_type') == analysis_type)
     ).to_pandas()
 
-    # Manually compute partial regression residuals
-    model_full = _fit_ols(subset, metric)
+    model_full = _fit_ols(subset, metric, extra_formula=extra_formula)
 
-    # Residualize outcome on arch dummies
-    y_on_others = smf.ols(f'{metric} ~ C(arch_key)', data=subset).fit()
-    resid_y = y_on_others.resid
+    covariate_terms = extra_formula.strip().lstrip('+').strip()
+    y_on_covars = smf.ols(f'{metric} ~ {covariate_terms}', data=subset).fit()
+    resid_y = y_on_covars.resid
 
-    # Residualize treatment on arch dummies
-    x_on_others = smf.ols('is_treatment ~ C(arch_key)', data=subset).fit()
-    resid_x = x_on_others.resid
+    # Residualize treatment on covariates
+    x_on_covars = smf.ols(f'is_treatment ~ {covariate_terms}', data=subset).fit()
+    resid_x = x_on_covars.resid
 
     fig, ax = plt.subplots(figsize=(6, 5))
     ax.scatter(
@@ -420,7 +550,6 @@ def plot_partial_regression(
         zorder=2,
     )
 
-    # Add regression line through partial residuals
     slope = model_full.params.get('is_treatment', 0)
     x_range = np.array([resid_x.min(), resid_x.max()])
     ax.plot(x_range, slope * x_range, color='black', linewidth=1.2, zorder=3)
@@ -430,16 +559,16 @@ def plot_partial_regression(
     metric_label = METRIC_LABELS.get(metric, metric)
     case_label = STAT_CASE_LABELS.get(stat_case, stat_case)
     analysis_label = ANALYSIS_LABELS.get(analysis_type, analysis_type)
-    ax.set_title(
-        f'Partial Regression — {metric_label}\n{analysis_label} | {case_label}',
-        fontsize=11,
-        fontweight='bold',
-    )
-    ax.set_xlabel(r'is\_treatment $|$ C(arch\_key)', fontsize=10)
-    ax.set_ylabel(f'{metric_label} $|$ C(arch\\_key)', fontsize=10)
+    rt_label = f' ({regression_type})' if regression_type else ''
+    title = f'Partial Regression — {metric_label}\n{analysis_label}{rt_label}'
+    title = f'{title} | {case_label}'
+    ax.set_title(title, fontsize=11, fontweight='bold')
+    ax.set_xlabel(r'is\_treatment $|$ covariates', fontsize=10)
+    ax.set_ylabel(f'{metric_label} $|$ covariates', fontsize=10)
 
     fig.tight_layout()
-    path = output_dir / f'partial_reg__{metric}__{stat_case}__{analysis_type}.png'
+    tag = f'__{regression_type}' if regression_type else ''
+    path = output_dir / f'partial_reg__{metric}__{stat_case}__{analysis_type}{tag}.png'
     fig.savefig(path, bbox_inches='tight')
     plt.close(fig)
     print(f'  Saved: {path}')
@@ -457,6 +586,8 @@ def plot_residual_diagnostics(
     stat_case: str,
     analysis_type: str,
     output_dir: str | Path,
+    extra_formula: str = '',
+    regression_type: str | None = None,
 ) -> Path:
     """Residual diagnostics: (a) residuals vs fitted, (b) residuals by arch_key.
 
@@ -467,6 +598,8 @@ def plot_residual_diagnostics(
     stat_case : representation space
     analysis_type : comparison type
     output_dir : path to save the figure
+    extra_formula : extra RHS terms for the regression formula
+    regression_type : label for the title (e.g., 'pooled', 'within')
 
     Returns
     -------
@@ -480,13 +613,12 @@ def plot_residual_diagnostics(
         (pl.col('stat_case') == stat_case) & (pl.col('analysis_type') == analysis_type)
     ).to_pandas()
 
-    model = _fit_ols(subset, metric)
+    model = _fit_ols(subset, metric, extra_formula=extra_formula)
     residuals = model.resid
     fitted = model.fittedvalues
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 5))
 
-    # (a) Residuals vs Fitted
     ax1.scatter(
         fitted,
         residuals,
@@ -501,7 +633,6 @@ def plot_residual_diagnostics(
     ax1.set_ylabel('Residuals', fontsize=10)
     ax1.set_title('(a) Residuals vs Fitted', fontsize=11, fontweight='bold')
 
-    # (b) Residuals by arch_key
     subset_resid = subset.copy()
     subset_resid['residual'] = residuals.values
 
@@ -510,7 +641,6 @@ def plot_residual_diagnostics(
     )
     arch_order = arch_var.index.tolist()
 
-    # Limit to top 20 architectures by residual variance for readability
     if len(arch_order) > 20:
         top_archs = arch_order[:20]
         subset_resid = subset_resid[subset_resid['arch_key'].isin(top_archs)]
@@ -542,12 +672,10 @@ def plot_residual_diagnostics(
     ax2.set_ylabel('Residuals', fontsize=10)
     ax2.tick_params(axis='x', rotation=90, labelsize=6)
 
-    # Escape underscores in arch tick labels for LaTeX
     ticks = ax2.get_xticks()
     ax2.set_xticks(ticks)
     ax2.set_xticklabels([_tex(lbl.get_text()) for lbl in ax2.get_xticklabels()])
 
-    # Highlight high-variance architectures
     threshold = arch_var.median() + 1.5 * arch_var.std()
     high_var = arch_var[arch_var > threshold].index.tolist()
     for label in ax2.get_xticklabels():
@@ -559,14 +687,14 @@ def plot_residual_diagnostics(
     metric_label = METRIC_LABELS.get(metric, metric)
     case_label = STAT_CASE_LABELS.get(stat_case, stat_case)
     analysis_label = ANALYSIS_LABELS.get(analysis_type, analysis_type)
-    fig.suptitle(
-        f'Residual Diagnostics — {metric_label}\n{analysis_label} | {case_label}',
-        fontsize=12,
-        fontweight='bold',
-    )
+    rt_label = f' ({regression_type})' if regression_type else ''
+    title = f'Residual Diagnostics — {metric_label}\n{analysis_label}{rt_label}'
+    title = f'{title} | {case_label}'
+    fig.suptitle(title, fontsize=12, fontweight='bold')
 
     fig.tight_layout()
-    path = output_dir / f'residuals__{metric}__{stat_case}__{analysis_type}.png'
+    tag = f'__{regression_type}' if regression_type else ''
+    path = output_dir / f'residuals__{metric}__{stat_case}__{analysis_type}{tag}.png'
     fig.savefig(path, bbox_inches='tight')
     plt.close(fig)
     print(f'  Saved: {path}')

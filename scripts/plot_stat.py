@@ -1,8 +1,8 @@
-"""Generate publication-ready figures from statistical regression results.
+"""Generate publication-ready forest plots from statistical regression results.
 
 Usage:
     uv run scripts/plot_stat.py
-    uv run scripts/plot_stat.py metric=isotropy stat_case=raw analysis_type=augmentation
+    uv run scripts/plot_stat.py regression_type=pooled
 """
 
 import sys
@@ -11,15 +11,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import hydra
-import polars as pl
 from omegaconf import DictConfig
 
-from src.visualizations.statistical import (
-    plot_forest,
-    plot_group_means,
-    plot_partial_regression,
-    plot_residual_diagnostics,
-)
+from src.visualizations.statistical import plot_forest
 
 
 @hydra.main(
@@ -33,41 +27,22 @@ def main(cfg: DictConfig) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     stat_cases = cfg.get('stat_cases', ['raw', 'proto_no_prewhiten', 'proto_prewhiten'])
-    metrics = cfg.get('metrics', None)
 
-    # --- Figure 1: Forest plots ---
-    print('\n[Figure 1] Forest plots...')
-    plot_forest(results_dir, output_dir, stat_cases=stat_cases, metrics=metrics)
-
-    # --- Load raw data for Figures 2–4 ---
-    raw_path = (
-        results_dir / f'{cfg.repo_id}__{cfg.prefix}{cfg.dataset}__{cfg.split}.parquet'
-    )
-    if not raw_path.exists():
-        print(f'[ERROR] Raw data not found: {raw_path}')
-        return
-
-    df = pl.read_parquet(raw_path)
-    metric = cfg.metric
-    stat_case = cfg.stat_case
-    analysis_type = cfg.analysis_type
-
-    print(
-        f'\n[Figures 2-4] metric={metric},'
-        f' stat_case={stat_case}, analysis_type={analysis_type}'
+    print('\n[Forest plots]')
+    print('  Case A: pooled...')
+    plot_forest(
+        results_dir, output_dir, stat_cases=stat_cases, regression_type='pooled'
     )
 
-    # --- Figure 2: Group means ---
-    print('\n[Figure 2] Group means...')
-    plot_group_means(df, metric, stat_case, analysis_type, output_dir)
+    print('  Case B: within-dataset...')
+    plot_forest(
+        results_dir, output_dir, stat_cases=stat_cases, regression_type='within'
+    )
 
-    # --- Figure 3: Partial regression ---
-    print('\n[Figure 3] Partial regression...')
-    plot_partial_regression(df, metric, stat_case, analysis_type, output_dir)
-
-    # --- Figure 4: Residual diagnostics ---
-    print('\n[Figure 4] Residual diagnostics...')
-    plot_residual_diagnostics(df, metric, stat_case, analysis_type, output_dir)
+    print('  Case C: interaction...')
+    plot_forest(
+        results_dir, output_dir, stat_cases=stat_cases, regression_type='interaction'
+    )
 
     print(f'\n[DONE] All figures saved to {output_dir}/')
 

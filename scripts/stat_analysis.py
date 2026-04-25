@@ -1,7 +1,39 @@
 """Statistical analysis on latent embeddings using precomputed metrics.
 
+This script regresses geometric metrics (e.g., effective_rank, isotropy) on treatment
+indicators to quantify the effect of architectural choices on embedding structure.
+
+The regression uses a binary treatment indicator where:
+    - 0 = control (baseline architecture)
+    - 1 = treatment (modified architecture)
+
+Three regression specifications are used:
+
+1. POOLED: metric ~ is_treatment + C(dataset) + C(arch_key)
+   - Tests if treatment affects target after controlling for dataset identity.
+   - If beta != 0 (p < 0.05), the effect is independent of which dataset.
+   - Equivalent to: "Does the treatment matter, regardless of evaluation dataset?"
+
+2. WITHIN: metric ~ is_treatment + C(arch_key)   [run per dataset]
+   - Same regression, estimated separately within each dataset.
+   - Tests if treatment effect holds within a given dataset.
+   - Equivalent to: "Does the treatment matter for CIFAR-10? For MNIST?"
+
+3. INTERACTION: metric ~ is_treatment * C(dataset) + C(dataset) + C(arch_key)
+   - Tests if treatment effect differs by dataset (interaction term).
+   - If beta_interaction != 0 (p < 0.05), the effect is dataset-dependent.
+   - Equivalent to: "Does the treatment effect depend on which dataset?"
+
+Statistical inference uses heteroskedasticity-consistent (HC3) standard errors.
+
 Usage:
-    python scripts/stat_analysis.py dataset=cifar10
+    uv run scripts/stat_analysis.py
+
+Output:
+    - combined.parquet: raw per-model data with dataset column
+    - stat__{metric}__{stat_case}___pooled.parquet
+    - stat__{metric}__{stat_case}___{dataset}.parquet    (within-dataset)
+    - stat__{metric}__{stat_case}___interaction.parquet
 """
 
 import logging
@@ -11,7 +43,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import hydra
-import numpy as np
 import polars as pl
 import statsmodels.formula.api as smf
 from omegaconf import DictConfig
@@ -110,13 +141,18 @@ FAMILY_SIZE_ORDERS = {
 def main(cfg: DictConfig) -> None:
     current: Path = Path('.')
     results_dir: Path = current / 'results/stat'
-
     results_dir.mkdir(parents=True, exist_ok=True)
 
     split = cfg.split
-    valid_splits = DATASET_SPLITS.get(cfg.dataset, {'train'})
-    if split not in valid_splits:
-        raise ValueError(f'Invalid split {split!r} for dataset {cfg.dataset}.')
+
+    # Normalise datasets to list (backward compat for string / single-item configs)
+    raw_datasets = cfg.get('datasets', [])
+    datasets = [raw_datasets] if isinstance(raw_datasets, str) else list(raw_datasets)
+
+    for ds in datasets:
+        valid_splits = DATASET_SPLITS.get(ds, {'train'})
+        if split not in valid_splits:
+            raise ValueError(f'Invalid split {split!r} for dataset {ds!r}.')
 
     print('\n[INFO] Loading model registry...')
     model_df = pl.read_parquet('hf://datasets/spaicom-lab/model-registry/**/*.parquet')
@@ -131,112 +167,120 @@ def main(cfg: DictConfig) -> None:
         print(f'    {at}: {count}')
 
     print('\n[INFO] Loading precomputed metrics...')
-    metrics_path = (
-        Path('results/compute_metrics')
-        / f'{cfg.repo_id}__{cfg.prefix}{cfg.dataset}__{split}_stat.parquet'
-    )
-    if not metrics_path.exists():
-        print(f'[ERROR] Metrics file not found: {metrics_path}')
-        print('  Run compute_metrics.py first to generate metrics.')
+    all_metrics = []
+    for ds in datasets:
+        metrics_path = (
+            Path('results/compute_metrics')
+            / f'{cfg.repo_id}__{cfg.prefix}{ds}__{split}_stat.parquet'
+        )
+        if not metrics_path.exists():
+            print(f'  [WARN] Metrics not found for {ds}: {metrics_path}')
+            continue
+        m_df = pl.read_parquet(metrics_path).with_columns(pl.lit(ds).alias('dataset'))
+        print(f'  Loaded {len(m_df)} rows from {ds}')
+
+        if cfg.get('compute_probing', False):
+            probing_path = (
+                Path('results/compute_metrics')
+                / f'{cfg.repo_id}__{cfg.prefix}{ds}__{split}_probing.parquet'
+            )
+            if probing_path.exists():
+                probing_df = pl.read_parquet(probing_path)
+                probing_metrics = probing_df.select(
+                    [
+                        'model',
+                        'probing_accuracy',
+                        'probing_recall',
+                        'probing_precision',
+                        'probing_f1',
+                    ]
+                )
+                m_df = m_df.join(probing_metrics, on='model', how='left')
+
+        all_metrics.append(m_df)
+
+    if not all_metrics:
+        print('[ERROR] No metrics loaded.')
         return
 
-    metrics_df = pl.read_parquet(metrics_path)
-    print(f'  Loaded {len(metrics_df)} metric rows')
-
-    # Add probing metrics if enabled
-    if cfg.get('compute_probing', False):
-        probing_path = (
-            Path('results/compute_metrics')
-            / f'{cfg.repo_id}__{cfg.prefix}{cfg.dataset}__{split}_probing.parquet'
-        )
-        if probing_path.exists():
-            probing_df = pl.read_parquet(probing_path)
-            print(f'  Loaded {len(probing_df)} probing rows')
-
-            probing_metrics = probing_df.select(
-                [
-                    'model',
-                    'probing_accuracy',
-                    'probing_recall',
-                    'probing_precision',
-                    'probing_f1',
-                ]
-            )
-            metrics_df = metrics_df.join(probing_metrics, on='model', how='left')
-            print(f'  Merged metrics: {len(metrics_df)} rows')
-        else:
-            print(f'  [WARN] Probing file not found: {probing_path}')
-
-    available_models = set(metrics_df['model'].unique().to_list())
-    print(f'  Available models in metrics: {len(available_models)}')
+    metrics_df = pl.concat(all_metrics)
+    print(f'  Total metric rows: {len(metrics_df)}')
+    print(f'  Available models: {metrics_df["model"].n_unique()}')
 
     print('\n[INFO] Building results from pairs...')
     all_results = []
-
     missing_models = set()
 
-    for row in pairs_df.iter_rows(named=True):
-        analysis_type = row['analysis_type']
-        control_model = row['control_model']
-        treatment_model = row['treatment_model']
-        arch_key = row['arch_key']
+    for ds in datasets:
+        ds_metrics = metrics_df.filter(pl.col('dataset') == ds)
+        available_ds_models = set(ds_metrics['model'].unique().to_list())
 
-        if control_model not in available_models:
-            missing_models.add(control_model)
-            continue
-        if treatment_model not in available_models:
-            missing_models.add(treatment_model)
-            continue
+        for row in pairs_df.iter_rows(named=True):
+            analysis_type = row['analysis_type']
+            control_model = row['control_model']
+            treatment_model = row['treatment_model']
+            arch_key = row['arch_key']
 
-        control_metrics = metrics_df.filter(pl.col('model') == control_model)
-        treatment_metrics = metrics_df.filter(pl.col('model') == treatment_model)
-
-        stat_cases = ['raw', 'proto_no_prewhiten', 'proto_prewhiten']
-        for stat_case in stat_cases:
-            control_case = control_metrics.filter(pl.col('stat_case') == stat_case)
-            treatment_case = treatment_metrics.filter(pl.col('stat_case') == stat_case)
-
-            if len(control_case) == 0 or len(treatment_case) == 0:
+            if control_model not in available_ds_models:
+                missing_models.add(control_model)
+                continue
+            if treatment_model not in available_ds_models:
+                missing_models.add(treatment_model)
                 continue
 
-            metric_cols = [
-                c
-                for c in control_case.columns
-                if c
-                not in [
-                    'arch_key',
-                    'stat_case',
-                    'n_prototypes',
-                    'prewhiten',
-                    'model',
-                    'split',
-                    'dataset',
+            control_metrics = ds_metrics.filter(pl.col('model') == control_model)
+            treatment_metrics = ds_metrics.filter(pl.col('model') == treatment_model)
+
+            stat_cases = ['raw', 'proto_no_prewhiten', 'proto_prewhiten']
+            for stat_case in stat_cases:
+                control_case = control_metrics.filter(pl.col('stat_case') == stat_case)
+                treatment_case = treatment_metrics.filter(
+                    pl.col('stat_case') == stat_case
+                )
+
+                if len(control_case) == 0 or len(treatment_case) == 0:
+                    continue
+
+                metric_cols = [
+                    c
+                    for c in control_case.columns
+                    if c
+                    not in [
+                        'arch_key',
+                        'stat_case',
+                        'n_prototypes',
+                        'prewhiten',
+                        'model',
+                        'split',
+                        'dataset',
+                    ]
                 ]
-            ]
-            control_row = control_case.to_dicts()[0]
-            treatment_row = treatment_case.to_dicts()[0]
+                control_row = control_case.to_dicts()[0]
+                treatment_row = treatment_case.to_dicts()[0]
 
-            all_results.append(
-                {
-                    'analysis_type': analysis_type,
-                    'arch_key': arch_key,
-                    'model_name': control_model,
-                    'is_treatment': 0,
-                    'stat_case': stat_case,
-                    **{k: control_row[k] for k in metric_cols},
-                }
-            )
+                all_results.append(
+                    {
+                        'analysis_type': analysis_type,
+                        'arch_key': arch_key,
+                        'dataset': ds,
+                        'model_name': control_model,
+                        'is_treatment': 0,
+                        'stat_case': stat_case,
+                        **{k: control_row[k] for k in metric_cols},
+                    }
+                )
 
-            all_results.append(
-                {
-                    'analysis_type': analysis_type,
-                    'arch_key': arch_key,
-                    'model_name': treatment_model,
-                    'is_treatment': 1,
-                    'stat_case': stat_case,
-                    **{k: treatment_row[k] for k in metric_cols},
-                }
-            )
+                all_results.append(
+                    {
+                        'analysis_type': analysis_type,
+                        'arch_key': arch_key,
+                        'dataset': ds,
+                        'model_name': treatment_model,
+                        'is_treatment': 1,
+                        'stat_case': stat_case,
+                        **{k: treatment_row[k] for k in metric_cols},
+                    }
+                )
 
     if missing_models:
         print(f'\n[WARN] Missing models ({len(missing_models)}):')
@@ -250,9 +294,7 @@ def main(cfg: DictConfig) -> None:
         return
 
     df = pl.DataFrame(all_results)
-    output_path = (
-        results_dir / f'{cfg.repo_id}__{cfg.prefix}{cfg.dataset}__{split}.parquet'
-    )
+    output_path = results_dir / 'combined.parquet'
     df.write_parquet(output_path)
     print(f'\n[Saved] {len(df)} results to {output_path}')
 
@@ -272,7 +314,8 @@ def main(cfg: DictConfig) -> None:
         )
         outcomes.extend(probing_outcomes)
     stat_cases = cfg.get('stat_cases', None)
-    run_stat_regression(df, results_dir, outcomes, stat_cases)
+    regression_types = cfg.get('regression_types', ['pooled'])
+    run_stat_regression(df, results_dir, outcomes, stat_cases, regression_types)
 
 
 def build_pairs(model_df: pl.DataFrame) -> pl.DataFrame:
@@ -534,6 +577,7 @@ def run_stat_regression(
     results_dir: Path,
     outcomes: list,
     stat_cases: list | None = None,
+    regression_types: list | None = None,
     *,
     standardize: bool = True,
 ) -> None:
@@ -541,31 +585,68 @@ def run_stat_regression(
 
     Parameters
     ----------
-    metrics_df : raw per-model DataFrame with all stat_cases
+    metrics_df : raw per-model DataFrame with all stat_cases and a `dataset` column
     results_dir : directory for output parquets
     outcomes : list of metric column names to regress
     stat_cases : list of stat_cases to process (e.g., ['raw', 'proto_no_prewhiten']).
         If None, uses all stat_cases present in metrics_df.
+    regression_types : list of regression modes to run.
+        'pooled'   -> metric ~ is_treatment + C(dataset) + C(arch_key)
+        'within'   -> same regression per dataset slice
+        'interaction' -> metric ~ is_treatment * C(dataset) + C(dataset) + C(arch_key)
+        If None, defaults to ['pooled'].
     standardize : if True, z-score each metric using control-group
         mean/std within each stat_case x analysis_type slice before
         fitting. Beta is then in units of control SDs.
     """
     if stat_cases is None:
         stat_cases = metrics_df['stat_case'].unique().to_list()
+    if regression_types is None:
+        regression_types = ['pooled']
+
+    FORMULA_SUFFIXES = {
+        'pooled': ' + C(dataset) + C(arch_key)',
+        'interaction': ' * C(dataset) + C(arch_key)',
+    }
 
     for case in stat_cases:
         print(f'\n[REGRESSION] Stat case: {case}')
 
         df_case = metrics_df.filter(pl.col('stat_case') == case)
-
         if len(df_case) == 0:
             print(f'  [WARN] No data for stat_case {case}, skipping')
             continue
 
         for outcome in outcomes:
-            _run_stat_for_outcome(
-                df_case, outcome, results_dir, case, standardize=standardize
-            )
+            # Pooled and interaction use the full dataset
+            for reg_type in regression_types:
+                if reg_type == 'within':
+                    continue
+                suffix = FORMULA_SUFFIXES.get(reg_type, ' + C(arch_key)')
+                _run_stat_for_outcome(
+                    df_case,
+                    outcome,
+                    results_dir,
+                    case,
+                    reg_type,
+                    suffix,
+                    standardize=standardize,
+                )
+
+            # Within-dataset: run separately per dataset
+            if 'within' in regression_types:
+                for ds in df_case['dataset'].unique().to_list():
+                    df_ds = df_case.filter(pl.col('dataset') == ds)
+                    _run_stat_for_outcome(
+                        df_ds,
+                        outcome,
+                        results_dir,
+                        case,
+                        'within',
+                        ' + C(arch_key)',
+                        standardize=standardize,
+                        dataset=ds,
+                    )
 
     print(f'\n[COMPLETE] Regression results saved to {results_dir}')
 
@@ -574,14 +655,15 @@ def _standardize_metric(
     df: pl.DataFrame,
     metric: str,
 ) -> pl.DataFrame:
-    """Z-score *metric* using control-group stats per stat_case × analysis_type.
+    """Z-score *metric* using control-group stats.
 
+    Uses control-group stats per dataset × stat_case × analysis_type.
     Returns the DataFrame with an added ``{metric}_std`` column plus
-    ``{metric}_control_mean`` and ``{metric}_control_std`` for traceability.
+    ``{metric}_control_mean`` and ``{metric}_control_std``.
     """
     control_stats = (
         df.filter(pl.col('is_treatment') == 0)
-        .group_by(['stat_case', 'analysis_type'])
+        .group_by(['dataset', 'stat_case', 'analysis_type'])
         .agg(
             pl.col(metric).mean().alias(f'{metric}_control_mean'),
             pl.col(metric).std().alias(f'{metric}_control_std'),
@@ -589,7 +671,7 @@ def _standardize_metric(
     )
 
     return df.join(
-        control_stats, on=['stat_case', 'analysis_type'], how='left'
+        control_stats, on=['dataset', 'stat_case', 'analysis_type'], how='left'
     ).with_columns(
         (
             (pl.col(metric) - pl.col(f'{metric}_control_mean'))
@@ -603,10 +685,25 @@ def _run_stat_for_outcome(
     outcome: str,
     results_dir: Path,
     stat_case: str,
+    reg_type: str,
+    formula_suffix: str,
     *,
     standardize: bool = True,
+    dataset: str | None = None,
 ) -> None:
-    """Run regression for a specific outcome variable."""
+    """Run regression for a specific outcome variable.
+
+    Parameters
+    ----------
+    metrics_df : DataFrame slice to regress (all data or single-dataset slice)
+    outcome : metric column name
+    results_dir : output directory
+    stat_case : stat_case label for output filename
+    reg_type : one of 'pooled', 'within', 'interaction'
+    formula_suffix : RHS terms appended after 'is_treatment'
+    standardize : z-score before fitting
+    dataset : for 'within' mode, the dataset name (used in filename)
+    """
     if standardize:
         metrics_df = _standardize_metric(metrics_df, outcome)
         reg_col = f'{outcome}_std'
@@ -624,31 +721,32 @@ def _run_stat_for_outcome(
         subset = subset_pl.to_pandas()
 
         try:
-            m = smf.ols(
-                f'{reg_col} ~ is_treatment + C(arch_key)',
-                data=subset,
-            ).fit(cov_type='HC3')
+            formula = f'{reg_col} ~ is_treatment{formula_suffix}'
+            m = smf.ols(formula, data=subset).fit(cov_type='HC3')
 
-            beta = m.params.get('is_treatment', np.nan)
-            se = m.bse.get('is_treatment', np.nan)
-            t_stat = m.tvalues.get('is_treatment', np.nan)
-            p_value = m.pvalues.get('is_treatment', np.nan)
-            conf_int = m.conf_int()
-            ci_lower = (
-                conf_int.loc['is_treatment', 0]
-                if 'is_treatment' in conf_int.index
-                else np.nan
-            )
-            ci_upper = (
-                conf_int.loc['is_treatment', 1]
-                if 'is_treatment' in conf_int.index
-                else np.nan
-            )
+            for term in [
+                'is_treatment',
+                'is_treatment:C(dataset)',
+                'is_treatment:C(dataset)[T.',
+            ]:
+                if term in m.params.index:
+                    beta = m.params[term]
+                    se = m.bse[term]
+                    t_stat = m.tvalues[term]
+                    p_value = m.pvalues[term]
+                    conf_int = m.conf_int()
+                    ci_lower = float(conf_int.loc[term, 0])
+                    ci_upper = float(conf_int.loc[term, 1])
+                    interaction_label = term
+                    break
+            else:
+                continue
 
             row = {
                 'analysis_type': analysis_type,
                 'stat_case': stat_case,
                 'outcome': outcome,
+                'regression_type': reg_type,
                 'beta': beta,
                 'se': se,
                 't_stat': t_stat,
@@ -659,6 +757,7 @@ def _run_stat_for_outcome(
                 'n_obs': int(m.nobs),
                 'df_resid': m.df_resid,
                 'standardized': standardize,
+                'term': interaction_label,
             }
 
             if standardize:
@@ -667,13 +766,22 @@ def _run_stat_for_outcome(
                 row['control_mean'] = subset[ctrl_mean_col].iloc[0]
                 row['control_std'] = subset[ctrl_std_col].iloc[0]
 
+            if reg_type == 'within' and dataset is not None:
+                row['dataset'] = dataset
+
             results.append(row)
         except Exception as e:
             print(f'[WARN] stat failed for {analysis_type}/{stat_case}/{outcome}: {e}')
 
     if results:
         df_out = pl.DataFrame(results)
-        output_path = results_dir / f'stat__{outcome}__{stat_case}.parquet'
+        if dataset:
+            tag = f'__{dataset}'
+        elif reg_type == 'within':
+            tag = ''
+        else:
+            tag = f'___{reg_type}'
+        output_path = results_dir / f'stat__{outcome}__{stat_case}{tag}.parquet'
         df_out.write_parquet(output_path)
         print(f'  Saved: {output_path.name}')
 
