@@ -22,6 +22,7 @@ dependencies = [
     "tqdm-joblib>=0.0.5",
     "umap-learn>=0.5.12",
     "wigglystuff>=0.1.10",
+    "kaleido>=1.2.0",
 ]
 
 [tool.ruff.lint]
