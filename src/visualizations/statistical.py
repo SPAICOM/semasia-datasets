@@ -375,7 +375,7 @@ def plot_forest(
                     # Group boundaries for dividers
                     group_boundaries = []
                     pos = 0
-                    for _, group_metrics in METRIC_GROUPS.values():
+                    for group_metrics in METRIC_GROUPS.values():
                         group_metrics_in_plot = [
                             m for m in group_metrics if m in df_a['metric'].values
                         ]
