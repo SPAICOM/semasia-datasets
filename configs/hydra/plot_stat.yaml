@@ -3,3 +3,12 @@ stat_cases:
 
 results_dir: results/stat
 output_dir: results/figures
+
+# Which regression types to plot. Options: pooled, within, interaction.
+regression_types:
+  - pooled
+
+# When true, all treatments are combined in a single wide figure.
+# When false (default), each treatment gets its own figure
+# (finetuning comparisons share one figure).
+combined_treatments: true

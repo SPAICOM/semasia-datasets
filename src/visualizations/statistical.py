@@ -57,6 +57,33 @@ METRIC_LABELS = {
     'probing_precision': 'Probing Precision',
     'probing_f1': 'Probing F1',
 }
+METRIC_GROUPS = {
+    'Spread / Distance': [
+        'total_spread',
+        'mean_distance_to_centroid',
+        'std_distance_to_centroid',
+        'density',
+    ],
+    'Dimensionality': [
+        'effective_rank',
+        'n_components_90pct',
+        'participation_ratio',
+        'participation_ratio_fast',
+    ],
+    'Spectral / Isotropy': [
+        'isotropy',
+        'spectral_entropy',
+        'explained_var_ratio_top1',
+        'explained_var_ratio_top3',
+        'top_eigenvalue_ratio',
+    ],
+    'Probing': [
+        'probing_accuracy',
+        'probing_recall',
+        'probing_precision',
+        'probing_f1',
+    ],
+}
 METRIC_ORDER = list(METRIC_LABELS.keys())
 ANALYSIS_ORDER = [
     'dataset_change',
@@ -64,6 +91,14 @@ ANALYSIS_ORDER = [
     'small_vs_finetuned',
     'augmentation',
     'model_scale',
+]
+# Each entry: (list_of_analyses, output_tag).
+# Finetuning comparisons share one figure (two columns, shared y-axis).
+_PLOT_GROUPS = [
+    (['dataset_change'], 'dataset_change'),
+    (['large_vs_finetuned', 'small_vs_finetuned'], 'finetuned'),
+    (['augmentation'], 'augmentation'),
+    (['model_scale'], 'model_scale'),
 ]
 STAT_CASE_ORDER = ['raw', 'proto_no_prewhiten', 'proto_prewhiten']
 DATASET_LABELS = {
@@ -96,6 +131,47 @@ def _apply_style() -> None:
 def _tex(s: str) -> str:
     """Escape underscores for LaTeX rendering."""
     return s.replace('_', r'\_')
+
+
+def _sig_style(p_values):
+    """Return per-row styling arrays for forest plot elements.
+
+    Three thresholds (BW-robust via color + marker shape + fill):
+      p < 0.05  → red,  filled circle   ('o'), thick line,  ``$\\ast$``
+      p < 0.10  → gold, filled diamond  ('D'), medium line, ``$\\dagger$``
+      p ≥ 0.10  → grey, hollow square   ('s'), thin line,   ''
+    """
+    line_colors, lws, facecolors, edgecolors, markers, annotations = (
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+    )
+    for p in p_values:
+        if p < 0.05:
+            line_colors.append(ACCENT_COLOR)
+            lws.append(2.5)
+            facecolors.append(ACCENT_COLOR)
+            edgecolors.append(ACCENT_COLOR)
+            markers.append('o')
+            annotations.append('')
+        elif p < 0.10:
+            line_colors.append(MARGINAL_COLOR)
+            lws.append(1.8)
+            facecolors.append(MARGINAL_COLOR)
+            edgecolors.append(MARGINAL_COLOR)
+            markers.append('D')
+            annotations.append('')
+        else:
+            line_colors.append(MUTED_COLOR)
+            lws.append(1.0)
+            facecolors.append('none')
+            edgecolors.append(MUTED_COLOR)
+            markers.append('s')
+            annotations.append('')
+    return line_colors, lws, facecolors, edgecolors, markers, annotations
 
 
 # ---------------------------------------------------------------------------
@@ -195,11 +271,12 @@ def plot_forest(
     stat_cases: list | None = None,
     metrics: list | None = None,
     regression_type: str | None = None,
+    combined: bool = False,
 ) -> list[Path]:
     """Forest plots of regression coefficients.
 
-    - regression_type='pooled' or 'interaction': one figure per stat_case
-    - regression_type='within': one figure per stat_case per dataset
+    - regression_type='pooled' or 'interaction': one figure per stat_case (or group)
+    - regression_type='within': one figure per stat_case per dataset (or group)
 
     Parameters
     ----------
@@ -208,6 +285,9 @@ def plot_forest(
     stat_cases : list of stat_cases to plot. If None, uses all cases present.
     metrics : list of metrics to plot. If None, uses all metrics present.
     regression_type : one of 'pooled', 'within', 'interaction'
+    combined : if True, all treatments appear in one wide figure per stat_case;
+               if False (default), each treatment group gets its own figure
+               (finetuning comparisons share one figure).
 
     Returns
     -------
@@ -231,23 +311,14 @@ def plot_forest(
             print(f'[WARN] No data for regression_type={regression_type}.')
             return []
 
-    is_standardized = (
+    _ = (
         'standardized' in reg.columns
         and reg['standardized'].drop_nulls().to_list()
         and reg['standardized'].drop_nulls()[0]
     )
-    x_label = (
-        r'$\beta$ (treatment effect, in control SDs)'
-        if is_standardized
-        else r'$\beta$ (treatment effect)'
-    )
+    x_label = r'$\beta$'
 
     saved = []
-    reg_type_labels = {
-        'pooled': 'Pooled (dataset control)',
-        'interaction': 'Interaction',
-        'within': 'Within-dataset',
-    }
 
     for case in stat_cases:
         df_case = reg.filter(pl.col('stat_case_parsed') == case)
@@ -268,121 +339,215 @@ def plot_forest(
                 df_case.filter(pl.col('dataset') == dataset) if dataset else df_case
             )
 
-            n_analyses = len(ANALYSIS_ORDER)
-            fig, axes = plt.subplots(
-                1,
-                n_analyses,
-                figsize=(4.5 * n_analyses, 6),
-                sharey=True,
-                layout='constrained',
-            )
-            fig.suptitle(
-                f'Treatment Effect Coefficients — {STAT_CASE_LABELS.get(case, case)}',
-                fontsize=13,
-                fontweight='bold',
-                y=1.02,
-            )
-
-            for ax, analysis in zip(axes, ANALYSIS_ORDER):
-                df_a = df_plot.filter(pl.col('analysis_type') == analysis).to_pandas()
-
-                if df_a.empty:
-                    ax.set_visible(False)
+            plot_groups = [(ANALYSIS_ORDER, 'all')] if combined else _PLOT_GROUPS
+            for analyses, plot_tag in plot_groups:
+                has_data = any(
+                    not df_plot.filter(pl.col('analysis_type') == a).is_empty()
+                    for a in analyses
+                )
+                if not has_data:
                     continue
 
-                df_a['metric_cat'] = pl.Series(df_a['metric']).cast(pl.Categorical)
-                present = [m for m in METRIC_ORDER if m in df_a['metric'].values]
-                df_a = df_a.set_index('metric').loc[present].reset_index()
+                n_cols = len(analyses)
+                fig, axes = plt.subplots(
+                    1,
+                    n_cols,
+                    figsize=(4.5 * n_cols + 1, 10),
+                    sharey=(n_cols > 1),
+                    gridspec_kw={'wspace': 0.12},
+                )
+                if n_cols == 1:
+                    axes = [axes]
 
-                y_pos = np.arange(len(df_a))
-                colors = [
-                    ACCENT_COLOR
-                    if p < 0.05
-                    else MARGINAL_COLOR
-                    if p < 0.10
-                    else MUTED_COLOR
-                    for p in df_a['p_value']
+                for ax, analysis in zip(axes, analyses):
+                    df_a = df_plot.filter(
+                        pl.col('analysis_type') == analysis
+                    ).to_pandas()
+
+                    if df_a.empty:
+                        ax.set_visible(False)
+                        continue
+
+                    df_a['metric_cat'] = pl.Series(df_a['metric']).cast(pl.Categorical)
+                    present = [m for m in METRIC_ORDER if m in df_a['metric'].values]
+                    df_a = df_a.set_index('metric').loc[present].reset_index()
+
+                    # Group boundaries for dividers
+                    group_boundaries = []
+                    pos = 0
+                    for _, group_metrics in METRIC_GROUPS.values():
+                        group_metrics_in_plot = [
+                            m for m in group_metrics if m in df_a['metric'].values
+                        ]
+                        if group_metrics_in_plot:
+                            pos += len(group_metrics_in_plot)
+                            if pos < len(df_a):
+                                group_boundaries.append(pos - 0.5)
+
+                    y_pos = np.arange(len(df_a))
+                    p_vals = df_a['p_value'].values
+                    ci_lower = df_a['ci_lower'].values
+                    ci_upper = df_a['ci_upper'].values
+                    beta = df_a['beta'].values
+                    line_colors, lws, facecolors, edgecolors, mrks, annots = _sig_style(
+                        p_vals
+                    )
+
+                    # Alternate group background shading
+                    shade_pos = 0
+                    for g_idx, (_, gm) in enumerate(METRIC_GROUPS.items()):
+                        gm_in = [m for m in gm if m in df_a['metric'].values]
+                        n_gm = len(gm_in)
+                        if n_gm:
+                            if g_idx % 2 == 0:
+                                ax.axhspan(
+                                    shade_pos - 0.5,
+                                    shade_pos + n_gm - 0.5,
+                                    color='#f5f5f5',
+                                    zorder=0,
+                                    alpha=0.8,
+                                )
+                            shade_pos += n_gm
+
+                    ax.hlines(
+                        y_pos,
+                        ci_lower,
+                        ci_upper,
+                        colors=line_colors,
+                        linewidth=lws,
+                        zorder=2,
+                    )
+
+                    # CI endpoint caps
+                    cap_h = 0.13
+                    for i, (y, c_lo, c_up) in enumerate(zip(y_pos, ci_lower, ci_upper)):
+                        ax.plot(
+                            [c_lo, c_lo],
+                            [y - cap_h, y + cap_h],
+                            color=line_colors[i],
+                            linewidth=lws[i],
+                            zorder=2,
+                            solid_capstyle='butt',
+                        )
+                        ax.plot(
+                            [c_up, c_up],
+                            [y - cap_h, y + cap_h],
+                            color=line_colors[i],
+                            linewidth=lws[i],
+                            zorder=2,
+                            solid_capstyle='butt',
+                        )
+
+                    # Per-row scatter to support distinct marker shapes
+                    for i, (b, y, fc, ec, m) in enumerate(
+                        zip(beta, y_pos, facecolors, edgecolors, mrks)
+                    ):
+                        ax.scatter(
+                            b,
+                            y,
+                            facecolors=fc,
+                            edgecolors=ec,
+                            marker=m,
+                            s=65,
+                            zorder=3,
+                            linewidths=1.5,
+                        )
+
+                    ax.axvline(
+                        0, color='black', linewidth=0.8, linestyle='--', alpha=0.5
+                    )
+
+                    # Horizontal group dividers
+                    for y in group_boundaries:
+                        ax.axhline(
+                            y=y,
+                            color='#888888',
+                            linewidth=1.5,
+                            linestyle='-',
+                            alpha=0.7,
+                        )
+
+                    labels = [METRIC_LABELS.get(m, m) for m in df_a['metric']]
+                    ax.set_yticks(y_pos)
+                    ax.set_yticklabels(labels, fontsize=20)
+                    ax.invert_yaxis()
+
+                    title = ANALYSIS_LABELS.get(analysis, analysis)
+                    ax.set_title(title, fontsize=28, pad=14)
+                    ax.set_xlabel(x_label, fontsize=24, labelpad=10)
+                    ax.tick_params(axis='x', labelsize=18, pad=8)
+
+                    # Expand x-axis, then place significance annotations
+                    xlo, xhi = ax.get_xlim()
+                    ax.set_xlim(xlo, xhi + 0.14 * abs(xhi - xlo))
+                    for i, (y, annot, color) in enumerate(
+                        zip(y_pos, annots, line_colors)
+                    ):
+                        if annot:
+                            ax.text(
+                                ci_upper[i],
+                                y,
+                                f' {annot}',
+                                va='center',
+                                ha='left',
+                                fontsize=18,
+                                color=color,
+                                zorder=4,
+                                clip_on=False,
+                            )
+
+                from matplotlib.lines import Line2D
+
+                legend_elements = [
+                    Line2D(
+                        [0],
+                        [0],
+                        marker='o',
+                        color=ACCENT_COLOR,
+                        markerfacecolor=ACCENT_COLOR,
+                        markeredgecolor=ACCENT_COLOR,
+                        markersize=14,
+                        linewidth=2.5,
+                        label=r'$p < 0.05$',
+                    ),
+                    Line2D(
+                        [0],
+                        [0],
+                        marker='D',
+                        color=MARGINAL_COLOR,
+                        markerfacecolor=MARGINAL_COLOR,
+                        markeredgecolor=MARGINAL_COLOR,
+                        markersize=12,
+                        linewidth=1.8,
+                        label=r'$p < 0.10$',
+                    ),
+                    Line2D(
+                        [0],
+                        [0],
+                        marker='s',
+                        color=MUTED_COLOR,
+                        markerfacecolor='none',
+                        markeredgecolor=MUTED_COLOR,
+                        markersize=12,
+                        linewidth=1.0,
+                        label=r'$p \geq 0.10$',
+                    ),
                 ]
-
-                ax.hlines(
-                    y_pos,
-                    df_a['ci_lower'],
-                    df_a['ci_upper'],
-                    colors=colors,
-                    linewidth=2.5,
-                    zorder=1,
+                fig.legend(
+                    handles=legend_elements,
+                    loc='upper center',
+                    ncol=3,
+                    frameon=False,
+                    fontsize=24,
+                    bbox_to_anchor=(0.5, 1.03),
                 )
-                ax.scatter(
-                    df_a['beta'],
-                    y_pos,
-                    c=colors,
-                    s=80,
-                    zorder=2,
-                    edgecolors='white',
-                    linewidths=0.8,
-                )
-                ax.axvline(0, color='black', linewidth=0.8, linestyle='--', alpha=0.5)
 
-                labels = [METRIC_LABELS.get(m, m) for m in df_a['metric']]
-                ax.set_yticks(y_pos)
-                ax.set_yticklabels(labels)
-                ax.invert_yaxis()
-
-                title = ANALYSIS_LABELS.get(analysis, analysis)
-                if dataset:
-                    ds_label = DATASET_LABELS.get(dataset, dataset)
-                    title = f'{title}\n({ds_label})'
-                rt_label = reg_type_labels.get(regression_type, regression_type)
-                title = f'{title}\n({rt_label})'
-                ax.set_title(title, fontsize=10)
-                ax.set_xlabel(x_label)
-
-            from matplotlib.lines import Line2D
-
-            legend_elements = [
-                Line2D(
-                    [0],
-                    [0],
-                    marker='o',
-                    color='w',
-                    markerfacecolor=ACCENT_COLOR,
-                    markersize=8,
-                    label=r'$p < 0.05$',
-                ),
-                Line2D(
-                    [0],
-                    [0],
-                    marker='o',
-                    color='w',
-                    markerfacecolor=MARGINAL_COLOR,
-                    markersize=8,
-                    label=r'$0.05 \leq p < 0.10$',
-                ),
-                Line2D(
-                    [0],
-                    [0],
-                    marker='o',
-                    color='w',
-                    markerfacecolor=MUTED_COLOR,
-                    markersize=8,
-                    label=r'$p \geq 0.10$',
-                ),
-            ]
-            fig.legend(
-                handles=legend_elements,
-                loc='lower center',
-                ncol=3,
-                frameon=False,
-                fontsize=9,
-                bbox_to_anchor=(0.5, -0.04),
-            )
-
-            tag = f'__{dataset}' if dataset else f'__{regression_type}'
-            path = output_dir / f'forest__{case}{tag}.png'
-            fig.savefig(path, bbox_inches='tight')
-            plt.close(fig)
-            saved.append(path)
-            print(f'  Saved: {path.name}')
+                tag = f'__{dataset}' if dataset else f'__{regression_type}'
+                path = output_dir / f'forest__{case}__{plot_tag}{tag}.pdf'
+                fig.savefig(path, bbox_inches='tight')
+                plt.close(fig)
+                saved.append(path)
+                print(f'  Saved: {path.name}')
 
     return saved
 

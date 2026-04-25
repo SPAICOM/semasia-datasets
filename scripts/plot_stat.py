@@ -27,22 +27,19 @@ def main(cfg: DictConfig) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     stat_cases = cfg.get('stat_cases', ['raw', 'proto_no_prewhiten', 'proto_prewhiten'])
+    regression_types = cfg.get('regression_types', ['pooled'])
+    combined = bool(cfg.get('combined_treatments', False))
 
     print('\n[Forest plots]')
-    print('  Case A: pooled...')
-    plot_forest(
-        results_dir, output_dir, stat_cases=stat_cases, regression_type='pooled'
-    )
-
-    print('  Case B: within-dataset...')
-    plot_forest(
-        results_dir, output_dir, stat_cases=stat_cases, regression_type='within'
-    )
-
-    print('  Case C: interaction...')
-    plot_forest(
-        results_dir, output_dir, stat_cases=stat_cases, regression_type='interaction'
-    )
+    for reg_type in regression_types:
+        print(f'  {reg_type}...')
+        plot_forest(
+            results_dir,
+            output_dir,
+            stat_cases=stat_cases,
+            regression_type=reg_type,
+            combined=combined,
+        )
 
     print(f'\n[DONE] All figures saved to {output_dir}/')
 

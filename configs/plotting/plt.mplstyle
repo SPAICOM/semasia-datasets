@@ -1,10 +1,10 @@
 figure.figsize: 16, 8
-font.size: 22
-axes.titlesize: 24
-axes.labelsize: 24
-xtick.labelsize: 22
-ytick.labelsize: 22
-legend.fontsize: 20
+font.size: 26
+axes.titlesize: 28
+axes.labelsize: 28
+xtick.labelsize: 26
+ytick.labelsize: 26
+legend.fontsize: 24
 legend.title_fontsize: 22
 lines.markersize: 18
 lines.linewidth: 3
