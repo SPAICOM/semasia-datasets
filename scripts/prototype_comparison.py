@@ -378,9 +378,9 @@ def main(cfg: DictConfig) -> None:
                     cluster_b=b_label,
                     seed=seed,
                 )
-                fname = f'group_{rank:02d}_a{a_label}_b{b_label}_s{group.score:.3f}.png'
+                fname = f'group_{rank:02d}_a{a_label}_b{b_label}_s{group.score:.3f}.pdf'
                 pair_path = k_dir / fname
-                pair_fig.savefig(pair_path, dpi=100, bbox_inches='tight')
+                pair_fig.savefig(pair_path, bbox_inches='tight')
                 plt.close(pair_fig)
                 print(f'    G{rank:02d}: A[{a_label}]↔B[{b_label}] s={group.score:.3f}')
 
