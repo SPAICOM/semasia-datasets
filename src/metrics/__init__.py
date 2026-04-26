@@ -20,6 +20,17 @@ from src.metrics.entropy import (
     participation_ratio,
     spectral_entropy,
 )
+from src.metrics.prototypes import (
+    compute_all_metrics,
+    correspondence_score,
+    entropy_from_jaccard,
+    f1_from_jaccard,
+    hungarian_score,
+    jaccard,
+    jaccard_matrix,
+    precision_from_jaccard,
+    recall_from_jaccard,
+)
 
 __all__ = [
     'align_prototypes',
@@ -38,4 +49,13 @@ __all__ = [
     'effective_rank',
     'participation_ratio',
     'compute_entropy_metrics',
+    'jaccard',
+    'jaccard_matrix',
+    'correspondence_score',
+    'precision_from_jaccard',
+    'recall_from_jaccard',
+    'f1_from_jaccard',
+    'entropy_from_jaccard',
+    'hungarian_score',
+    'compute_all_metrics',
 ]

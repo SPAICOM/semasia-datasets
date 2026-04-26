@@ -90,3 +90,15 @@ test-slow:
 # Run marimo notebooks
 marimo:
     uv run marimo edit .
+
+# Run prototype comparison between two models
+proto-compare:
+    uv run scripts/prototype_comparison.py
+
+# Run prototype comparison with custom dataset
+proto-compare-dataset DATASET:
+    uv run scripts/prototype_comparison.py dataset={{DATASET}}
+
+# Run prototype comparison with custom models
+proto-compare-models MODEL_A MODEL_B:
+    uv run scripts/prototype_comparison.py model_a={{MODEL_A}} model_b={{MODEL_B}}

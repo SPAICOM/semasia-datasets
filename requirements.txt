@@ -681,6 +681,18 @@ idna==3.11 \
     #   httpx
     #   requests
     #   yarl
+igraph==1.0.0 \
+    --hash=sha256:05c79a2a8fca695b2f217a6fa7f2549f896f757d4db41be32a055400cb19cc30 \
+    --hash=sha256:1a27753cd80680a8f676c2d5a467aaa4a95e510b30748398ec4e4aeb982130e8 \
+    --hash=sha256:2414d0be2e4d77ee5357807d100974b40f6082bb1bb71988ec46cfb6728651ee \
+    --hash=sha256:2d04c2c76f686fb1f554ee35dfd3085f5e73b7965ba6b4cf06d53e66b1955522 \
+    --hash=sha256:a55dc3a2a4e3fc3eba42479910c1511bfc3ecb33cdf5f0406891fd85f14b5aee \
+    --hash=sha256:b607cafc24b10a615e713ee96e58208ef27e0764af80140c7cc45d4724a3f2df \
+    --hash=sha256:c2bce3cd472fec3dd9c4d8a3ea5b6b9be65fb30edf760beb4850760dd4f2d479 \
+    --hash=sha256:c2cbc415e02523e5a241eecee82319080bf928a70b1ba299f3b3e25bf029b6d4 \
+    --hash=sha256:f2b52dc1757fff0fed29a9f7a276d971a11db4211569ed78b9eab36288dfcc9d \
+    --hash=sha256:faeff8ede0cf15eb4ded44b0fcea6e1886740146e60504c24ad2da14e0939563
+    # via semantic-dataset
 iniconfig==2.3.0 \
     --hash=sha256:c76315c77db068650d49c5b56314774a7804df16fee4402c1f19d6d15d8c4730 \
     --hash=sha256:f631c04d2c48c52b84d0d0549c99ff3859c98df65b3101406327ecc7d53fbf12
@@ -2169,6 +2181,10 @@ tadasets==0.2.2 \
     --hash=sha256:0be975f49d0f1e36539730215dba2389c68ecabfe08cdf1fb87edc2f26f8e3dc \
     --hash=sha256:35e6e70fb956c10a6ef2e9d892a9efb8678176b1c11d866d279a3253df94bbb6
     # via scikit-tda
+texttable==1.7.0 \
+    --hash=sha256:2d2068fb55115807d3ac77a4ca68fa48803e84ebb0ee2340f858107a36522638 \
+    --hash=sha256:72227d592c82b3d7f672731ae73e4d1f88cd8e2ef5b075a7a7f01a23a3743917
+    # via igraph
 threadpoolctl==3.6.0 \
     --hash=sha256:43a0b8fd5a2928500110039e43a5eed8480b918967083ea48dc3ab9f13c4a7fb \
     --hash=sha256:8ab8b4aa3491d812b623328249fab5302a68d2d71745c8a4c719a2fcaba9f44e

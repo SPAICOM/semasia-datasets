@@ -23,6 +23,7 @@ dependencies = [
     "umap-learn>=0.5.12",
     "wigglystuff>=0.1.10",
     "kaleido>=1.2.0",
+    "igraph>=1.0.0",
 ]
 
 [tool.ruff.lint]
