@@ -102,3 +102,15 @@ proto-compare-dataset DATASET:
 # Run prototype comparison with custom models
 proto-compare-models MODEL_A MODEL_B:
     uv run scripts/prototype_comparison.py model_a={{MODEL_A}} model_b={{MODEL_B}}
+
+# Run prototype alignment (lstsq probing on transmitted A → B raw space)
+proto-alignment:
+    uv run scripts/proto_alignment.py
+
+# Run prototype alignment on a specific dataset
+proto-alignment-dataset DATASET:
+    uv run scripts/proto_alignment.py dataset={{DATASET}}
+
+# Run prototype alignment with custom models
+proto-alignment-models MODEL_A MODEL_B:
+    uv run scripts/proto_alignment.py model_a={{MODEL_A}} model_b={{MODEL_B}}

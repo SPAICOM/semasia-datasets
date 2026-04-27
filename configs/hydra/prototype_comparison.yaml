@@ -28,10 +28,10 @@ n_prototypes:
   - 8
   - 9
   - 10
-  - 20
-  - 40
-  - 80
-  - 160
+  # - 20
+  # - 40
+  # - 80
+  # - 160
 
 prewhiten: false
 
@@ -44,9 +44,6 @@ metrics:
 
 n_cluster_samples: 8
 n_foscttm: 5000  # subsample size for raw-embedding FOSCTTM (cdist memory guard)
-# matching_method: hungarian | connected_components | spectral | leiden
-matching_method: spectral
-
 save_heatmaps: true
 save_results: true
 

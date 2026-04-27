@@ -1,0 +1,30 @@
+repo_id: "spaicom-lab"
+prefix: "semantic-"
+
+dataset: cifar10
+train_split: train
+test_split: test
+
+model_a: vit_small_patch16_224.augreg_in1k
+model_b: vit_base_patch16_224.augreg_in1k
+
+seed: 42
+
+n_prototypes:
+  - 2
+  - 4
+  - 8
+  - 16
+  - 32
+  - 64
+  - 128
+
+# Classification metrics to plot (accuracy | precision | recall | f1)
+metrics:
+  - accuracy
+  # - precision
+  # - recall
+  # - f1
+
+save_results: true
+save_plots: true

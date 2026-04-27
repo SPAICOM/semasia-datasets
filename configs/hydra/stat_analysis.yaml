@@ -22,13 +22,13 @@ metrics:
   - total_spread
   - mean_distance_to_centroid
   - std_distance_to_centroid
-  - participation_ratio_fast
+  # - participation_ratio_fast
   - isotropy
   - density
   - n_components_90pct
   - explained_var_ratio_top1
   - explained_var_ratio_top3
-  - top_eigenvalue_ratio
+  # - top_eigenvalue_ratio
   - spectral_entropy
   - effective_rank
   - participation_ratio

@@ -95,13 +95,19 @@ def _cluster_indices_to_sets(
 
 
 def _save_plotly(fig, path: Path) -> Path:
+    fig.write_image(path.with_suffix('.png'))
     try:
-        fig.write_image(path)
-        return path
+        fig.write_image(path.with_suffix('.pdf'))
+        return path.with_suffix('.pdf')
     except Exception:
-        path = path.with_suffix('.html')
-        fig.write_html(path)
-        return path
+        html_path = path.with_suffix('.html')
+        fig.write_html(html_path)
+        return html_path
+
+
+def _save_mpl(fig, path: Path) -> None:
+    fig.savefig(path.with_suffix('.pdf'), bbox_inches='tight')
+    fig.savefig(path.with_suffix('.png'), dpi=150, bbox_inches='tight')
 
 
 @hydra.main(
@@ -127,7 +133,7 @@ def main(cfg: DictConfig) -> None:
     prewhiten = cfg.get('prewhiten', True)
     threshold = cfg.get('jaccard_threshold', 0.5)
     n_cluster_samples = cfg.get('n_cluster_samples', 8)
-    matching_method = cfg.get('matching_method', 'hungarian')
+    _GRID_STRATEGIES = ('spectral', 'hungarian', 'injected')
     n_foscttm = cfg.get('n_foscttm', 5000)
 
     if model_a is None or model_b is None:
@@ -319,11 +325,18 @@ def main(cfg: DictConfig) -> None:
             k_dir = plots_dir / f'k{k}'
             k_dir.mkdir(exist_ok=True)
 
-            groups: list[MatchGroup] = compute_matching(
-                J_k, method=matching_method, threshold=threshold
+            idx_a = indices_a_by_k[k]
+            idx_b = indices_b_by_k[k]
+
+            # Spectral groups are reused for bipartite/force/pair images
+            groups_spectral: list[MatchGroup] = compute_matching(
+                J_k, method='spectral', threshold=threshold
             )
-            matched_pairs: set[tuple[int, int]] = {
-                (i, j) for g in groups for i in g.a_clusters for j in g.b_clusters
+            matched_pairs_spectral: set[tuple[int, int]] = {
+                (i, j)
+                for g in groups_spectral
+                for i in g.a_clusters
+                for j in g.b_clusters
             }
 
             heatmap_path = _save_plotly(
@@ -338,7 +351,7 @@ def main(cfg: DictConfig) -> None:
                     model_a,
                     model_b,
                     threshold=threshold,
-                    matched_pairs=matched_pairs,
+                    matched_pairs=matched_pairs_spectral,
                 ),
                 k_dir / 'bipartite.pdf',
             )
@@ -350,18 +363,15 @@ def main(cfg: DictConfig) -> None:
                     model_a,
                     model_b,
                     threshold=threshold,
-                    matched_pairs=matched_pairs,
-                    groups=groups,
+                    matched_pairs=matched_pairs_spectral,
+                    groups=groups_spectral,
                 ),
                 k_dir / 'force.pdf',
             )
             print(f'[COMPLETE] Force graph saved to {force_path}')
 
-            # Cluster group images
-            idx_a = indices_a_by_k[k]
-            idx_b = indices_b_by_k[k]
-            print(f'  Saving cluster group images for k={k} ({matching_method})...')
-            for rank, group in enumerate(groups):
+            print(f'  Saving cluster group images for k={k} (spectral)...')
+            for rank, group in enumerate(groups_spectral):
                 a_label = '+'.join(str(i) for i in group.a_clusters)
                 b_label = '+'.join(str(j) for j in group.b_clusters)
                 a_indices = np.concatenate([idx_a[i] for i in group.a_clusters])
@@ -380,31 +390,57 @@ def main(cfg: DictConfig) -> None:
                     seed=seed,
                 )
                 fname = f'group_{rank:02d}_a{a_label}_b{b_label}_s{group.score:.3f}.pdf'
-                pair_path = k_dir / fname
-                pair_fig.savefig(pair_path, bbox_inches='tight')
+                _save_mpl(pair_fig, k_dir / fname)
                 plt.close(pair_fig)
                 print(f'    G{rank:02d}: A[{a_label}]↔B[{b_label}] s={group.score:.3f}')
 
-            for model_side, side_key, side_indices in [
-                (model_a, 'a', idx_a),
-                (model_b, 'b', idx_b),
-            ]:
-                grid_fig = plot_cluster_grid_images(
-                    groups,
-                    side_indices,
-                    img_datasets,
-                    dataset_boundaries,
-                    side=side_key,
-                    n_samples=n_cluster_samples,
-                    model_name=model_side,
-                    seed=seed,
-                )
-                grid_path = k_dir / f'grid_{side_key}.pdf'
-                grid_fig.savefig(grid_path, bbox_inches='tight')
-                plt.close(grid_fig)
-                print(
-                    f'  [COMPLETE] Image grid ({side_key.upper()}) saved to {grid_path}'
-                )
+            # Grids for all three matching strategies
+            for strategy in _GRID_STRATEGIES:
+                strategy_dir = k_dir / strategy
+                strategy_dir.mkdir(exist_ok=True)
+
+                if strategy == 'injected':
+                    # B adopts A's cluster structure: same sample assignments
+                    strat_groups: list[MatchGroup] = [
+                        MatchGroup(a_clusters=[i], b_clusters=[i], score=1.0)
+                        for i in range(k)
+                    ]
+                    idx_b_strat = idx_a
+                elif strategy == 'spectral':
+                    strat_groups = groups_spectral
+                    idx_b_strat = idx_b
+                else:
+                    strat_groups = compute_matching(
+                        J_k, method=strategy, threshold=threshold
+                    )
+                    idx_b_strat = idx_b
+
+                for model_side, side_key, side_indices in [
+                    (model_a, 'a', idx_a),
+                    (model_b, 'b', idx_b_strat),
+                ]:
+                    # For injected, A and B share the same index pool; offset B's
+                    # seed so the two grids show independently sampled images.
+                    grid_seed = (
+                        seed + 1
+                        if (strategy == 'injected' and side_key == 'b')
+                        else seed
+                    )
+                    grid_fig = plot_cluster_grid_images(
+                        strat_groups,
+                        side_indices,
+                        img_datasets,
+                        dataset_boundaries,
+                        side=side_key,
+                        n_samples=n_cluster_samples,
+                        model_name=model_side,
+                        seed=grid_seed,
+                    )
+                    grid_path = strategy_dir / f'grid_{side_key}.pdf'
+                    _save_mpl(grid_fig, grid_path)
+                    plt.close(grid_fig)
+                    msg = f'  [COMPLETE] Grid ({side_key.upper()}, {strategy})'
+                    print(f'  {msg} → {grid_path}')
 
         all_profile_data = {
             'f1': [r.f1 for r in results],
