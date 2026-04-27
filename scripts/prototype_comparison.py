@@ -34,6 +34,7 @@ from src.metrics.prototypes import (
 from src.objects import LatentSpace
 from src.visualizations.prototypes import (
     plot_bipartite_merge,
+    plot_cluster_grid_images,
     plot_cluster_pair_images,
     plot_force_graph,
     plot_prototype_heatmap,
@@ -383,6 +384,27 @@ def main(cfg: DictConfig) -> None:
                 pair_fig.savefig(pair_path, bbox_inches='tight')
                 plt.close(pair_fig)
                 print(f'    G{rank:02d}: A[{a_label}]↔B[{b_label}] s={group.score:.3f}')
+
+            for model_side, side_key, side_indices in [
+                (model_a, 'a', idx_a),
+                (model_b, 'b', idx_b),
+            ]:
+                grid_fig = plot_cluster_grid_images(
+                    groups,
+                    side_indices,
+                    img_datasets,
+                    dataset_boundaries,
+                    side=side_key,
+                    n_samples=n_cluster_samples,
+                    model_name=model_side,
+                    seed=seed,
+                )
+                grid_path = k_dir / f'grid_{side_key}.pdf'
+                grid_fig.savefig(grid_path, bbox_inches='tight')
+                plt.close(grid_fig)
+                print(
+                    f'  [COMPLETE] Image grid ({side_key.upper()}) saved to {grid_path}'
+                )
 
         all_profile_data = {
             'f1': [r.f1 for r in results],

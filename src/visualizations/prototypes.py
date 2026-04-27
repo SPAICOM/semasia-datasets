@@ -22,7 +22,7 @@ def plot_prototype_heatmap(
     J: NDArray[np.float32],
     model_a: str,
     model_b: str,
-    color_scale: str = 'Viridis',
+    color_scale: str = 'Magma',
     zmin: float = 0.0,
     zmax: float = 1.0,
 ) -> go.Figure:
@@ -56,8 +56,8 @@ def plot_prototype_heatmap(
         zmin=zmin,
         zmax=zmax,
         labels={
-            'x': f'{model_b} Prototypes',
-            'y': f'{model_a} Prototypes',
+            'x': model_b,
+            'y': model_a,
             'color': 'Jaccard',
         },
         aspect='equal',
@@ -705,8 +705,11 @@ def plot_cluster_pair_images(
     seed : int
         Random seed for reproducible sampling.
     """
+    import matplotlib as _mpl
     import matplotlib.pyplot as plt
     import numpy as _np
+
+    _mpl.rcParams['font.family'] = 'Times New Roman'
 
     rng = _np.random.default_rng(seed)
 
@@ -749,6 +752,86 @@ def plot_cluster_pair_images(
     return fig
 
 
+def plot_cluster_grid_images(
+    groups,
+    indices_by_cluster: dict,
+    img_datasets: list,
+    dataset_boundaries: list[int],
+    side: str = 'a',
+    n_samples: int = 8,
+    model_name: str = '',
+    seed: int = 42,
+):
+    """Grid of images: rows = matched groups (same order for A and B), cols = samples.
+
+    Pass the same ``groups`` list and the same ``seed`` for both model grids to
+    guarantee row-level correspondence between the two figures.
+
+    Parameters
+    ----------
+    groups : list of MatchGroup
+        Matched groups; determines row ordering.
+    indices_by_cluster : dict[int, np.ndarray]
+        Cluster index → global sample indices for one model side.
+    img_datasets : list of (dataset, img_col_name | None)
+    dataset_boundaries : list of int
+    side : {'a', 'b'}
+        Which clusters to read from each group ('a' → group.a_clusters).
+    n_samples : int
+        Number of images per row.
+    model_name : str
+        Figure suptitle.
+    seed : int
+        Random seed for reproducible sampling.
+    """
+    import matplotlib as _mpl
+    import matplotlib.pyplot as plt
+    import numpy as _np
+
+    _mpl.rcParams['font.family'] = 'Times New Roman'
+
+    rng = _np.random.default_rng(seed)
+
+    def _get_image(global_idx: int):
+        ds_idx = int(_np.searchsorted(dataset_boundaries[1:], global_idx, side='right'))
+        local_idx = global_idx - dataset_boundaries[ds_idx]
+        ds, img_col = img_datasets[ds_idx]
+        if ds is None or img_col is None:
+            return None
+        return ds[int(local_idx)][img_col]
+
+    def _sample(indices, n: int) -> list:
+        idx_list = list(indices)
+        chosen = rng.choice(len(idx_list), size=min(n, len(idx_list)), replace=False)
+        return [_get_image(idx_list[int(c)]) for c in chosen]
+
+    n_groups = len(groups)
+    n_cols = n_samples
+    fig, axes = plt.subplots(n_groups, n_cols, figsize=(n_cols * 1.4, n_groups * 1.6))
+    axes = _np.array(axes).reshape(n_groups, n_cols)
+
+    for row, group in enumerate(groups):
+        cluster_ids = group.a_clusters if side == 'a' else group.b_clusters
+        combined = _np.concatenate(
+            [indices_by_cluster[i] for i in cluster_ids if i in indices_by_cluster]
+        )
+        imgs = _sample(combined, n_cols)
+        label = '+'.join(str(i) for i in cluster_ids)
+        for col in range(n_cols):
+            ax = axes[row, col]
+            ax.axis('off')
+            if col < len(imgs) and imgs[col] is not None:
+                arr = _np.array(imgs[col])
+                ax.imshow(arr, cmap='gray' if arr.ndim == 2 else None)
+        axes[row, 0].set_ylabel(
+            f'C{label}', fontsize=7, rotation=0, labelpad=28, va='center'
+        )
+
+    fig.suptitle(model_name, fontsize=10)
+    fig.tight_layout(pad=0.3)
+    return fig
+
+
 __all__ = [
     'plot_prototype_heatmap',
     'plot_similarity_profile',
@@ -756,4 +839,5 @@ __all__ = [
     'plot_bipartite_merge',
     'plot_force_graph',
     'plot_cluster_pair_images',
+    'plot_cluster_grid_images',
 ]
