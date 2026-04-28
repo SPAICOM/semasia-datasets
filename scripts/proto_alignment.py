@@ -135,7 +135,7 @@ def _plot_line(
 
     Parameters
     ----------
-    dashes : dict[series_name -> dash style], e.g. {'acc (hungarian)': 'dot'}
+    dashes : dict[series_name -> dash style], e.g. {'Hungarian': 'dot'}
     hlines : dict[label -> y_value] for horizontal reference lines
     hline_colors : dict[label -> color]; falls back to _metric_color(label)
     """
@@ -188,6 +188,7 @@ def _plot_line(
         range=[x[0], x[-1]],
         tickmode='array',
         tickvals=x,
+        tickangle=0,
         showgrid=True,
         gridwidth=1,
         gridcolor='rgba(0,0,0,0.1)',

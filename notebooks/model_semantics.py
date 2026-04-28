@@ -498,6 +498,111 @@ def _(df_pc, mo):
 
 
 @app.cell(hide_code=True)
+def _(mo):
+
+    fmt_ui = mo.ui.dropdown(
+        options=['pdf', 'png', 'svg'],
+        value='pdf',
+        label='Format',
+    )
+    fmt_ui
+    return (fmt_ui,)
+
+
+@app.cell(hide_code=True)
+def _(df_pc, mo):
+    _ds_options = sorted(df_pc['dataset'].unique().to_list())
+    class_select_ui = mo.ui.multiselect(
+        options=_ds_options,
+        value=_ds_options,
+        label='Classes',
+    )
+    class_select_ui
+    return (class_select_ui,)
+
+
+@app.cell(hide_code=True)
+def _(class_select_ui, df_pc, fmt_ui, mo, n_dims_ui, pc_method_ui):
+    import importlib as _importlib
+    import io as _io_pc
+
+    import matplotlib.pyplot as _plt_pc
+
+    import src.visualizations.parallel_coordinates as _pc_mod
+
+    _importlib.reload(_pc_mod)
+    make_parallel_coordinates = _pc_mod.make_parallel_coordinates
+
+    _fmt_mime = {
+        'pdf': 'application/pdf',
+        'png': 'image/png',
+        'svg': 'image/svg+xml',
+    }
+
+    def _make_pc_download():
+        _fmt = fmt_ui.value
+        _fig = make_parallel_coordinates(
+            df_pc,
+            pc_method_ui.value,
+            n_dims_ui.value,
+            selected_labels=class_select_ui.value if class_select_ui.value else None,
+        )
+        _buf = _io_pc.BytesIO()
+        _fig.savefig(_buf, format=_fmt, bbox_inches='tight', dpi=150)
+        _buf.seek(0)
+        _plt_pc.close(_fig)
+        return _buf.read()
+
+    def _make_pc_pdf():
+        _fig = make_parallel_coordinates(
+            df_pc,
+            pc_method_ui.value,
+            n_dims_ui.value,
+            selected_labels=class_select_ui.value if class_select_ui.value else None,
+        )
+        _data = _pc_mod.to_pdf(_fig)
+        _plt_pc.close(_fig)
+        return _data
+
+    # preview
+    _selected = class_select_ui.value if class_select_ui.value else None
+    _fig_prev = make_parallel_coordinates(
+        df_pc, pc_method_ui.value, n_dims_ui.value, selected_labels=_selected
+    )
+    _buf_prev = _io_pc.BytesIO()
+    _fig_prev.savefig(_buf_prev, format='png', bbox_inches='tight', dpi=100)
+    _buf_prev.seek(0)
+    _plt_pc.close(_fig_prev)
+
+    _fname = f'parallel_coordinates_{pc_method_ui.value}_{n_dims_ui.value}d'
+
+    mo.vstack(
+        [
+            mo.image(_buf_prev.getvalue()),
+            mo.hstack(
+                [
+                    mo.download(
+                        data=_make_pc_pdf,
+                        filename=f'{_fname}.pdf',
+                        mimetype='application/pdf',
+                        label='Save as PDF',
+                    ),
+                    mo.download(
+                        data=_make_pc_download,
+                        filename=f'{_fname}.{fmt_ui.value}',
+                        mimetype=_fmt_mime[fmt_ui.value],
+                        label='Save as…',
+                    ),
+                ],
+                align='center',
+                gap=1,
+            ),
+        ]
+    )
+    return
+
+
+@app.cell(hide_code=True)
 def _(
     DATASET_CONFIGS: dict,
     all_sample_info,

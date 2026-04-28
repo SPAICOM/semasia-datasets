@@ -22,13 +22,14 @@ STYLE_PATH = (
 )
 DPI = 150
 ACCENT_COLOR = '#c44e52'
+STRONG_COLOR = '#8b0000'
 MARGINAL_COLOR = '#f0a500'
 MUTED_COLOR = '#8c8c8c'
 PALETTE_TREATMENT = {'0': '#7ea6c9', '1': '#c44e52'}
 ANALYSIS_LABELS = {
-    'dataset_change': 'Dataset Change',
-    'large_vs_finetuned': 'Large vs Fine-tuned',
-    'small_vs_finetuned': 'Small vs Fine-tuned',
+    'dataset_change': 'Dataset Informativity',
+    'large_vs_finetuned': 'Specialization',
+    'small_vs_finetuned': 'Transfer Learning',
     'augmentation': 'Augmentation',
     'model_scale': 'Model Scale',
 }
@@ -136,10 +137,11 @@ def _tex(s: str) -> str:
 def _sig_style(p_values):
     """Return per-row styling arrays for forest plot elements.
 
-    Three thresholds (BW-robust via color + marker shape + fill):
-      p < 0.05  → red,  filled circle   ('o'), thick line,  ``$\\ast$``
-      p < 0.10  → gold, filled diamond  ('D'), medium line, ``$\\dagger$``
-      p ≥ 0.10  → grey, hollow square   ('s'), thin line,   ''
+    Four thresholds (BW-robust via color + marker shape + fill):
+      p < 0.01  → dark red, filled star     ('*'), thickest line
+      p < 0.05  → red,      filled circle   ('o'), thick line
+      p < 0.10  → gold,     filled diamond  ('D'), medium line
+      p ≥ 0.10  → grey,     hollow square   ('s'), thin line
     """
     line_colors, lws, facecolors, edgecolors, markers, annotations = (
         [],
@@ -150,7 +152,14 @@ def _sig_style(p_values):
         [],
     )
     for p in p_values:
-        if p < 0.05:
+        if p < 0.01:
+            line_colors.append(STRONG_COLOR)
+            lws.append(3.5)
+            facecolors.append(STRONG_COLOR)
+            edgecolors.append(STRONG_COLOR)
+            markers.append('*')
+            annotations.append('')
+        elif p < 0.05:
             line_colors.append(ACCENT_COLOR)
             lws.append(2.5)
             facecolors.append(ACCENT_COLOR)
@@ -311,12 +320,7 @@ def plot_forest(
             print(f'[WARN] No data for regression_type={regression_type}.')
             return []
 
-    _ = (
-        'standardized' in reg.columns
-        and reg['standardized'].drop_nulls().to_list()
-        and reg['standardized'].drop_nulls()[0]
-    )
-    x_label = r'$\beta$'
+    x_label = r'$\hat{\beta}$'
 
     saved = []
 
@@ -386,9 +390,17 @@ def plot_forest(
 
                     y_pos = np.arange(len(df_a))
                     p_vals = df_a['p_value'].values
-                    ci_lower = df_a['ci_lower'].values
-                    ci_upper = df_a['ci_upper'].values
-                    beta = df_a['beta'].values
+                    # Scale by pooled control SD so all metrics share the same axis.
+                    # Dividing by a constant per metric preserves p-values exactly.
+                    scale = (
+                        df_a['control_std'].values
+                        if 'control_std' in df_a.columns
+                        else np.ones(len(df_a))
+                    )
+                    scale = np.where(scale == 0, 1.0, scale)
+                    ci_lower = df_a['ci_lower'].values / scale
+                    ci_upper = df_a['ci_upper'].values / scale
+                    beta = df_a['beta'].values / scale
                     line_colors, lws, facecolors, edgecolors, mrks, annots = _sig_style(
                         p_vals
                     )
@@ -502,6 +514,17 @@ def plot_forest(
                     Line2D(
                         [0],
                         [0],
+                        marker='*',
+                        color=STRONG_COLOR,
+                        markerfacecolor=STRONG_COLOR,
+                        markeredgecolor=STRONG_COLOR,
+                        markersize=16,
+                        linewidth=3.5,
+                        label=r'$p < 0.01$',
+                    ),
+                    Line2D(
+                        [0],
+                        [0],
                         marker='o',
                         color=ACCENT_COLOR,
                         markerfacecolor=ACCENT_COLOR,
@@ -536,7 +559,7 @@ def plot_forest(
                 fig.legend(
                     handles=legend_elements,
                     loc='upper center',
-                    ncol=3,
+                    ncol=4,
                     frameon=False,
                     fontsize=24,
                     bbox_to_anchor=(0.5, 1.03),

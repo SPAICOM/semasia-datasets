@@ -31,7 +31,7 @@ metrics:
   # - top_eigenvalue_ratio
   - spectral_entropy
   - effective_rank
-  - participation_ratio
+  # - participation_ratio
 
 regression_types:
   - pooled

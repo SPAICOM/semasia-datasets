@@ -670,5 +670,145 @@ def _(dataset_ui, df_pc, orig_ds, pc_label_col, pc_widget, sel_ds_indices):
     return
 
 
+@app.cell
+def _(attr_ui, dataset_ui, df_pc, pc_label_col):
+    import importlib as _il
+
+    import src.visualizations.parallel_coordinates as _pc_mod
+
+    _il.reload(_pc_mod)
+
+    _class_names = get_class_names(dataset_ui.value, attr_ui.value)
+    _unique_labels = sorted(df_pc[pc_label_col].unique().to_list())
+    pc_lbl_names = {
+        lbl: _class_names[lbl] if lbl < len(_class_names) else str(lbl)
+        for lbl in _unique_labels
+    }
+
+    pc_class_select = mo.ui.multiselect(
+        options={name: lbl for lbl, name in pc_lbl_names.items()},
+        value=list(pc_lbl_names.values()),
+        label='Classes',
+    )
+    pc_fmt_ui = mo.ui.dropdown(
+        options=['pdf', 'png', 'svg'],
+        value='pdf',
+        label='Format',
+    )
+    mo.vstack(
+        [
+            mo.md('**Select classes:**'),
+            mo.hstack([pc_class_select, pc_fmt_ui], gap=2),
+        ]
+    )
+    return pc_class_select, pc_fmt_ui, pc_lbl_names
+
+
+@app.cell
+def _(
+    df_pc,
+    n_dims_ui,
+    pc_class_select,
+    pc_fmt_ui,
+    pc_label_col,
+    pc_lbl_names,
+    pc_method_ui,
+):
+    import importlib as _il_s
+    import io as _io_s
+
+    import matplotlib.pyplot as _plt_s
+
+    import src.visualizations.parallel_coordinates as _pc_mod_s
+
+    _il_s.reload(_pc_mod_s)
+
+    _fmt_mime = {'pdf': 'application/pdf', 'png': 'image/png', 'svg': 'image/svg+xml'}
+    _selected = pc_class_select.value if pc_class_select.value else None
+
+    _fig_s = _pc_mod_s.make_parallel_coordinates(
+        df_pc,
+        pc_method_ui.value,
+        n_dims_ui.value,
+        label_col=pc_label_col,
+        selected_labels=_selected,
+        label_names=pc_lbl_names,
+    )
+    _buf_s = _io_s.BytesIO()
+    _fig_s.savefig(_buf_s, format='png', bbox_inches='tight', dpi=100)
+    _buf_s.seek(0)
+    _plt_s.close(_fig_s)
+
+    _fname_s = f'parallel_coordinates_{pc_method_ui.value}_{n_dims_ui.value}d'
+
+    def _make_pdf_s():
+        import importlib as _il_p
+
+        import matplotlib.pyplot as _plt_p
+
+        import src.visualizations.parallel_coordinates as _m
+
+        _il_p.reload(_m)
+        _f = _m.make_parallel_coordinates(
+            df_pc,
+            pc_method_ui.value,
+            n_dims_ui.value,
+            label_col=pc_label_col,
+            selected_labels=pc_class_select.value if pc_class_select.value else None,
+            label_names=pc_lbl_names,
+        )
+        _d = _m.to_pdf(_f)
+        _plt_p.close(_f)
+        return _d
+
+    def _make_pc_s():
+        import importlib as _il_f
+        import io as _io_f
+
+        import matplotlib.pyplot as _plt_f
+
+        import src.visualizations.parallel_coordinates as _m2
+
+        _il_f.reload(_m2)
+        _f2 = _m2.make_parallel_coordinates(
+            df_pc,
+            pc_method_ui.value,
+            n_dims_ui.value,
+            label_col=pc_label_col,
+            selected_labels=pc_class_select.value if pc_class_select.value else None,
+            label_names=pc_lbl_names,
+        )
+        _buf2 = _io_f.BytesIO()
+        _f2.savefig(_buf2, format=pc_fmt_ui.value, bbox_inches='tight', dpi=150)
+        _buf2.seek(0)
+        _plt_f.close(_f2)
+        return _buf2.read()
+
+    mo.vstack(
+        [
+            mo.image(_buf_s.getvalue()),
+            mo.hstack(
+                [
+                    mo.download(
+                        data=_make_pdf_s,
+                        filename=f'{_fname_s}.pdf',
+                        mimetype='application/pdf',
+                        label='Save as PDF',
+                    ),
+                    mo.download(
+                        data=_make_pc_s,
+                        filename=f'{_fname_s}.{pc_fmt_ui.value}',
+                        mimetype=_fmt_mime[pc_fmt_ui.value],
+                        label='Save as…',
+                    ),
+                ],
+                align='center',
+                gap=1,
+            ),
+        ]
+    )
+    return
+
+
 if __name__ == '__main__':
     app.run()

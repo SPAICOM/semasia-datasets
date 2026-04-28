@@ -248,17 +248,11 @@ def _build_config_entry(model: str, present_splits: set[str]) -> dict:
     dict
         Config entry with config_name and data_files.
     """
-    data_files: list[dict[str, str]] = []
-    if 'train' in present_splits:
-        data_files.append({'split': 'train', 'path': f'train/{model}/*.parquet'})
-    if 'validation' in present_splits:
-        data_files.append(
-            {'split': 'validation', 'path': f'validation/{model}/*.parquet'}
-        )
-    if 'val' in present_splits:
-        data_files.append({'split': 'validation', 'path': f'val/{model}/*.parquet'})
-    if 'test' in present_splits:
-        data_files.append({'split': 'test', 'path': f'test/{model}/*.parquet'})
+    data_files = [
+        {'split': split, 'path': f'{split}/{model}/*.parquet'}
+        for split in ('train', 'validation', 'valid', 'val', 'test')
+        if split in present_splits
+    ]
 
     return {'config_name': model, 'data_files': data_files}
 

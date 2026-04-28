@@ -161,6 +161,14 @@ def main(cfg: DictConfig) -> None:
     )
 
     pairs_df = build_pairs(model_df)
+    # Attach architecture family from the registry using the control model.
+    pairs_df = pairs_df.join(
+        model_df.select(['model_name', 'family']).rename(
+            {'model_name': 'control_model'}
+        ),
+        on='control_model',
+        how='left',
+    )
     print(f'  Total pairs: {len(pairs_df)}')
     for at in pairs_df['analysis_type'].unique().to_list():
         count = len(pairs_df.filter(pl.col('analysis_type') == at))
@@ -220,6 +228,7 @@ def main(cfg: DictConfig) -> None:
             control_model = row['control_model']
             treatment_model = row['treatment_model']
             arch_key = row['arch_key']
+            arch_family = row.get('family') or arch_key
 
             if control_model not in available_ds_models:
                 missing_models.add(control_model)
@@ -231,8 +240,7 @@ def main(cfg: DictConfig) -> None:
             control_metrics = ds_metrics.filter(pl.col('model') == control_model)
             treatment_metrics = ds_metrics.filter(pl.col('model') == treatment_model)
 
-            stat_cases = ['raw', 'proto_no_prewhiten', 'proto_prewhiten']
-            for stat_case in stat_cases:
+            for stat_case in ['raw']:
                 control_case = control_metrics.filter(pl.col('stat_case') == stat_case)
                 treatment_case = treatment_metrics.filter(
                     pl.col('stat_case') == stat_case
@@ -262,6 +270,7 @@ def main(cfg: DictConfig) -> None:
                     {
                         'analysis_type': analysis_type,
                         'arch_key': arch_key,
+                        'arch_family': arch_family,
                         'dataset': ds,
                         'model_name': control_model,
                         'is_treatment': 0,
@@ -274,6 +283,7 @@ def main(cfg: DictConfig) -> None:
                     {
                         'analysis_type': analysis_type,
                         'arch_key': arch_key,
+                        'arch_family': arch_family,
                         'dataset': ds,
                         'model_name': treatment_model,
                         'is_treatment': 1,
@@ -294,6 +304,15 @@ def main(cfg: DictConfig) -> None:
         return
 
     df = pl.DataFrame(all_results)
+
+    null_counts = {c: df[c].null_count() for c in df.columns if df[c].null_count() > 0}
+    if null_counts:
+        print('\n[WARN] Null values found in combined DataFrame:')
+        for col, count in null_counts.items():
+            print(f'  {col}: {count} nulls ({100 * count / len(df):.1f}%)')
+    else:
+        print('\n[OK] No null values in combined DataFrame.')
+
     output_path = results_dir / 'combined.parquet'
     df.write_parquet(output_path)
     print(f'\n[Saved] {len(df)} results to {output_path}')
@@ -313,9 +332,10 @@ def main(cfg: DictConfig) -> None:
             ],
         )
         outcomes.extend(probing_outcomes)
-    stat_cases = cfg.get('stat_cases', None)
     regression_types = cfg.get('regression_types', ['pooled'])
-    run_stat_regression(df, results_dir, outcomes, stat_cases, regression_types)
+    run_stat_regression(df, results_dir, outcomes, ['raw'], regression_types)
+    write_latex_table(results_dir, outcomes)
+    write_obs_table(df, results_dir)
 
 
 def build_pairs(model_df: pl.DataFrame) -> pl.DataFrame:
@@ -323,9 +343,11 @@ def build_pairs(model_df: pl.DataFrame) -> pl.DataFrame:
 
     1. dataset_change: same (arch_key, aug), both no ft, different ds
        control = easier dataset, treatment = harder dataset
-    2. large_vs_finetuned: same (arch_key, pretrain_dataset, aug), with/without ft
+    2. large_vs_finetuned (Specialization): same (arch_key, pretrain_dataset,
+       aug), with/without ft
        control = finetuned to IN-1K, treatment = no finetuning
-    3. small_vs_finetuned: in1k no ft vs any large->ft to 1k, same (arch_key, aug)
+    3. small_vs_finetuned (Transfer Learning): in1k no ft vs any
+       large->ft to 1k, same (arch_key, aug)
        control = large->ft to IN-1K, treatment = IN-1K no ft
     4. augmentation: same (arch_key, pretrain_dataset, ft), with/without aug
        control = with augmentation, treatment = no augmentation
@@ -416,7 +438,8 @@ def build_pairs(model_df: pl.DataFrame) -> pl.DataFrame:
             ]
         )
 
-    # 3. SMALL_VS_FINETUNED: control=large->ft->1K, treatment=in1k no ft
+    # 3. TRANSFER LEARNING (small_vs_finetuned):
+    #    control=large->ft->1K, treatment=in1k no ft
     in1k_no_ft = imagenet_df.filter(
         (pl.col('pretrain_dataset') == 'ImageNet-1K') & pl.col('pretrain_ft').is_null()
     )
@@ -578,8 +601,6 @@ def run_stat_regression(
     outcomes: list,
     stat_cases: list | None = None,
     regression_types: list | None = None,
-    *,
-    standardize: bool = True,
 ) -> None:
     """Run regression on computed metrics for each analysis case.
 
@@ -595,9 +616,11 @@ def run_stat_regression(
         'within'   -> same regression per dataset slice
         'interaction' -> metric ~ is_treatment * C(dataset) + C(dataset) + C(arch_key)
         If None, defaults to ['pooled'].
-    standardize : if True, z-score each metric using control-group
-        mean/std within each stat_case x analysis_type slice before
-        fitting. Beta is then in units of control SDs.
+
+    Regressions are run on raw (unstandardized) metric values.  A pooled
+    control-group standard deviation is computed per metric and saved alongside
+    the coefficients so the plot can rescale β for cross-metric comparability
+    without altering p-values.
     """
     if stat_cases is None:
         stat_cases = metrics_df['stat_case'].unique().to_list()
@@ -605,8 +628,8 @@ def run_stat_regression(
         regression_types = ['pooled']
 
     FORMULA_SUFFIXES = {
-        'pooled': ' + C(dataset) + C(arch_key)',
-        'interaction': ' * C(dataset) + C(arch_key)',
+        'pooled': ' + C(dataset) + C(arch_family)',
+        'interaction': ' * C(dataset) + C(arch_family)',
     }
 
     for case in stat_cases:
@@ -618,11 +641,20 @@ def run_stat_regression(
             continue
 
         for outcome in outcomes:
+            if outcome not in df_case.columns:
+                continue
+
+            # Pooled control std across all analysis_types and datasets — single
+            # scale factor per metric used by the plot for cross-metric comparability.
+            pooled_control_std = float(
+                df_case.filter(pl.col('is_treatment') == 0)[outcome].drop_nulls().std()
+            )
+
             # Pooled and interaction use the full dataset
             for reg_type in regression_types:
                 if reg_type == 'within':
                     continue
-                suffix = FORMULA_SUFFIXES.get(reg_type, ' + C(arch_key)')
+                suffix = FORMULA_SUFFIXES.get(reg_type, ' + C(arch_family)')
                 _run_stat_for_outcome(
                     df_case,
                     outcome,
@@ -630,7 +662,7 @@ def run_stat_regression(
                     case,
                     reg_type,
                     suffix,
-                    standardize=standardize,
+                    pooled_control_std=pooled_control_std,
                 )
 
             # Within-dataset: run separately per dataset
@@ -643,41 +675,12 @@ def run_stat_regression(
                         results_dir,
                         case,
                         'within',
-                        ' + C(arch_key)',
-                        standardize=standardize,
+                        ' + C(arch_family)',
+                        pooled_control_std=pooled_control_std,
                         dataset=ds,
                     )
 
     print(f'\n[COMPLETE] Regression results saved to {results_dir}')
-
-
-def _standardize_metric(
-    df: pl.DataFrame,
-    metric: str,
-) -> pl.DataFrame:
-    """Z-score *metric* using control-group stats.
-
-    Uses control-group stats per dataset × stat_case × analysis_type.
-    Returns the DataFrame with an added ``{metric}_std`` column plus
-    ``{metric}_control_mean`` and ``{metric}_control_std``.
-    """
-    control_stats = (
-        df.filter(pl.col('is_treatment') == 0)
-        .group_by(['dataset', 'stat_case', 'analysis_type'])
-        .agg(
-            pl.col(metric).mean().alias(f'{metric}_control_mean'),
-            pl.col(metric).std().alias(f'{metric}_control_std'),
-        )
-    )
-
-    return df.join(
-        control_stats, on=['dataset', 'stat_case', 'analysis_type'], how='left'
-    ).with_columns(
-        (
-            (pl.col(metric) - pl.col(f'{metric}_control_mean'))
-            / pl.col(f'{metric}_control_std')
-        ).alias(f'{metric}_std')
-    )
 
 
 def _run_stat_for_outcome(
@@ -688,10 +691,10 @@ def _run_stat_for_outcome(
     reg_type: str,
     formula_suffix: str,
     *,
-    standardize: bool = True,
+    pooled_control_std: float,
     dataset: str | None = None,
 ) -> None:
-    """Run regression for a specific outcome variable.
+    """Run regression for a specific outcome variable on raw (unstandardized) values.
 
     Parameters
     ----------
@@ -701,15 +704,11 @@ def _run_stat_for_outcome(
     stat_case : stat_case label for output filename
     reg_type : one of 'pooled', 'within', 'interaction'
     formula_suffix : RHS terms appended after 'is_treatment'
-    standardize : z-score before fitting
+    pooled_control_std : pooled control-group SD of this metric (across all
+        analysis_types and datasets). Saved in results so the plot can rescale
+        β for cross-metric comparability without changing p-values.
     dataset : for 'within' mode, the dataset name (used in filename)
     """
-    if standardize:
-        metrics_df = _standardize_metric(metrics_df, outcome)
-        reg_col = f'{outcome}_std'
-    else:
-        reg_col = outcome
-
     results = []
     analysis_types = metrics_df['analysis_type'].unique().to_list()
 
@@ -718,10 +717,12 @@ def _run_stat_for_outcome(
         if len(subset_pl) < 2:
             continue
 
-        subset = subset_pl.to_pandas()
+        subset = subset_pl.drop_nulls(subset=[outcome]).to_pandas()
+        if len(subset) < 2:
+            continue
 
         try:
-            formula = f'{reg_col} ~ is_treatment{formula_suffix}'
+            formula = f'{outcome} ~ is_treatment{formula_suffix}'
             m = smf.ols(formula, data=subset).fit(cov_type='HC3')
 
             for term in [
@@ -756,15 +757,9 @@ def _run_stat_for_outcome(
                 'r_squared': m.rsquared,
                 'n_obs': int(m.nobs),
                 'df_resid': m.df_resid,
-                'standardized': standardize,
+                'control_std': pooled_control_std,
                 'term': interaction_label,
             }
-
-            if standardize:
-                ctrl_mean_col = f'{outcome}_control_mean'
-                ctrl_std_col = f'{outcome}_control_std'
-                row['control_mean'] = subset[ctrl_mean_col].iloc[0]
-                row['control_std'] = subset[ctrl_std_col].iloc[0]
 
             if reg_type == 'within' and dataset is not None:
                 row['dataset'] = dataset
@@ -784,6 +779,264 @@ def _run_stat_for_outcome(
         output_path = results_dir / f'stat__{outcome}__{stat_case}{tag}.parquet'
         df_out.write_parquet(output_path)
         print(f'  Saved: {output_path.name}')
+
+
+def _stars(p: float) -> str:
+    if p < 0.01:
+        return r'^{***}'
+    if p < 0.05:
+        return r'^{**}'
+    if p < 0.10:
+        return r'^{*}'
+    return ''
+
+
+def write_latex_table(
+    results_dir: Path,
+    outcomes: list[str],
+    regression_type: str = 'pooled',
+) -> None:
+    """Write a single LaTeX table of unstandardized regression coefficients.
+
+    Runs fresh OLS regressions (without z-scoring) on combined.parquet so
+    that β is in the original metric units.  One row per metric; each cell
+    shows β with significance stars and the p-value in parentheses in a
+    smaller font on the same line.  The table is wrapped in \\resizebox so
+    it always fits the text width.
+    """
+    from src.visualizations.statistical import (
+        ANALYSIS_LABELS,
+        ANALYSIS_ORDER,
+        METRIC_GROUPS,
+        METRIC_LABELS,
+    )
+
+    combined_path = results_dir / 'combined.parquet'
+    if not combined_path.exists():
+        print('[WARN] combined.parquet not found; skipping LaTeX table.')
+        return
+
+    df_all = pl.read_parquet(combined_path)
+
+    FORMULA_SUFFIX = ' + C(dataset) + C(arch_family)'
+
+    import numpy as np
+
+    lookup: dict[tuple[str, str, str], tuple[float, float]] = {}
+    # F-test lookup: (analysis_type, ctrl_var) -> (F_stat, p_value)
+    # Uses the first available outcome as representative.
+    f_lookup: dict[tuple[str, str], tuple[float, float]] = {}
+
+    for stat_case in ['raw']:
+        df_case = df_all.filter(pl.col('stat_case') == stat_case)
+        if df_case.is_empty():
+            continue
+
+        first_outcome = next((o for o in outcomes if o in df_case.columns), None)
+
+        for outcome in outcomes:
+            if outcome not in df_case.columns:
+                continue
+            for analysis_type in ANALYSIS_ORDER:
+                subset = (
+                    df_case.filter(pl.col('analysis_type') == analysis_type)
+                    .drop_nulls(subset=[outcome])
+                    .to_pandas()
+                )
+                if len(subset) < 2:
+                    continue
+                try:
+                    m = smf.ols(
+                        f'{outcome} ~ is_treatment{FORMULA_SUFFIX}', data=subset
+                    ).fit(cov_type='HC3')
+                    if 'is_treatment' in m.params.index:
+                        lookup[(stat_case, analysis_type, outcome)] = (
+                            float(m.params['is_treatment']),
+                            float(m.pvalues['is_treatment']),
+                        )
+                    # Compute control F-tests once, using the first outcome
+                    if outcome == first_outcome:
+                        idx = list(m.params.index)
+                        for ctrl_label, ctrl_prefix in [
+                            ('dataset', 'C(dataset)'),
+                            ('arch_family', 'C(arch_family)'),
+                        ]:
+                            ctrl_pos = [
+                                i
+                                for i, t in enumerate(idx)
+                                if t.startswith(ctrl_prefix)
+                            ]
+                            if not ctrl_pos:
+                                continue
+                            R = np.zeros((len(ctrl_pos), len(idx)))
+                            for row_i, col_j in enumerate(ctrl_pos):
+                                R[row_i, col_j] = 1.0
+                            f_res = m.f_test(R)
+                            f_val = float(np.squeeze(f_res.fvalue))
+                            f_p = float(f_res.pvalue)
+                            f_lookup[(analysis_type, ctrl_label)] = (f_val, f_p)
+                except Exception:
+                    pass
+
+    if not lookup:
+        print('[WARN] No regression results for LaTeX table.')
+        return
+
+    present_analyses = [a for a in ANALYSIS_ORDER if any(k[1] == a for k in lookup)]
+    present_metrics = {k[2] for k in lookup}
+
+    n_cols = len(present_analyses)
+    n_total = n_cols + 1
+    col_spec = 'l' + 'r' * n_cols
+    col_headers = ' & '.join(ANALYSIS_LABELS.get(a, a) for a in present_analyses)
+
+    lines: list[str] = [
+        r'\begin{table}[htbp]',
+        r'\centering',
+        r'\caption{Pooled OLS regression coefficients $\beta$ '
+        r'(HC3 robust standard errors) for fifteen embedding geometry '
+        r'and linear probing metrics across five pretraining conditions. '
+        r'Each $\beta$ is the estimated treatment effect in original '
+        r'metric units, from \textit{metric} $\sim$ '
+        r'\textit{is\_treatment} $+$ \texttt{C(dataset)} $+$ '
+        r'\texttt{C(arch\_family)}. '
+        r'Metrics are grouped by category; '
+        r'conditions are defined in Table~\ref{tab:conditions}. '
+        r'P-values in parentheses.}',
+        r'\label{tab:regression_results}',
+        r'\resizebox{\linewidth}{!}{%',
+        r'\begin{tabular}{' + col_spec + r'}',
+        r'\toprule',
+        f' & {col_headers} \\\\',
+        r'\midrule',
+    ]
+
+    for group_name, group_metrics in METRIC_GROUPS.items():
+        group_outcomes = [
+            m for m in group_metrics if m in outcomes and m in present_metrics
+        ]
+        if not group_outcomes:
+            continue
+
+        lines.append(
+            r'\multicolumn{' + str(n_total) + r'}{l}{\textit{' + group_name + r'}} \\'
+        )
+
+        for metric in group_outcomes:
+            metric_label = METRIC_LABELS.get(metric, metric)
+            cells: list[str] = []
+            for analysis in present_analyses:
+                entry = lookup.get(('raw', analysis, metric))
+                if entry is not None:
+                    beta, p = entry
+                    cells.append(
+                        f'${{\\textstyle {beta:.3f}{_stars(p)}}}$ '
+                        f'{{\\scriptsize $({p:.3f})$}}'
+                    )
+                else:
+                    cells.append('---')
+
+            lines.append(f'{metric_label} & {" & ".join(cells)} \\\\')
+
+        lines.append(r'\addlinespace[2pt]')
+
+    # Control variable joint F-test rows
+    lines.append(r'\midrule')
+    lines.append(
+        r'\multicolumn{' + str(n_total) + r'}{l}{\textit{Controls (joint $F$-test)}} \\'
+    )
+    for ctrl_label, ctrl_display in [
+        ('dataset', 'Dataset FE'),
+        ('arch_family', 'Arch.\ Family FE'),
+    ]:
+        cells: list[str] = []
+        for analysis in present_analyses:
+            entry = f_lookup.get((analysis, ctrl_label))
+            if entry is not None:
+                f_val, f_p = entry
+                cells.append(
+                    f'$F={f_val:.2f}{_stars(f_p)}$ {{\\scriptsize $({f_p:.3f})$}}'
+                )
+            else:
+                cells.append('---')
+        lines.append(f'{ctrl_display} & {" & ".join(cells)} \\\\')
+
+    lines += [
+        r'\bottomrule',
+        r'\multicolumn{'
+        + str(n_total)
+        + r'}{l}{\footnotesize $^{***}p<0.01$; $^{**}p<0.05$; $^{*}p<0.10$} \\',
+        r'\end{tabular}',
+        r'}',  # close \resizebox
+        r'\end{table}',
+    ]
+
+    output_path = results_dir / f'latex_table___{regression_type}.tex'
+    output_path.write_text('\n'.join(lines))
+    print(f'\n[Saved] LaTeX table to {output_path}')
+
+
+def write_obs_table(
+    df: pl.DataFrame,
+    results_dir: Path,
+) -> None:
+    """Write a LaTeX table with the number of
+    observations per analysis type and dataset."""
+    from src.visualizations.statistical import (
+        ANALYSIS_LABELS,
+        ANALYSIS_ORDER,
+        DATASET_LABELS,
+    )
+
+    datasets = sorted(df['dataset'].unique().to_list())
+    present_analyses = [
+        a for a in ANALYSIS_ORDER if a in df['analysis_type'].unique().to_list()
+    ]
+
+    # Count pairs (divide by 2 since each pair has a control and treatment row)
+    counts = (
+        df.group_by(['analysis_type', 'dataset'])
+        .agg((pl.len() // 2).alias('n_pairs'))
+        .sort(['analysis_type', 'dataset'])
+    )
+
+    # Build lookup: (analysis_type, dataset) -> n_pairs
+    lookup = {
+        (row['analysis_type'], row['dataset']): row['n_pairs']
+        for row in counts.iter_rows(named=True)
+    }
+
+    ds_headers = ' & '.join(DATASET_LABELS.get(d, d) for d in datasets)
+    col_spec = 'l' + 'r' * (len(datasets) + 1)
+
+    lines: list[str] = [
+        r'\begin{table}[htbp]',
+        r'\centering',
+        r'\caption{Number of matched pairs per pretraining '
+        r'condition and evaluation dataset.}',
+        r'\label{tab:obs_counts}',
+        r'\begin{tabular}{' + col_spec + r'}',
+        r'\toprule',
+        f'Condition & {ds_headers} & Total \\\\',
+        r'\midrule',
+    ]
+
+    for analysis in present_analyses:
+        label = ANALYSIS_LABELS.get(analysis, analysis)
+        row_counts = [lookup.get((analysis, d), 0) for d in datasets]
+        total = sum(row_counts)
+        cells = ' & '.join(str(c) for c in row_counts)
+        lines.append(f'{label} & {cells} & {total} \\\\')
+
+    lines += [
+        r'\bottomrule',
+        r'\end{tabular}',
+        r'\end{table}',
+    ]
+
+    output_path = results_dir / 'obs_table.tex'
+    output_path.write_text('\n'.join(lines))
+    print(f'\n[Saved] Observations table to {output_path}')
 
 
 if __name__ == '__main__':
