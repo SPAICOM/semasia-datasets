@@ -534,6 +534,14 @@ def _(X2d, attr_ui, chart, dataset_ui, idx, orig_ds, trace_to_global, y):
     _fig.savefig(_buf, format='png', bbox_inches='tight', dpi=150)
     _buf.seek(0)
     plt.close(_fig)
+    _png_bytes = _buf.getvalue()
+
+    def _make_pdf():
+        _f = show_images(_pil_images, _titles)
+        _b = io.BytesIO()
+        _f.savefig(_b, format='pdf', bbox_inches='tight')
+        plt.close(_f)
+        return _b.read()
 
     # ── render ────────────────────────────────────────────────────────────────
     _df = pl.DataFrame(_rows)
@@ -543,7 +551,24 @@ def _(X2d, attr_ui, chart, dataset_ui, idx, orig_ds, trace_to_global, y):
                 f"**Here's a preview of the images you've selected** "
                 f'({len(_rows)} total):'
             ),
-            mo.image(_buf.getvalue()),
+            mo.image(_png_bytes),
+            mo.hstack(
+                [
+                    mo.download(
+                        data=_make_pdf,
+                        filename='selected_images.pdf',
+                        mimetype='application/pdf',
+                        label='Save as PDF',
+                    ),
+                    mo.download(
+                        data=_png_bytes,
+                        filename='selected_images.png',
+                        mimetype='image/png',
+                        label='Save as PNG',
+                    ),
+                ],
+                gap=1,
+            ),
             mo.ui.table(_df, selection=None),
         ]
     )
@@ -657,6 +682,14 @@ def _(dataset_ui, df_pc, orig_ds, pc_label_col, pc_widget, sel_ds_indices):
     _fig.savefig(_buf, format='png', bbox_inches='tight', dpi=150)
     _buf.seek(0)
     plt.close(_fig)
+    _png_bytes = _buf.getvalue()
+
+    def _make_pdf():
+        _f = show_images(_pil_images, _titles)
+        _b = io.BytesIO()
+        _f.savefig(_b, format='pdf', bbox_inches='tight')
+        plt.close(_f)
+        return _b.read()
 
     mo.vstack(
         [
@@ -664,7 +697,24 @@ def _(dataset_ui, df_pc, orig_ds, pc_label_col, pc_widget, sel_ds_indices):
                 f'**{len(_filtered)} / {len(sel_ds_indices)} selected** — '
                 f'showing first {len(_sample)}:'
             ),
-            mo.image(_buf.getvalue()),
+            mo.image(_png_bytes),
+            mo.hstack(
+                [
+                    mo.download(
+                        data=_make_pdf,
+                        filename='selected_images.pdf',
+                        mimetype='application/pdf',
+                        label='Save as PDF',
+                    ),
+                    mo.download(
+                        data=_png_bytes,
+                        filename='selected_images.png',
+                        mimetype='image/png',
+                        label='Save as PNG',
+                    ),
+                ],
+                gap=1,
+            ),
         ]
     )
     return
@@ -695,18 +745,36 @@ def _(attr_ui, dataset_ui, df_pc, pc_label_col):
         value='pdf',
         label='Format',
     )
+    hide_deselected_ui = mo.ui.switch(value=True, label='Hide deselected')
+    gray_deselected_ui = mo.ui.switch(value=True, label='Gray deselected')
     mo.vstack(
         [
             mo.md('**Select classes:**'),
-            mo.hstack([pc_class_select, pc_fmt_ui], gap=2),
+            mo.hstack(
+                [
+                    pc_class_select,
+                    pc_fmt_ui,
+                    hide_deselected_ui,
+                    gray_deselected_ui,
+                ],
+                gap=2,
+            ),
         ]
     )
-    return pc_class_select, pc_fmt_ui, pc_lbl_names
+    return (
+        gray_deselected_ui,
+        hide_deselected_ui,
+        pc_class_select,
+        pc_fmt_ui,
+        pc_lbl_names,
+    )
 
 
 @app.cell
 def _(
     df_pc,
+    gray_deselected_ui,
+    hide_deselected_ui,
     n_dims_ui,
     pc_class_select,
     pc_fmt_ui,
@@ -723,8 +791,14 @@ def _(
 
     _il_s.reload(_pc_mod_s)
 
-    _fmt_mime = {'pdf': 'application/pdf', 'png': 'image/png', 'svg': 'image/svg+xml'}
+    _fmt_mime = {
+        'pdf': 'application/pdf',
+        'png': 'image/png',
+        'svg': 'image/svg+xml',
+    }
     _selected = pc_class_select.value if pc_class_select.value else None
+    _hide = hide_deselected_ui.value
+    _gray = gray_deselected_ui.value
 
     _fig_s = _pc_mod_s.make_parallel_coordinates(
         df_pc,
@@ -733,6 +807,8 @@ def _(
         label_col=pc_label_col,
         selected_labels=_selected,
         label_names=pc_lbl_names,
+        hide_deselected=_hide,
+        gray_deselected=_gray,
     )
     _buf_s = _io_s.BytesIO()
     _fig_s.savefig(_buf_s, format='png', bbox_inches='tight', dpi=100)
@@ -756,6 +832,8 @@ def _(
             label_col=pc_label_col,
             selected_labels=pc_class_select.value if pc_class_select.value else None,
             label_names=pc_lbl_names,
+            hide_deselected=hide_deselected_ui.value,
+            gray_deselected=gray_deselected_ui.value,
         )
         _d = _m.to_pdf(_f)
         _plt_p.close(_f)
@@ -777,6 +855,8 @@ def _(
             label_col=pc_label_col,
             selected_labels=pc_class_select.value if pc_class_select.value else None,
             label_names=pc_lbl_names,
+            hide_deselected=hide_deselected_ui.value,
+            gray_deselected=gray_deselected_ui.value,
         )
         _buf2 = _io_f.BytesIO()
         _f2.savefig(_buf2, format=pc_fmt_ui.value, bbox_inches='tight', dpi=150)
