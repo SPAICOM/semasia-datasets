@@ -13,6 +13,8 @@ def make_parallel_coordinates(
     label_col='dataset',
     selected_labels=None,
     label_names=None,
+    hide_deselected=True,
+    gray_deselected=True,
 ):
     df = df.to_pandas()
     pc_cols = [f'PC{i}' for i in range(n_dims, 0, -1)]
@@ -76,16 +78,18 @@ def make_parallel_coordinates(
 
     for idx in range(len(df)):
         lbl = df[label_col].iloc[idx]
-        if lbl not in draw_set:
+        is_selected = lbl in draw_set
+        if not is_selected and hide_deselected:
             continue
         ys = [lbl_ypos[lbl]] + [norms[col]['norm'].iloc[idx] for col in pc_cols]
         xs = [lx] + list(range(n))
         px, py = bezier_path(xs, ys)
-        ax.plot(px, py, c=label_color[lbl], lw=0.7, alpha=0.1)
+        _c = label_color[lbl] if (is_selected or not gray_deselected) else '#888888'
+        ax.plot(px, py, c=_c, lw=1.2, alpha=0.15 if is_selected else 0.01)
 
     # label axis — always shows all labels, dims non-selected ones
     ax.plot([lx, lx], [0.0, 1.0], color='#999', lw=0.8, ls='--')
-    ax.text(lx, 1.09, 'Label', ha='center', va='bottom', fontsize=8, color='#666')
+    ax.text(lx, 1.09, 'Label', ha='center', va='bottom', fontsize=12, color='#666')
     for lbl in all_labels:
         yp = lbl_ypos[lbl]
         c = label_color[lbl]
@@ -98,7 +102,7 @@ def make_parallel_coordinates(
             name,
             ha='right',
             va='center',
-            fontsize=8,
+            fontsize=12,
             color=c,
             fontweight='bold',
             alpha=1.0 if is_active else 0.25,
@@ -108,11 +112,11 @@ def make_parallel_coordinates(
         mn = norms[col]['min']
         mx = norms[col]['max']
         ax.plot([i, i], [0.0, 1.0], 'k-', lw=1.0)
-        ax.text(i, 1.09, col, ha='center', va='bottom', fontsize=9)
+        ax.text(i, 1.09, col, ha='center', va='bottom', fontsize=13)
         for tick in np.linspace(0, 1, 5):
             val = mn + tick * (mx - mn)
             ax.plot([i - 0.04, i + 0.04], [tick, tick], 'k-', lw=0.7)
-            ax.text(i - 0.07, tick, f'{val:.2f}', ha='right', va='center', fontsize=6.5)
+            ax.text(i - 0.07, tick, f'{val:.2f}', ha='right', va='center', fontsize=9)
 
     return fig
 
