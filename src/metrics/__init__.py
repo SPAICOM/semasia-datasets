@@ -1,5 +1,22 @@
 """Metrics for latent space analysis."""
 
+from src.metrics.graph import (
+    compute_graph_metrics,
+    cycle_length,
+    degree_distribution,
+    density,
+    disorder_number,
+    eigengap,
+    girth,
+    graph_diameter,
+    gutman_index,
+    mean_square_clustering,
+    number_of_connected_components,
+    number_of_cycles,
+    schultz_index,
+    square_clustering_coefficients,
+    wiener_index,
+)
 from src.metrics.alignment import (
     align_prototypes,
     chamfer_distance,
@@ -33,6 +50,21 @@ from src.metrics.prototypes import (
 )
 
 __all__ = [
+    'compute_graph_metrics',
+    'cycle_length',
+    'degree_distribution',
+    'density',
+    'disorder_number',
+    'eigengap',
+    'girth',
+    'graph_diameter',
+    'gutman_index',
+    'mean_square_clustering',
+    'number_of_connected_components',
+    'number_of_cycles',
+    'schultz_index',
+    'square_clustering_coefficients',
+    'wiener_index',
     'align_prototypes',
     'chamfer_distance',
     'compute_jaccard_metrics',

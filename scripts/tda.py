@@ -10,58 +10,12 @@ import numpy as np
 import polars as pl
 from omegaconf import DictConfig
 
+from src.plotting.tda import plot_persistence_diagram, plot_persistence_images
+
 logging.getLogger('httpx').setLevel(logging.WARNING)
 
 RESULTS_DIR = Path('results/tda_signatures')
 OUTPUT_DIR = Path('results/tda_plots')
-
-_DIM_COLORS = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple']
-
-
-def _plot_diagram(ax: plt.Axes, pts: np.ndarray, title: str = '') -> None:
-    """Scatter-plot a persistence diagram on *ax*."""
-    if pts.size == 0:
-        ax.text(
-            0.5, 0.5, 'empty diagram', ha='center', va='center', transform=ax.transAxes
-        )
-        return
-
-    dims = sorted({int(d) for d in pts[:, 2]})
-    all_finite = pts[np.isfinite(pts[:, 1])]
-
-    for dim in dims:
-        finite_mask = (pts[:, 2] == dim) & np.isfinite(pts[:, 1])
-        if finite_mask.any():
-            ax.scatter(
-                pts[finite_mask, 0],
-                pts[finite_mask, 1],
-                s=8,
-                alpha=0.6,
-                color=_DIM_COLORS[dim % len(_DIM_COLORS)],
-                label=f'H{dim}',
-            )
-
-    if len(all_finite):
-        lo = min(all_finite[:, 0].min(), all_finite[:, 1].min())
-        hi = max(all_finite[:, 0].max(), all_finite[:, 1].max())
-        ax.plot([lo, hi], [lo, hi], 'k--', lw=0.8, alpha=0.4)
-
-    ax.set_xlabel('Birth')
-    ax.set_ylabel('Death')
-    ax.legend(loc='lower right', markerscale=2, fontsize=7)
-    ax.set_title(title, fontsize=9)
-
-
-def _plot_images(axes: list, images_nested: list, max_dim: int) -> None:
-    """Plot one persistence image per homological dimension."""
-    for dim in range(max_dim + 1):
-        ax = axes[dim]
-        img = np.array(images_nested[dim])  # (n_bins, n_bins)
-        im = ax.imshow(img.T, origin='lower', aspect='auto', cmap='viridis')
-        plt.colorbar(im, ax=ax, shrink=0.85, pad=0.02)
-        ax.set_xlabel('Birth axis')
-        ax.set_ylabel('Persistence axis')
-        ax.set_title(f'H{dim}', fontsize=9)
 
 
 @hydra.main(
@@ -104,7 +58,7 @@ def main(cfg: DictConfig) -> None:
 
         # --- persistence diagram ---
         fig_diag, ax_diag = plt.subplots(figsize=(6, 6))
-        _plot_diagram(
+        plot_persistence_diagram(
             ax_diag,
             pts,
             title=f'{model_name} | {cfg.dataset} | {split}',
@@ -122,7 +76,7 @@ def main(cfg: DictConfig) -> None:
             f'Persistence Images – {model_name} | {cfg.dataset} | {split}',
             fontsize=10,
         )
-        _plot_images(axes_list, images_nested, max_dim)
+        plot_persistence_images(axes_list, images_nested, max_dim)
         fig_img.tight_layout()
         img_path = out_dir / f'{split}__persistence_image.png'
         fig_img.savefig(img_path, dpi=150)

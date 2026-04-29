@@ -1,10 +1,12 @@
 defaults:
     - _self_
+    - dataset: cifar10
 
 repo_id: "spaicom-lab"
 prefix: "semantic-"
-dataset: cifar10
-model: mobilenet # set to a specific model name to filter, or leave null to plot all
+model: null # set to a specific model name to filter, or leave null to plot all
+splits: [train]
+seed: 42
 
 tda:
     # Maximum homological dimension (inclusive): 0, 1, …, max_dim are computed
@@ -18,8 +20,6 @@ tda:
     sigma: 0.1
     # ripser metric passed to ripser.ripser() — e.g. euclidean, cosine
     metric: euclidean
-    # Random seed for the landmark subsample and stochastic dim-reduction methods
-    seed: 42
 
 
 # --- Preprocessing flags ---------------------------------------------------
@@ -46,6 +46,7 @@ preprocess:
     dim_reduction_components: 20
 
     # Landmark subsample size
+    max_latent: 1000
     max_points: 1000
 
     # --- Prototype-based subsampling -------------------------------------------
@@ -54,7 +55,7 @@ preprocess:
     prototypes:
         enable: true
         # Number of samples per cluster to compute prototype
-        n_samples: 10
+        n_samples: null
         # Clustering class (e.g., KMeans, DBSCAN, AgglomerativeClustering)
         clusterer_cls: KMeans
         # Additional kwargs passed to the clusterer (e.g., eps for DBSCAN)
@@ -70,7 +71,6 @@ comparison:
     # Set to null to compute all C(n, 2) pairs.
     max_pairs: 23
     # Random seed for pair sampling (ignored when max_pairs is null).
-    seed: 42
     # Extra kwargs forwarded to the distance function:
     #   wasserstein: p (int, default 2)
     #   betti_curve: norm ('l1' | 'l2' | 'linf', default 'l2')

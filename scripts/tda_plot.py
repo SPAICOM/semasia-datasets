@@ -24,15 +24,20 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import hydra
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
-import numpy as np
 import polars as pl
-from matplotlib.collections import LineCollection
-from matplotlib.colors import Normalize
 from omegaconf import DictConfig
-from sklearn.manifold import MDS
+
+from src.plotting.tda import (
+    DEFAULT_NODE_COLOR,
+    FAMILY_PALETTE,
+    UNKNOWN_COLOR,
+    compute_layout,
+    plot_tda_distance_graph,
+)
 
 REGISTRY_URL = 'hf://datasets/spaicom-lab/model-registry/**/*.parquet'
 
+<<<<<<< HEAD
 FAMILY_PALETTE = [
     '#1f77b4',
     '#ff7f0e',
@@ -124,6 +129,8 @@ def compute_layout(
         print(f'[WARN] Unknown layout {name!r}, falling back to mds')
         return _mds_layout(models, df, seed)
 
+=======
+>>>>>>> engrima
 
 # ---------------------------------------------------------------------------
 # Main
@@ -229,34 +236,28 @@ def main(cfg: DictConfig) -> None:
     # Draw
     # ------------------------------------------------------------------
     dpi = 150
-    fig_w = cfg.fig_height / dpi * (16 / 9)  # widescreen aspect
+    fig_w = cfg.fig_height / dpi * (16 / 9)
     fig_h = cfg.fig_height / dpi
     fig, ax = plt.subplots(figsize=(fig_w, fig_h), dpi=dpi)
-    ax.set_aspect('equal')
-    ax.axis('off')
 
-    distances = df_edges['distance'].to_numpy()
-    d_min, d_max = float(distances.min()), float(distances.max())
-    norm = Normalize(vmin=d_min, vmax=d_max)
-    cmap = plt.get_cmap('coolwarm')  # blue (low) → red (high)
-
-    # Build LineCollection — much faster than drawing one segment at a time
-    segments = []
-    edge_values = []
-    for row in df_edges.iter_rows(named=True):
-        x0, y0 = pos[row['model_a']]
-        x1, y1 = pos[row['model_b']]
-        segments.append([(x0, y0), (x1, y1)])
-        edge_values.append(row['distance'])
-
-    lc = LineCollection(
-        segments,
-        cmap=cmap,
-        norm=norm,
-        linewidths=cfg.edge_width,
-        alpha=0.7,
-        zorder=1,
+    plot_tda_distance_graph(
+        fig=fig,
+        ax=ax,
+        df_edges=df_edges,
+        pos=pos,
+        models=edge_models,
+        node_colors=node_colors,
+        edge_width=cfg.edge_width,
+        node_size=cfg.node_size,
+        node_label=cfg.get('node_label', 'short'),
+        family_handles=family_handles if family_handles else None,
+        distance_label=f'{cfg.distance_metric} distance',
+        title=(
+            f'TDA Model Distance Graph  ·  {cfg.dataset} / {cfg.split}  ·  '
+            f'{cfg.distance_metric}  ·  top {len(df_edges)} edges'
+        ),
     )
+<<<<<<< HEAD
     lc.set_array(np.array(edge_values))
     ax.add_collection(lc)
 
@@ -312,6 +313,8 @@ def main(cfg: DictConfig) -> None:
         pad=10,
     )
     ax.autoscale()
+=======
+>>>>>>> engrima
     fig.tight_layout()
 
     # ------------------------------------------------------------------
