@@ -841,6 +841,7 @@ class LatentSpace:
         apply_parseval: bool = True,
         return_cluster_indices: bool = False,
         prewhiten: bool = False,
+        strategy: AnchorStrategy = 'prototype',
     ) -> np.ndarray | tuple[np.ndarray, dict[int, np.ndarray]]:
         """Compute cluster prototypes with optional Parseval frame.
 
@@ -894,7 +895,7 @@ class LatentSpace:
             whitened = self.prewhiten()
             latent_for_clustering = whitened
 
-        anchor = Anchor(latent_for_clustering, strategy='prototype', seed=self._seed)
+        anchor = Anchor(latent_for_clustering, strategy=strategy, seed=self._seed)
         anchor.fit(
             n_anchors=n_clusters,
             n_samples=n_samples,

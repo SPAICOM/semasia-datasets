@@ -11,7 +11,7 @@ from sklearn.cluster import KMeans
 if TYPE_CHECKING:
     from sklearn.base import ClusterMixin
 
-AnchorStrategy = Literal['prototype']
+AnchorStrategy = Literal['prototype', 'random']
 
 
 class Anchor:
@@ -100,10 +100,15 @@ class Anchor:
                     clusterer_kwargs=clusterer_kwargs,
                     centroid_data=centroid_data,
                 )
+            case 'random':
+                self._fit_random(
+                    n_anchors=n_anchors,
+                    centroid_data=centroid_data,
+                )
             case _:
                 raise ValueError(
                     f'Unknown anchor strategy {self._strategy!r}. '
-                    "Currently supported: 'prototype'."
+                    "Supported: 'prototype', 'random'."
                 )
         return self
 
@@ -193,22 +198,39 @@ class Anchor:
             mask = cluster_labels == c
             in_cluster = data_for_centroids[mask]
 
-            if n_samples is not None and in_cluster.shape[0] < n_samples:
-                raise ValueError(
-                    f'Cluster {c} has {in_cluster.shape[0]} samples, '
-                    f'but n_samples={n_samples}.'
-                )
+            n_use = min(n_samples, in_cluster.shape[0]) if n_samples is not None else None
 
-            if n_samples is None:
+            if n_use is None:
                 anchors[i] = in_cluster.mean(axis=0)
             else:
                 rng = np.random.default_rng(self._seed + i)
-                idx = rng.choice(in_cluster.shape[0], size=n_samples, replace=False)
+                idx = rng.choice(in_cluster.shape[0], size=n_use, replace=False)
                 anchors[i] = in_cluster[idx].mean(axis=0)
 
             self._cluster_indices[i] = np.where(mask)[0]
 
         self._anchors = anchors
+
+    def _fit_random(
+        self,
+        n_anchors: int | None,
+        centroid_data: np.ndarray | None,
+    ) -> None:
+        if n_anchors is None:
+            raise ValueError("'random' strategy requires n_anchors.")
+        n = self._point_cloud.shape[0]
+        if n_anchors > n:
+            raise ValueError(f'n_anchors ({n_anchors}) exceeds n_points ({n}).')
+        rng = np.random.default_rng(self._seed)
+        idx = rng.choice(n, size=n_anchors, replace=False)
+        data = centroid_data if centroid_data is not None else self._point_cloud
+        self._anchors = data[idx].astype(np.float32)
+        # Voronoi partition: assign each point to its nearest anchor
+        from scipy.spatial.distance import cdist
+        dists = cdist(self._point_cloud, self._anchors, metric='euclidean')
+        labels = dists.argmin(axis=1)
+        for i in range(n_anchors):
+            self._cluster_indices[i] = np.where(labels == i)[0]
 
 
 __all__ = ['Anchor', 'AnchorStrategy']

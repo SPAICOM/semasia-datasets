@@ -15,6 +15,28 @@ if TYPE_CHECKING:
     from src.tsp import LaplacianType
 
 AlignmentMethod = Literal['relative', 'cca', 'graph', 'ot']
+RelativeMode = Literal['euclidean', 'cosine']
+
+
+def _relative_euclidean(
+    X: np.ndarray,
+    anchors: np.ndarray,
+    normalize: bool = True,
+) -> np.ndarray:
+    """Euclidean distances from each point to each anchor row, shape (n, k)."""
+    dists = cdist(X, anchors, metric='euclidean').astype(np.float32)
+    if normalize:
+        max_d = float(dists.max())
+        if max_d > 0.0:
+            dists /= max_d
+    return dists
+
+
+def _relative_cosine(X: np.ndarray, anchors: np.ndarray) -> np.ndarray:
+    """Cosine similarity between each point and each anchor row, shape (n, k)."""
+    X_n = X / (np.linalg.norm(X, axis=1, keepdims=True) + 1e-10)
+    A_n = anchors / (np.linalg.norm(anchors, axis=1, keepdims=True) + 1e-10)
+    return (X_n @ A_n.T).astype(np.float32)
 
 
 class AlignmentProblem:
@@ -56,7 +78,14 @@ class AlignmentProblem:
 
             - ``'relative'``: project each space into its own anchor-relative
               coordinate frame (same anchor parameters applied to both).
-              Accepts all :meth:`LatentSpace.get_relative` keyword arguments.
+              Both spaces are prewhitened before anchor computation.
+              Keywords: ``n_anchors`` (int), ``n_samples`` (int, 10),
+              ``relative_mode`` ('euclidean'|'cosine', default 'euclidean'),
+              ``apply_parseval`` (bool, True), ``normalize_distances`` (bool, True).
+              *euclidean*: Parseval frame built from anchors; relative
+              representation is L2 distance to frame rows, normalized to [0,1].
+              *cosine*: raw anchor centroids; cosine similarity used directly
+              (no Parseval transform required).
             - ``'cca'``: Canonical Correlation Analysis — find linear
               projections that maximise cross-space correlations.
               Keyword: ``n_components`` (int, default 2).
@@ -113,18 +142,37 @@ class AlignmentProblem:
         clusterer_kwargs: dict | None = None,
         n_samples: int | None = 10,
         apply_parseval: bool = True,
+        relative_mode: RelativeMode = 'euclidean',
+        normalize_distances: bool = True,
         force_recompute: bool = False,
     ) -> tuple[LatentSpace, LatentSpace]:
         """Project each space into a shared anchor-relative frame.
 
-        Anchors are selected from ``space_a`` only.  The resulting cluster
-        assignments are then injected into ``space_b`` so that both spaces use
-        the same set of semantic anchor points (expressed in each space's own
-        feature dimensions).  This yields comparable ``(n_points, n_anchors)``
-        representations.
+        Anchors are selected from ``space_a`` only; the same cluster
+        assignments are injected into ``space_b`` so both spaces use the
+        same semantic partitioning expressed in their own feature dimensions.
+        This yields comparable ``(n_points, n_anchors)`` representations.
 
-        Requires ``space_a.n_points == space_b.n_points`` (point correspondence).
-        Spaces may have different ``n_features``.
+        Both spaces are prewhitened before anchor computation so that the
+        two latent distributions are decorrelated and unit-variance.
+
+        Two relative-embedding modes are supported:
+
+        *euclidean* (default)
+            The anchor matrix is orthonormalised into a Parseval frame via
+            SVD (``apply_parseval=True``).  The relative coordinate of each
+            point is its L2 distance to every frame row.  Distances are
+            optionally normalized to ``[0, 1]`` by the global maximum
+            (``normalize_distances=True``), which is required for the
+            inner-product structure to be preserved across spaces.
+
+        *cosine*
+            Raw anchor centroids are used without a Parseval transform —
+            cosine similarity is scale-invariant, so no normalisation step
+            is needed.  ``apply_parseval`` is ignored in this mode.
+
+        Requires ``space_a.n_points == space_b.n_points`` (point
+        correspondence).  Spaces may have different ``n_features``.
         """
         if self.space_a.n_points != self.space_b.n_points:
             raise ValueError(
@@ -133,39 +181,59 @@ class AlignmentProblem:
                 f'space_b has {self.space_b.n_points}.'
             )
 
-        # Compute anchors from space_a
+        # 1. Prewhiten both spaces (decorrelate features, unit variance).
+        if self.space_a._whitening_L is None:
+            self.space_a.prewhiten(inplace=True)
+        if self.space_b._whitening_L is None:
+            self.space_b.prewhiten(inplace=True)
+
+        # 2. Parseval transform is meaningful only for the euclidean mode;
+        #    cosine similarity is already scale-invariant.
+        _apply_parseval = apply_parseval and (relative_mode == 'euclidean')
+
+        # 3. Compute anchors from (whitened) space_a.
         self.space_a.compute_prototypes(
             n_clusters=n_anchors,
             n_samples=n_samples,
             clusterer_cls=clusterer_cls,
             clusterer_kwargs=clusterer_kwargs,
-            apply_parseval=apply_parseval,
+            apply_parseval=_apply_parseval,
+            strategy=strategy,
         )
 
-        # Reconstruct per-point cluster label array from space_a's assignments
+        # 4. Transfer cluster assignments to space_b so its anchors are the
+        #    corresponding centroids expressed in space_b's feature space.
         cluster_labels = np.empty(self.space_a.n_points, dtype=int)
         for anchor_idx, point_indices in self.space_a.anchor.cluster_indices.items():
             cluster_labels[point_indices] = anchor_idx
 
-        # Inject the same cluster assignments into space_b so its anchors are
-        # the corresponding points expressed in space_b's feature space
         self.space_b.compute_prototypes(
             clusters=cluster_labels,
             n_samples=n_samples,
-            apply_parseval=apply_parseval,
+            apply_parseval=_apply_parseval,
         )
 
-        rel_a = LatentSpace(
-            self.space_a.apply_analysis_operator(),
-            extras=self.space_a.extras,
-            seed=self.space_a.seed,
+        # 5. Build relative representations.
+        if relative_mode == 'euclidean':
+            # analysis_operator rows are the orthonormal Parseval frame vectors.
+            anchors_a = self.space_a.analysis_operator  # (k, d_a)
+            anchors_b = self.space_b.analysis_operator  # (k, d_b)
+            rel_a = _relative_euclidean(
+                self.space_a.latent, anchors_a, normalize=normalize_distances
+            )
+            rel_b = _relative_euclidean(
+                self.space_b.latent, anchors_b, normalize=normalize_distances
+            )
+        else:  # cosine
+            anchors_a = self.space_a.prototypes  # raw centroids, (k, d_a)
+            anchors_b = self.space_b.prototypes  # raw centroids, (k, d_b)
+            rel_a = _relative_cosine(self.space_a.latent, anchors_a)
+            rel_b = _relative_cosine(self.space_b.latent, anchors_b)
+
+        return (
+            LatentSpace(rel_a, extras=self.space_a.extras, seed=self.space_a.seed),
+            LatentSpace(rel_b, extras=self.space_b.extras, seed=self.space_b.seed),
         )
-        rel_b = LatentSpace(
-            self.space_b.apply_analysis_operator(),
-            extras=self.space_b.extras,
-            seed=self.space_b.seed,
-        )
-        return rel_a, rel_b
 
     def _align_cca(
         self,
@@ -342,4 +410,4 @@ class AlignmentProblem:
         return aligned_a, aligned_b
 
 
-__all__ = ['AlignmentProblem', 'AlignmentMethod']
+__all__ = ['AlignmentProblem', 'AlignmentMethod', 'RelativeMode']
