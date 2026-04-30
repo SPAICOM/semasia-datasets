@@ -24,6 +24,7 @@ def _pearson_cross_correlation(A: np.ndarray, B: np.ndarray) -> np.ndarray:
     np.ndarray, shape (ka, kb)
         ``C[i, j] = pearson_r(A[:, i], B[:, j])``.
     """
+
     # centre and normalise each column to zero-mean unit-variance
     def _standardise(X: np.ndarray) -> np.ndarray:
         mu = X.mean(axis=0)
@@ -146,8 +147,15 @@ def plot_pc_correlation_heatmap(
         for j in range(k_eff):
             val = C[i, j]
             text_color = 'white' if abs(val) > 0.65 else 'black'
-            ax.text(j, i, f'{val:.2f}', ha='center', va='center',
-                    fontsize=max(5, 9 - k_eff // 4), color=text_color)
+            ax.text(
+                j,
+                i,
+                f'{val:.2f}',
+                ha='center',
+                va='center',
+                fontsize=max(5, 9 - k_eff // 4),
+                color=text_color,
+            )
 
     fig.tight_layout()
     return fig, ax

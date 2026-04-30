@@ -53,14 +53,14 @@ def build_knn_graph(
 
     # drop self (nearest neighbour at distance 0)
     distances = distances[:, 1:]  # (n, k)
-    indices = indices[:, 1:]      # (n, k)
+    indices = indices[:, 1:]  # (n, k)
 
     row = np.repeat(np.arange(n), k)
     col = indices.ravel()
 
     if weighted:
         sigma = float(distances[:, -1].mean()) or 1.0
-        data = np.exp(-(distances.ravel() ** 2) / (2.0 * sigma ** 2)).astype(np.float32)
+        data = np.exp(-(distances.ravel() ** 2) / (2.0 * sigma**2)).astype(np.float32)
     else:
         data = np.ones(n * k, dtype=np.float32)
 

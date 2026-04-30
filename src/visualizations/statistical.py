@@ -27,7 +27,7 @@ MARGINAL_COLOR = '#f0a500'
 MUTED_COLOR = '#8c8c8c'
 PALETTE_TREATMENT = {'0': '#7ea6c9', '1': '#c44e52'}
 ANALYSIS_LABELS = {
-    'dataset_change': 'Dataset Informativity',
+    'dataset_change': 'Dataset Complexity',
     'large_vs_finetuned': 'Specialization',
     'small_vs_finetuned': 'Transfer Learning',
     'augmentation': 'Augmentation',

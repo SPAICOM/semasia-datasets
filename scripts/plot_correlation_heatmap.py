@@ -97,7 +97,9 @@ def main(
 
     if n_anchors is not None:
         ax.set_title(
-            ax.get_title().replace('PC correlation', f'PC correlation (relative, {n_anchors} anchors)'),
+            ax.get_title().replace(
+                'PC correlation', f'PC correlation (relative, {n_anchors} anchors)'
+            ),
             fontsize=10,
             pad=8,
         )

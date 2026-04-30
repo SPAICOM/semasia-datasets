@@ -267,7 +267,8 @@ def _():
         label='Samples',
         show_value=True,
     )
-    return dataset_ui, method_ui, n_samples_ui
+    show_legend_ui = mo.ui.switch(value=True, label='Show legend')
+    return dataset_ui, method_ui, n_samples_ui, show_legend_ui
 
 
 @app.cell
@@ -301,11 +302,19 @@ def _(models_by_split, split_ui):
 
 
 @app.cell
-def _(attr_ui, dataset_ui, method_ui, model_ui, n_samples_ui, split_ui):
+def _(
+    attr_ui,
+    dataset_ui,
+    method_ui,
+    model_ui,
+    n_samples_ui,
+    show_legend_ui,
+    split_ui,
+):
     mo.vstack(
         [
             mo.hstack([dataset_ui, split_ui, model_ui, attr_ui], gap=2),
-            mo.hstack([method_ui, n_samples_ui], gap=2),
+            mo.hstack([method_ui, n_samples_ui, show_legend_ui], gap=2),
         ]
     )
     return
@@ -379,11 +388,11 @@ def _(label, latent, method_ui, n_samples_ui):
             ).fit_transform(X)
         else:
             X2d = _umap.UMAP(n_components=2, random_state=42).fit_transform(X)
-    return X2d, idx, n, y
+    return X2d, idx, y
 
 
 @app.cell
-def _(X2d, attr_ui, dataset_ui, idx, method_ui, n, y):
+def _(X2d, attr_ui, dataset_ui, idx, method_ui, show_legend_ui, y):
     import plotly.graph_objects as go
 
     _ds_name = dataset_ui.value
@@ -391,14 +400,32 @@ def _(X2d, attr_ui, dataset_ui, idx, method_ui, n, y):
     _unique = sorted(set(y.tolist()))
     _many_classes = len(_unique) > 20
 
-    # trace_to_global[curve_idx] = array of global point indices for that trace
-    # (global = index into X2d / y / idx arrays)
-    trace_to_global = []
+    _font = dict(family='Times New Roman', size=13, color='#222222')
 
+    _PALETTE = [
+        '#E69F00',
+        '#56B4E9',
+        '#009E73',
+        '#0072B2',
+        '#D55E00',
+        '#CC79A7',
+        '#000000',
+        '#F0E442',
+    ]
+
+    _axis = dict(
+        title=None,
+        showticklabels=False,
+        showgrid=False,
+        zeroline=False,
+        showline=False,
+        ticks='',
+    )
+
+    trace_to_global = []
     _fig = go.Figure()
 
     if _many_classes:
-        # Single trace — pointIndex IS the global index
         trace_to_global.append(np.arange(len(y)))
         _fig.add_trace(
             go.Scatter(
@@ -407,11 +434,11 @@ def _(X2d, attr_ui, dataset_ui, idx, method_ui, n, y):
                 mode='markers',
                 marker={
                     'size': 4,
-                    'opacity': 0.7,
+                    'opacity': 0.8,
                     'color': y,
-                    'colorscale': 'Turbo',
+                    'colorscale': 'plasma',
                     'showscale': True,
-                    'colorbar': {'title': 'Label'},
+                    'colorbar': {'title': 'Label', 'tickfont': _font},
                 },
                 customdata=np.stack([idx, y], axis=1),
                 hovertemplate=(
@@ -424,7 +451,7 @@ def _(X2d, attr_ui, dataset_ui, idx, method_ui, n, y):
             )
         )
     else:
-        for _lbl in _unique:
+        for _i, _lbl in enumerate(_unique):
             _mask = y == _lbl
             _global_pts = np.where(_mask)[0]
             trace_to_global.append(_global_pts)
@@ -437,8 +464,8 @@ def _(X2d, attr_ui, dataset_ui, idx, method_ui, n, y):
                     name=_name,
                     marker={
                         'size': 5,
-                        'opacity': 0.75,
-                        'color': DISCRETE_COLORS[_lbl % len(DISCRETE_COLORS)],
+                        'opacity': 0.8,
+                        'color': _PALETTE[_i % len(_PALETTE)],
                     },
                     customdata=idx[_global_pts].reshape(-1, 1),
                     hovertemplate=(
@@ -451,16 +478,44 @@ def _(X2d, attr_ui, dataset_ui, idx, method_ui, n, y):
             )
 
     _fig.update_layout(
-        title=f'{method_ui.value} — {_ds_name} test ({n:,} samples)',
-        xaxis_title='Component 1',
-        yaxis_title='Component 2',
-        legend_title='Class',
+        title=None,
+        font=_font,
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        xaxis=_axis,
+        yaxis=_axis,
+        showlegend=show_legend_ui.value,
+        legend=dict(
+            title=dict(text='Class', font=_font),
+            font=_font,
+            bgcolor='rgba(255,255,255,0.6)',
+            bordercolor='rgba(0,0,0,0.1)',
+            borderwidth=1,
+        ),
+        width=1200,
         height=580,
-        margin={'t': 50, 'b': 10},
+        margin={'t': 10, 'b': 10, 'l': 10, 'r': 10},
     )
 
+    def _make_scatter_pdf():
+        import io as _io
+
+        _buf = _io.BytesIO()
+        _buf.write(_fig.to_image(format='pdf'))
+        return _buf.getvalue()
+
     chart = mo.ui.plotly(_fig)
-    chart
+    mo.vstack(
+        [
+            chart,
+            mo.download(
+                data=_make_scatter_pdf,
+                filename=f'scatter_{method_ui.value}_{_ds_name}.pdf',
+                mimetype='application/pdf',
+                label='Save as PDF',
+            ),
+        ]
+    )
     return chart, trace_to_global
 
 

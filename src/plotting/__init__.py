@@ -2,8 +2,8 @@
 
 from .latent import plot_pc_correlation_heatmap
 from .tda import (
-    DIM_COLORS,
     DEFAULT_NODE_COLOR,
+    DIM_COLORS,
     FAMILY_PALETTE,
     UNKNOWN_COLOR,
     compute_circular_layout,

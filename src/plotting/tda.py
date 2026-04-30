@@ -2,7 +2,6 @@
 
 from typing import TYPE_CHECKING, Literal
 
-import matplotlib.cm as cm
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import numpy as np
@@ -17,14 +16,34 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 
 DIM_COLORS: list[str] = [
-    'tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple',
+    'tab:blue',
+    'tab:orange',
+    'tab:green',
+    'tab:red',
+    'tab:purple',
 ]
 
 FAMILY_PALETTE: list[str] = [
-    '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
-    '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf',
-    '#aec7e8', '#ffbb78', '#98df8a', '#ff9896', '#c5b0d5',
-    '#c49c94', '#f7b6d2', '#c7c7c7', '#dbdb8d', '#9edae5',
+    '#1f77b4',
+    '#ff7f0e',
+    '#2ca02c',
+    '#d62728',
+    '#9467bd',
+    '#8c564b',
+    '#e377c2',
+    '#7f7f7f',
+    '#bcbd22',
+    '#17becf',
+    '#aec7e8',
+    '#ffbb78',
+    '#98df8a',
+    '#ff9896',
+    '#c5b0d5',
+    '#c49c94',
+    '#f7b6d2',
+    '#c7c7c7',
+    '#dbdb8d',
+    '#9edae5',
 ]
 
 UNKNOWN_COLOR: str = '#cccccc'
@@ -55,8 +74,9 @@ def plot_persistence_diagram(
         Axes title.
     """
     if pts.size == 0:
-        ax.text(0.5, 0.5, 'empty diagram', ha='center', va='center',
-                transform=ax.transAxes)
+        ax.text(
+            0.5, 0.5, 'empty diagram', ha='center', va='center', transform=ax.transAxes
+        )
         return
 
     dims = sorted({int(d) for d in pts[:, 2]})
@@ -66,8 +86,10 @@ def plot_persistence_diagram(
         mask = (pts[:, 2] == dim) & np.isfinite(pts[:, 1])
         if mask.any():
             ax.scatter(
-                pts[mask, 0], pts[mask, 1],
-                s=8, alpha=0.6,
+                pts[mask, 0],
+                pts[mask, 1],
+                s=8,
+                alpha=0.6,
                 color=DIM_COLORS[dim % len(DIM_COLORS)],
                 label=f'H{dim}',
             )
@@ -164,8 +186,10 @@ def compute_mds_layout(
         n_init=4,
     ).fit_transform(D)
 
-    return {m: (float(pos_array[i, 0]), float(pos_array[i, 1]))
-            for i, m in enumerate(models)}
+    return {
+        m: (float(pos_array[i, 0]), float(pos_array[i, 1]))
+        for i, m in enumerate(models)
+    }
 
 
 def compute_circular_layout(
@@ -183,8 +207,7 @@ def compute_random_layout(
     """Place nodes at random positions in [−1, 1]²."""
     rng = np.random.default_rng(seed)
     coords = rng.uniform(-1, 1, size=(len(models), 2))
-    return {m: (float(coords[i, 0]), float(coords[i, 1]))
-            for i, m in enumerate(models)}
+    return {m: (float(coords[i, 0]), float(coords[i, 1])) for i, m in enumerate(models)}
 
 
 def compute_layout(
@@ -292,8 +315,9 @@ def plot_tda_distance_graph(
         segments.append([(x0, y0), (x1, y1)])
         edge_values.append(row['distance'])
 
-    lc = LineCollection(segments, cmap=colormap, norm=norm,
-                        linewidths=edge_width, alpha=0.7, zorder=1)
+    lc = LineCollection(
+        segments, cmap=colormap, norm=norm, linewidths=edge_width, alpha=0.7, zorder=1
+    )
     lc.set_array(np.array(edge_values))
     ax.add_collection(lc)
 
@@ -303,8 +327,15 @@ def plot_tda_distance_graph(
 
     xs = [pos[m][0] for m in models]
     ys = [pos[m][1] for m in models]
-    ax.scatter(xs, ys, c=node_colors, s=node_size ** 2, zorder=2,
-               edgecolors='white', linewidths=0.8)
+    ax.scatter(
+        xs,
+        ys,
+        c=node_colors,
+        s=node_size**2,
+        zorder=2,
+        edgecolors='white',
+        linewidths=0.8,
+    )
 
     if node_label != 'none':
         for m, x, y in zip(models, xs, ys):
@@ -312,8 +343,14 @@ def plot_tda_distance_graph(
             ax.text(x, y, label, fontsize=5, ha='center', va='bottom', clip_on=True)
 
     if family_handles:
-        ax.legend(handles=family_handles, fontsize=7, title_fontsize=8,
-                  loc='upper left', framealpha=0.85, markerscale=1.2)
+        ax.legend(
+            handles=family_handles,
+            fontsize=7,
+            title_fontsize=8,
+            loc='upper left',
+            framealpha=0.85,
+            markerscale=1.2,
+        )
 
     if title:
         ax.set_title(title, fontsize=11, pad=10)

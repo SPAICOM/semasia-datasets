@@ -44,7 +44,7 @@ def compute_laplacian(
             case 'unnormalized':
                 return sp.diags(degrees, format='csr') - A
             case 'symmetric':
-                d_inv_sqrt = np.where(degrees > 0, degrees ** -0.5, 0.0)
+                d_inv_sqrt = np.where(degrees > 0, degrees**-0.5, 0.0)
                 D_inv_sqrt = sp.diags(d_inv_sqrt)
                 return sp.eye(A.shape[0], format='csr') - D_inv_sqrt @ A @ D_inv_sqrt
             case 'random_walk':
@@ -63,7 +63,7 @@ def compute_laplacian(
         case 'unnormalized':
             return np.diag(degrees) - A
         case 'symmetric':
-            d_inv_sqrt = np.where(degrees > 0, degrees ** -0.5, 0.0)
+            d_inv_sqrt = np.where(degrees > 0, degrees**-0.5, 0.0)
             D_inv_sqrt = np.diag(d_inv_sqrt)
             return np.eye(A.shape[0]) - D_inv_sqrt @ A @ D_inv_sqrt
         case 'random_walk':

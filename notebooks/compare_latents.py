@@ -52,6 +52,7 @@ def _load_raw(model: str, dataset: str) -> np.ndarray:
 
 def _whiten(X: np.ndarray) -> np.ndarray:
     from scipy.linalg import solve_triangular
+
     mean = X.mean(axis=0)
     X_c = X - mean
     C = np.cov(X, rowvar=False) + 1e-6 * np.eye(X.shape[1])
@@ -75,8 +76,12 @@ def _correlation_matrix(
 ) -> np.ndarray:
     la = LatentSpace(arr_a, seed=seed)
     lb = LatentSpace(arr_b, seed=seed)
-    la.compute_principal_components(method=method, n_components=n_components, k=k, seed=seed)
-    lb.compute_principal_components(method=method, n_components=n_components, k=k, seed=seed)
+    la.compute_principal_components(
+        method=method, n_components=n_components, k=k, seed=seed
+    )
+    lb.compute_principal_components(
+        method=method, n_components=n_components, k=k, seed=seed
+    )
 
     k_eff_a = la.pc_embedding.shape[1]
     k_eff_b = lb.pc_embedding.shape[1]
@@ -129,7 +134,9 @@ def compare_latents(
 
         print('Clustering (KMeans)...')
         km: dict[str, KMeans] = {
-            m: KMeans(n_clusters=n_anchors, random_state=42, n_init='auto').fit(whitened[m])
+            m: KMeans(n_clusters=n_anchors, random_state=42, n_init='auto').fit(
+                whitened[m]
+            )
             for m in models
         }
 
