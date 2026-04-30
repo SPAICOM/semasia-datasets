@@ -1,0 +1,15 @@
+results_dir: results/alignment
+plots_dir: results/alignment/plots
+
+log_x: true # set to true for log2 scale on the k axis
+
+# Methods to plot (proto | cca | linear)
+methods:
+  - proto
+  - cca
+  - linear
+
+# Metrics to plot (must exist as columns in the parquet files)
+metrics:
+  - accuracy
+  - mse

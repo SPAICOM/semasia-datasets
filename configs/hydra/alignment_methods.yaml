@@ -1,0 +1,41 @@
+repo_id: "spaicom-lab"
+prefix: "semantic-"
+
+dataset: cifar10
+train_split: train
+test_split: test
+
+pairs:
+  - model_a: vit_small_patch16_224.augreg_in1k
+    model_b: vit_large_patch16_224.augreg_in21k
+  - model_a: vit_base_patch16_224.augreg_in21k
+    model_b: vit_large_patch16_224.augreg_in21k
+  - model_a: vit_large_patch16_384.augreg_in21k_ft_in1k
+    model_b: vit_large_patch16_224.augreg_in21k
+  - model_a: aimv2_1b_patch14_224.apple_pt
+    model_b: vit_large_patch16_224.augreg_in21k
+
+seed: 42
+
+# k is used as n_prototypes for proto and n_components for CCA
+k_values:
+  - 2
+  - 4
+  - 8
+  - 16
+  - 32
+  - 64
+  - 128
+
+# Methods to run (proto | cca | linear)
+methods:
+  - proto
+  - cca
+  - linear
+
+# Toggle metrics on/off
+metrics:
+  accuracy: true
+  mse: true
+
+save_results: true
