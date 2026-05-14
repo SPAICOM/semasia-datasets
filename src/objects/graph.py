@@ -9,7 +9,12 @@ import networkx as nx
 import numpy as np
 import scipy.sparse as sp
 
-from src.tsp import LaplacianType, build_knn_graph, compute_eigenvectors, compute_laplacian
+from src.tsp import (
+    LaplacianType,
+    build_knn_graph,
+    compute_eigenvectors,
+    compute_laplacian,
+)
 from src.metrics.graph import compute_graph_metrics
 
 GraphLayout = Literal['kamada_kawai', 'spectral']
@@ -160,7 +165,9 @@ class Graph:
         if normalization != self._laplacian_type:
             self._eigenvalues = None
             self._eigenvectors = None
-        self._laplacian = compute_laplacian(self._adjacency, normalization=normalization)
+        self._laplacian = compute_laplacian(
+            self._adjacency, normalization=normalization
+        )
         self._laplacian_type = normalization
         return self._laplacian
 
@@ -329,14 +336,22 @@ class Graph:
             fig = ax.get_figure()
 
         nx.draw_networkx_edges(
-            G, pos, ax=ax,
-            alpha=edge_alpha, width=edge_width, edge_color='gray',
+            G,
+            pos,
+            ax=ax,
+            alpha=edge_alpha,
+            width=edge_width,
+            edge_color='gray',
         )
 
         if node_color is not None:
             nc = nx.draw_networkx_nodes(
-                G, pos, ax=ax,
-                node_size=node_size, node_color=node_color, cmap=cmap,
+                G,
+                pos,
+                ax=ax,
+                node_size=node_size,
+                node_color=node_color,
+                cmap=cmap,
             )
             fig.colorbar(nc, ax=ax, fraction=0.03, pad=0.02)
         else:

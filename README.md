@@ -12,7 +12,7 @@
 </h5>
 
 > [!TIP]
-> 
+> Latent representations learned by neural networks often exhibit semantic structure, where concept similarity is reflected by geometric proximity in embedding space. However, comparing such spaces across models remains difficult: changes in architecture, pretraining data, objective, or random seed can yield embeddings with similar content but incompatible geometry. This latent space alignment problem is central to interpretability, transfer and multimodal learning, federated systems, and semantic communication; however, progress remains limited by the lack of large-scale, model-diverse, and metadata-rich benchmarks. To address this gap, we introduce SEMASIA, a large-scale collection of latent representations extracted from approximately 1,700 pretrained vision models across eight standard image-classification benchmarks. SEMASIA pairs embeddings with structured metadata describing architectures, training regimes, pretraining sources, and model scale. We demonstrate three applications of the resource. First, we analyze the conceptual organization of individual latent spaces, showing consistent prototype-like clustering and hierarchical semantic neighborhoods across models and datasets. Second, we benchmark supervised alignment mappings between latent spaces using reconstruction error and downstream task performance. Third, we perform a large-scale regression analysis of how pretraining-data complexity, specialization, transfer learning, augmentation, and model scale relate to geometric and probing properties of embeddings. By coupling representational scale with standardized metadata, SEMASIA provides a reproducible foundation for studying latent geometry, evaluating alignment methods, and developing next-generation heterogeneous and interoperable AI systems. 
 
 ## Dependencies
 
@@ -42,11 +42,88 @@ The `setup` recipe will:
 
 After the command completes, the development environment will be ready to use. 🚀
 
+## Analysis
+
+All analyses are run via `just`. Configurations are managed with [Hydra](https://hydra.cc) — any default can be overridden by appending `key=value` pairs to the command (e.g. `just tda-compare cifar10 comparison.distance=wasserstein`).
+
+### Encoding
+
+Before running any analysis on a new dataset, encode it with all available timm models:
+
+```bash
+just timm-encode DATASET   # encode locally without pushing to HuggingFace
+just push DATASET          # encode + push to HuggingFace + update readme
+```
+
+### Statistical Metrics
+
+Compute geometric and probing properties of latent spaces, then run regression analysis over model metadata:
+
+```bash
+just compute-metrics DATASET        # compute stat metrics for a dataset
+just compute-metrics-tda DATASET    # include TDA metrics (slower)
+just compute-metrics-test DATASET   # quick test run limited to 5 models
+
+# Two-phase workflow for large runs
+just compute-download               # Phase 1: download and cache all latents
+just compute-compute                # Phase 2: compute metrics from cached latents
+
+just stat                           # run regression analysis on precomputed metrics
+just stat-plot                      # plot regression results
+```
+
+### Graph Signatures
+
+Extract KNN-graph structural metrics (cycles, Wiener index, eigengap, etc.) from latent spaces:
+
+```bash
+just tsp-extraction
+```
+
+### Prototype Analysis
+
+Compare prototype structures across pairs of models:
+
+```bash
+just proto-compare                             # default model pair from config
+just proto-compare-dataset DATASET            # override dataset
+just proto-compare-models MODEL_A MODEL_B     # override model pair
+```
+
+### Latent Space Alignment
+
+Evaluate alignment methods (proto, CCA, linear) that transmit embeddings from model A into model B's space, and visualize the results:
+
+```bash
+just alignment                                 # run evaluation with config defaults
+just alignment-plot                            # plot accuracy/MSE vs compression ratio (k)
+
+# PC correlation heatmap between two models on a dataset
+just plot-heatmap MODEL_A MODEL_B DATASET
+```
+
+Prototype-based alignment using lstsq probing on the transmitted space:
+
+```bash
+just proto-alignment                           # default config
+just proto-alignment-dataset DATASET          # override dataset
+just proto-alignment-models MODEL_A MODEL_B   # override model pair
+```
+
 ## Citation
 
 If you find this code useful for your research, please consider citing the following paper:
 
 ```
+@misc{pandolfo2026semasialargescaledatasetsemantically,
+      title={SEMASIA: A Large-Scale Dataset of Semantically Structured Latent Representations}, 
+      author={Mario Edoardo Pandolfo and Enrico Grimaldi and Lorenzo Marinucci and Leonardo Di Nino and Simone Fiorellino and Sergio Barbarossa and Paolo Di Lorenzo},
+      year={2026},
+      eprint={2605.09485},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG},
+      url={https://arxiv.org/abs/2605.09485}, 
+}
 ```
 
 ## Authors

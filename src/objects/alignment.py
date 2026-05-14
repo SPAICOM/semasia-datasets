@@ -307,13 +307,19 @@ class AlignmentProblem:
                 f'space_b has {self.space_b.n_points}.'
             )
 
-        knn_kwargs = dict(k=k_neighbors, metric=metric, weighted=weighted, mutual=mutual)
+        knn_kwargs = dict(
+            k=k_neighbors, metric=metric, weighted=weighted, mutual=mutual
+        )
 
         graph_a = Graph.from_point_cloud(self.space_a.latent, **knn_kwargs)
         graph_b = Graph.from_point_cloud(self.space_b.latent, **knn_kwargs)
 
-        _, Phi_a = graph_a.compute_eigenvectors(k=n_eigvecs, normalization=normalization)
-        _, Phi_b = graph_b.compute_eigenvectors(k=n_eigvecs, normalization=normalization)
+        _, Phi_a = graph_a.compute_eigenvectors(
+            k=n_eigvecs, normalization=normalization
+        )
+        _, Phi_b = graph_b.compute_eigenvectors(
+            k=n_eigvecs, normalization=normalization
+        )
 
         # Resolve sign ambiguity: each eigenvector's largest-magnitude element
         # is made positive so that C is comparable across runs.
