@@ -1,4 +1,4 @@
-# REPO TITLE
+# SEMASIA: A Large-Scale Dataset of Semantically Structured Latent Representations
 
 
 <h5 align="center">
