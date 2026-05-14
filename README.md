@@ -128,7 +128,13 @@ If you find this code useful for your research, please consider citing the follo
 
 ## Authors
 
-- [EXAMPLE](https://scholar.google.com/citations?user=EXAMPLE)
+- [Mario Edoardo Pandolfo](https://scholar.google.com/citations?user=wAeScL8AAAAJ)
+- [Enrico Grimaldi](https://scholar.google.com/citations?user=Y-31eCwAAAAJ)
+- [Lorenzo Marinucci](https://scholar.google.com/citations?user=_VdGlLoAAAAJ)
+- [Leonardo Di Nino](https://scholar.google.com/citations?user=4UdFEvAAAAAJ)
+- [Simone Fiorellino](https://scholar.google.com/citations?user=nKMc4GQAAAAJ)
+- [Sergio Barbarossa](https://scholar.google.com/citations?user=2woHFu8AAAAJ)
+- [Paolo Di Lorenzo](https://scholar.google.com/citations?user=VZYvspQAAAAJ)
 
 ## Used Technologies
 
