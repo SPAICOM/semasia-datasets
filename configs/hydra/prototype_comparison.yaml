@@ -3,13 +3,13 @@ defaults:
   - clustering: kmeans
 
 repo_id: "spaicom-lab"
-prefix: "semantic-"
+prefix: "semasia-"
 
 datasets:
   - cifar10
-  # - mnist
-  # - fashion_mnist
-  # - oxford-flowers
+  - mnist
+  - fashion_mnist
+  - oxford-flowers
 split: train
 
 model_a: vit_base_patch16_224.augreg_in1k

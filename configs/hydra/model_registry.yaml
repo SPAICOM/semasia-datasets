@@ -3,6 +3,6 @@ defaults:
 
 hf:
     namespace: spaicom-lab
-    repo_id: spaicom-lab/model-registry
+    repo_id: spaicom-lab/semasia-model-registry
     private: false
     commit_message: "Add/update model metadata registry"

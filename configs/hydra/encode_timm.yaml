@@ -29,7 +29,7 @@ dataloader:
 # --------------------------
 hf:
     namespace: spaicom-lab # 👈 replace with your HF username or org
-    repo_prefix: semantic- # will create repos like "<namespace>/semantic-cifar10"
+    repo_prefix: semasia- # will create repos like "<namespace>/semantic-cifar10"
     private: false # set to true if you want private repos
     push: false # whether to push automatically after export
     re_push: false # whether to re push the already present model in HF

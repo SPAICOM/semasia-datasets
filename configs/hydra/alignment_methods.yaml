@@ -1,19 +1,21 @@
 repo_id: "spaicom-lab"
-prefix: "semantic-"
+prefix: "semasia-"
 
-dataset: cifar10
+datasets:
+  - cifar10
+  - mnist
+  - fashion_mnist
+
 train_split: train
 test_split: test
 
-pairs:
-  - model_a: vit_small_patch16_224.augreg_in1k
-    model_b: vit_large_patch16_224.augreg_in21k
-  - model_a: vit_base_patch16_224.augreg_in21k
-    model_b: vit_large_patch16_224.augreg_in21k
-  - model_a: vit_large_patch16_384.augreg_in21k_ft_in1k
-    model_b: vit_large_patch16_224.augreg_in21k
-  - model_a: aimv2_1b_patch14_224.apple_pt
-    model_b: vit_large_patch16_224.augreg_in21k
+model_b: vit_large_patch16_224.augreg_in21k  
+
+models_a:
+  - vit_base_patch16_224.augreg_in21k
+  - vit_large_patch16_384.augreg_in21k_ft_in1k
+  - vit_small_patch16_224.augreg_in1k
+  - aimv2_1b_patch14_224.apple_pt
 
 seed: 42
 

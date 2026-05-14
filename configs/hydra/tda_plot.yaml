@@ -2,7 +2,7 @@ defaults:
     - _self_
 
 repo_id: "spaicom-lab"
-prefix: "semantic-"
+prefix: "semasia-"
 dataset: cifar10
 split: train
 distance_metric: bottleneck

@@ -229,102 +229,127 @@ def main(cfg: DictConfig) -> None:
     results_dir = current / 'results' / 'alignment'
     results_dir.mkdir(parents=True, exist_ok=True)
 
-    dataset_path = f'{cfg.repo_id}/{cfg.prefix}{cfg.dataset}'
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     seed: int = cfg.seed
     k_values: list[int] = list(cfg.k_values)
     selected_metrics: dict[str, bool] = dict(cfg.metrics)
     selected_methods: list[str] = list(cfg.get('methods', ['proto', 'cca']))
-    pairs: list[dict] = list(cfg.pairs)
+    model_b: str = cfg.model_b
+    models_a: list[str] = list(cfg.models_a)
+    datasets: list[str] = list(cfg.datasets)
 
-    tqdm.write(f'\n[INFO] Dataset: {dataset_path}')
+    tqdm.write(f'[INFO] Datasets: {datasets}')
+    tqdm.write(f'[INFO] Model B: {model_b}')
+    tqdm.write(f'[INFO] Models A: {models_a}')
     tqdm.write(f'[INFO] Methods: {selected_methods}  |  k values: {k_values}')
     tqdm.write(f'[INFO] Metrics: {[m for m, v in selected_metrics.items() if v]}')
 
-    for pair in tqdm(pairs, desc='Pairs', unit='pair'):
-        model_a: str = pair['model_a']
-        model_b: str = pair['model_b']
-        out_path = results_dir / f'{model_a}__{model_b}__{cfg.dataset}.parquet'
+    for dataset in tqdm(datasets, desc='Datasets', unit='dataset'):
+        dataset_path = f'{cfg.repo_id}/{cfg.prefix}{dataset}'
+        tqdm.write(f'\n[INFO] Dataset: {dataset_path}')
 
-        if out_path.exists():
-            tqdm.write(f'[SKIP] {model_a} → {model_b} already done ({out_path.name})')
-            continue
-
-        tqdm.write(f'\n{"="*60}')
-        tqdm.write(f'[PAIR] {model_a}  →  {model_b}')
-
-        tqdm.write(f'  Loading {model_a} train...')
-        la_train, labels_train = _load_split(dataset_path, model_a, cfg.train_split)
+        # Load model_b once per dataset (shared across all model_a iterations)
         tqdm.write(f'  Loading {model_b} train...')
-        lb_train, _ = _load_split(dataset_path, model_b, cfg.train_split)
-        tqdm.write(f'  Loading {model_a} test...')
-        la_test, labels_test = _load_split(dataset_path, model_a, cfg.test_split)
+        lb_train, labels_train = _load_split(dataset_path, model_b, cfg.train_split)
         tqdm.write(f'  Loading {model_b} test...')
-        lb_test, _ = _load_split(dataset_path, model_b, cfg.test_split)
+        lb_test, labels_test = _load_split(dataset_path, model_b, cfg.test_split)
 
-        tqdm.write(
-            f'  Train A={la_train.shape}  B={lb_train.shape}'
-            f'  |  Test A={la_test.shape}  B={lb_test.shape}'
-        )
+        # No Mismatch baseline is the same for all model_a in this dataset
+        nm_metrics: dict[str, float] = {}
+        if selected_metrics.get('accuracy', False):
+            preds_nm = _lstsq_predict(lb_train, labels_train, lb_test, device)
+            nm_metrics['accuracy'] = float(np.mean(preds_nm == labels_test))
+        if selected_metrics.get('mse', False):
+            nm_metrics['mse'] = 0.0
+        tqdm.write(f'  no_mismatch: {nm_metrics}')
 
-        results: list[AlignmentResult] = []
+        for model_a in tqdm(models_a, desc='Models A', unit='model'):
+            out_path = results_dir / f'{model_a}__{model_b}__{dataset}.parquet'
 
-        # fit linear map once (SVD is reused across k values)
-        linear_svd = None
-        if 'linear' in selected_methods:
-            tqdm.write('  linear: fitting SVD of linear map...')
-            linear_svd = _fit_linear(la_train, lb_train, seed)
+            # Skip if already complete
+            if out_path.exists():
+                _existing = pl.read_parquet(out_path)
+                if _existing['method'].is_in(['no_mismatch']).any():
+                    tqdm.write(f'[SKIP] {model_a} → {model_b} ({out_path.name})')
+                    continue
 
-        for k in tqdm(k_values, desc='  k values', unit='k', leave=False):
-            tqdm.write(f'\n  [k={k}]')
+            tqdm.write(f'\n{"="*60}')
+            tqdm.write(f'[PAIR] {model_a}  →  {model_b}')
 
-            if 'proto' in selected_methods:
-                tqdm.write('    proto: transmitting...')
-                b_hat_proto = _proto_transmit(la_train, lb_train, la_test, k, seed)
-                m_proto = _compute_metrics(
-                    selected_metrics, b_hat_proto, lb_test,
-                    lb_train, labels_train, labels_test, device,
-                )
-                tqdm.write(f'    proto: {m_proto}')
-                results.append(AlignmentResult(model_a, model_b, 'proto', k, m_proto))
+            if cfg.get('save_results', True):
+                nm_row = pl.DataFrame([{
+                    'model_a': model_a, 'model_b': model_b,
+                    'method': 'no_mismatch', 'k': 0, **nm_metrics,
+                }])
+                if out_path.exists():
+                    df = pl.concat([pl.read_parquet(out_path), nm_row], how='diagonal')
+                    df.write_parquet(out_path)
+                    tqdm.write(f'  [PATCHED] {out_path.name}')
+                    continue
 
-            if 'cca' in selected_methods:
-                tqdm.write('    cca:   transmitting...')
-                b_hat_cca = _cca_transmit(la_train, lb_train, la_test, k)
-                m_cca = _compute_metrics(
-                    selected_metrics, b_hat_cca, lb_test,
-                    lb_train, labels_train, labels_test, device,
-                )
-                tqdm.write(f'    cca:   {m_cca}')
-                results.append(AlignmentResult(model_a, model_b, 'cca', k, m_cca))
+            # ── Full alignment (only for brand-new parquets) ───────────────────
+            tqdm.write(f'  Loading {model_a} train...')
+            la_train, _ = _load_split(dataset_path, model_a, cfg.train_split)
+            tqdm.write(f'  Loading {model_a} test...')
+            la_test, _ = _load_split(dataset_path, model_a, cfg.test_split)
 
-            if linear_svd is not None:
-                U, s, Vt, ls_a_lin, ls_b_lin = linear_svd
-                b_hat_lin = _linear_transmit(la_test, U, s, Vt, ls_a_lin, ls_b_lin, k)
-                m_lin = _compute_metrics(
-                    selected_metrics, b_hat_lin, lb_test,
-                    lb_train, labels_train, labels_test, device,
-                )
-                tqdm.write(f'    linear: {m_lin}')
-                results.append(AlignmentResult(model_a, model_b, 'linear', k, m_lin))
+            tqdm.write(
+                f'  Train A={la_train.shape}  B={lb_train.shape}'
+                f'  |  Test A={la_test.shape}  B={lb_test.shape}'
+            )
 
-        # ── Save parquet ───────────────────────────────────────────────────────
-        if cfg.get('save_results', True):
-            rows = []
-            for r in results:
-                row = {
-                    'model_a': r.model_a,
-                    'model_b': r.model_b,
-                    'method': r.method,
-                    'k': r.k,
-                }
-                row.update(r.metrics)
-                rows.append(row)
+            results: list[AlignmentResult] = []
+            results.append(AlignmentResult(model_a, model_b, 'no_mismatch', 0, nm_metrics))
 
-            df = pl.DataFrame(rows)
-            df.write_parquet(out_path)
-            tqdm.write(f'\n  [SAVED] {out_path}')
-            tqdm.write(str(df))
+            linear_svd = None
+            if 'linear' in selected_methods:
+                tqdm.write('  linear: fitting SVD of linear map...')
+                linear_svd = _fit_linear(la_train, lb_train, seed)
+
+            for k in tqdm(k_values, desc='  k values', unit='k', leave=False):
+                tqdm.write(f'\n  [k={k}]')
+
+                if 'proto' in selected_methods:
+                    tqdm.write('    proto: transmitting...')
+                    b_hat_proto = _proto_transmit(la_train, lb_train, la_test, k, seed)
+                    m_proto = _compute_metrics(
+                        selected_metrics, b_hat_proto, lb_test,
+                        lb_train, labels_train, labels_test, device,
+                    )
+                    tqdm.write(f'    proto: {m_proto}')
+                    results.append(AlignmentResult(model_a, model_b, 'proto', k, m_proto))
+
+                if 'cca' in selected_methods:
+                    tqdm.write('    cca:   transmitting...')
+                    b_hat_cca = _cca_transmit(la_train, lb_train, la_test, k)
+                    m_cca = _compute_metrics(
+                        selected_metrics, b_hat_cca, lb_test,
+                        lb_train, labels_train, labels_test, device,
+                    )
+                    tqdm.write(f'    cca:   {m_cca}')
+                    results.append(AlignmentResult(model_a, model_b, 'cca', k, m_cca))
+
+                if linear_svd is not None:
+                    U, s, Vt, ls_a_lin, ls_b_lin = linear_svd
+                    b_hat_lin = _linear_transmit(la_test, U, s, Vt, ls_a_lin, ls_b_lin, k)
+                    m_lin = _compute_metrics(
+                        selected_metrics, b_hat_lin, lb_test,
+                        lb_train, labels_train, labels_test, device,
+                    )
+                    tqdm.write(f'    linear: {m_lin}')
+                    results.append(AlignmentResult(model_a, model_b, 'linear', k, m_lin))
+
+            # ── Save parquet ───────────────────────────────────────────────────
+            if cfg.get('save_results', True):
+                rows = []
+                for r in results:
+                    row = {'model_a': r.model_a, 'model_b': r.model_b, 'method': r.method, 'k': r.k}
+                    row.update(r.metrics)
+                    rows.append(row)
+                df = pl.DataFrame(rows)
+                df.write_parquet(out_path)
+                tqdm.write(f'\n  [SAVED] {out_path}')
+                tqdm.write(str(df))
 
 
 if __name__ == '__main__':

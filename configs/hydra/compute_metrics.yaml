@@ -3,7 +3,7 @@ defaults:
   - clustering: kmeans
 
 repo_id: "spaicom-lab"
-prefix: "semantic-"
+prefix: "semasia-"
 dataset: mnist
 split: train
 model: null

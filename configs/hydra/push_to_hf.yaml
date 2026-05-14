@@ -7,6 +7,6 @@ defaults:
 # --------------------------
 hf:
     namespace: spaicom-lab # 👈 replace with your HF username or org
-    repo_prefix: semantic- # will create repos like "<namespace>/semantic-cifar10"
+    repo_prefix: semasia- # will create repos like "<namespace>/semasia-cifar10"
     private: false # set to true if you want private repos
     commit_message: "Add/update parquet shards and configs"

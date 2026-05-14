@@ -3,7 +3,7 @@ defaults:
     - dataset: cifar10
 
 repo_id: "spaicom-lab"
-prefix: "semantic-"
+prefix: "semasia-"
 model: null # set to a specific model name to filter, or leave null to run all
 splits: [train]
 seed: 42

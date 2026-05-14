@@ -27,6 +27,8 @@ _METHOD_PALETTE = {
     'linear': '#00CC96',
 }
 
+_NM_COLOR = '#636363'  # grey for the No Mismatch baseline
+
 
 @hydra.main(
     config_path='../configs/hydra/',
@@ -60,6 +62,7 @@ def main(cfg: DictConfig) -> None:
     data['k'] = data['k'].astype(int)
 
     methods: list[str] = list(cfg.get('methods', ['proto', 'cca', 'linear']))
+    nm_data = data[data['method'] == 'no_mismatch'].copy()
     data = data[data['method'].isin(methods)]
     if data.empty:
         print(f'[WARN] No data left after filtering for methods {methods}.')
@@ -101,6 +104,16 @@ def main(cfg: DictConfig) -> None:
                 ax=ax,
             )
 
+            # No Mismatch baseline: horizontal line (mean ± SE across pairs)
+            has_nm = False
+            nm_subset = nm_data[(nm_data['dataset'] == dataset) & nm_data[metric].notna()]
+            if metric != 'mse' and not nm_subset.empty:
+                nm_mean = nm_subset[metric].mean()
+                ax.axhline(
+                    nm_mean, color=_NM_COLOR, linestyle='--', linewidth=1.5, label='No Mismatch',
+                )
+                has_nm = True
+
             ax.set_xlabel('k', fontsize=12)
             ax.set_ylabel(metric.capitalize(), fontsize=12)
             ax.set_title(dataset, fontsize=13)
@@ -111,17 +124,20 @@ def main(cfg: DictConfig) -> None:
             ax.set_xticks(k_vals)
             ax.set_xticklabels([str(k) for k in k_vals])
             ax.set_xlim(k_vals[0], k_vals[-1])
+            if metric == 'accuracy':
+                ax.set_ylim(None, 1)
 
-            _LABEL_MAP = {'proto': 'Proto', 'cca': 'CCA', 'linear': 'Linear'}
+            _LABEL_MAP = {'proto': 'Proto', 'cca': 'CCA', 'linear': 'Linear', 'No Mismatch': 'No Mismatch'}
             handles, labels = ax.get_legend_handles_labels()
             labels = [_LABEL_MAP.get(l, l) for l in labels]
+            ncol = len(present_methods) + (1 if has_nm else 0)
             ax.legend(
                 handles,
                 labels,
                 title=None,
                 loc='upper center',
                 bbox_to_anchor=(0.5, 1.28),
-                ncol=len(present_methods),
+                ncol=ncol,
                 frameon=True,
             )
 

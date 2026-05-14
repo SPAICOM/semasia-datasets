@@ -7,7 +7,7 @@ defaults:
 # --------------------------
 hf:
     namespace: spaicom-lab # 👈 replace with your HF username or org
-    repo_prefix: semantic- # will create repos like "<namespace>/semantic-cifar10"
+    repo_prefix: semasia- # will create repos like "<namespace>/semasia-cifar10"
     private: false # set to true if you want private repos
     commit_message: "Add/update readme"
 
@@ -15,4 +15,4 @@ hydra:
     mode: MULTIRUN
     sweeper:
         params:
-            dataset: cifar10,cifar100,mnist,fashion_mnist,tiny_imagenet,svhn,imagenet-1k,celeba,oxford-flowers
+            dataset: cifar10,cifar100,mnist,fashion_mnist,tiny_imagenet,imagenet-1k,celeba,oxford-flowers

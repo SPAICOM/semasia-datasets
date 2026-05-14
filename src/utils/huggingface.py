@@ -405,7 +405,7 @@ def generate_model_registry_readme(
     repo_dir : Path
         Local directory where the README.md will be written.
     repo_id : str
-        Full Hugging Face repository ID (e.g., "spaicom-lab/model-registry").
+        Full Hugging Face repository ID (e.g., "spaicom-lab/semasia-model-registry").
     num_models : int
         Number of models in the registry.
     push_online : bool, optional
@@ -447,7 +447,7 @@ def generate_model_registry_readme(
     from datasets import load_dataset
     import polars as pl
 
-    ds = load_dataset("spaicom-lab/model-registry")
+    ds = load_dataset("spaicom-lab/semasia-model-registry")
     df = ds["train"].to_polars()
 
     # Query by model name

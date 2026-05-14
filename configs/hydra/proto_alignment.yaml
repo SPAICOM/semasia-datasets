@@ -1,5 +1,5 @@
 repo_id: "spaicom-lab"
-prefix: "semantic-"
+prefix: "semasia-"
 
 dataset: cifar10
 train_split: train
