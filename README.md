@@ -3,9 +3,8 @@
 
 <h5 align="center">
     
-[![ieee](https://img.shields.io/static/v1?label=IEEE+Paper&message=ID-HERE&color=0057b7&logo=ieee)](https://ieeexplore.ieee.org/document/ID-HERE)
-[![arXiv](https://img.shields.io/badge/Arxiv-ID.HERE-b31b1b.svg?logo=arXiv)](https://arxiv.org/abs/CODE.HERE)
-[![License](https://img.shields.io/badge/Code%20License-MIT-yellow)](https://github.com/SPAICOM/REPO-NAME-HERE/blob/main/LICENSE)
+[![arXiv](https://img.shields.io/badge/Arxiv-2605.09485-b31b1b.svg?logo=arXiv)](https://arxiv.org/abs/2605.09485)
+[![License](https://img.shields.io/badge/Code%20License-MIT-yellow)](https://github.com/SPAICOM/semasia-datasets/blob/main/LICENSE)
 
  <br>
 
