@@ -5,6 +5,7 @@
     
 [![arXiv](https://img.shields.io/badge/Arxiv-2605.09485-b31b1b.svg?logo=arXiv)](https://arxiv.org/abs/2605.09485)
 [![License](https://img.shields.io/badge/Code%20License-MIT-yellow)](https://github.com/SPAICOM/semasia-datasets/blob/main/LICENSE)
+[![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/SPAICOM/semasia-datasets/blob/main/notebooks/semasia.py)
 
  <br>
 
