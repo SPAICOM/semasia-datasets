@@ -2,10 +2,10 @@
 # requires-python = ">=3.12"
 # dependencies = [
 #     "datasets>=4.8.5",
-#     "huggingface-hub>=1.15.0",
+#     "huggingface-hub==1.15.0",
 #     "marimo>=0.23.6",
 #     "matplotlib>=3.10.9",
-#     "numpy>=2.4.5",
+#     "numpy==2.4.5",
 #     "plotly>=6.7.0",
 #     "polars>=1.40.1",
 #     "scikit-learn>=1.8.0",
