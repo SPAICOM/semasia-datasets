@@ -2,10 +2,10 @@
 # requires-python = ">=3.12"
 # dependencies = [
 #     "datasets>=4.8.5",
-#     "huggingface-hub==1.15.0",
+#     "huggingface-hub>=1.15.0",
 #     "marimo>=0.23.6",
 #     "matplotlib>=3.10.9",
-#     "numpy==2.4.5",
+#     "numpy>=2.4.5",
 #     "plotly>=6.7.0",
 #     "polars>=1.40.1",
 #     "scikit-learn>=1.8.0",
@@ -259,6 +259,17 @@ def _(mo):
 
 @app.cell(hide_code=True)
 def _(mo):
+    mo.md("""
+    ---
+    ## Interactive Demo — Latent Space Exploration
+
+    Load latent representations from a chosen model and benchmark, project them to 2D with **PCA / t-SNE / UMAP**, and select points to inspect the original images. A **parallel coordinates** view lets you brush along principal axes to reveal hierarchical semantic structure.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
     hf_token_ui = mo.ui.text(placeholder="hf_...", label="HuggingFace Token", kind="password")
     mo.vstack([
         mo.callout(mo.md(r"""
@@ -384,7 +395,6 @@ def _(
     mo,
 ):
     mo.vstack([
-        mo.md("---\n## Interactive Demo — Latent Space Exploration\n\nLoad latent representations from a chosen model and benchmark, project them to 2D with **PCA / t-SNE / UMAP**, and select points to inspect the original images. A **parallel coordinates** view lets you brush along principal axes to reveal hierarchical semantic structure.\n\n↓ Configure dataset, model, and reduction method below."),
         mo.hstack([l_model_ui, l_method_ui, l_n_samples_ui, l_show_legend_ui], gap=2),
         mo.md("**Split per dataset:**"),
         mo.hstack(list(l_split_uis.values()), gap=2, wrap=True),
