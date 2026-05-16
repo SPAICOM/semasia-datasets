@@ -260,11 +260,29 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     hf_token_ui = mo.ui.text(placeholder="hf_...", label="HuggingFace Token", kind="password")
+    mo.vstack([
+        mo.callout(mo.md(r"""
+    **A HuggingFace token is required** to access the SEMASIA datasets.
+
+    We recommend creating a **dedicated, short-lived token** with minimal permissions:
+
+    1. Open [huggingface.co/settings/tokens/new](https://huggingface.co/settings/tokens/new)
+    2. Choose **Fine-grained**, give it a name like *semasia-demo*
+    3. Under *Repository permissions* set only **Read access to contents of all public gated repos you can access**
+    4. Paste it below — held **only in memory**, never written to disk or to this notebook file
+    5. **Revoke it** from [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens) once the demo is over
+    """), kind="warn"),
+        hf_token_ui,
+    ])
     return (hf_token_ui,)
 
 
 @app.cell(hide_code=True)
 def _(HF_REPO, hf_token_ui, mo):
+    mo.stop(
+        not hf_token_ui.value,
+        mo.callout(mo.md("Enter your HuggingFace token above to load the model list."), kind="info"),
+    )
     import os as _os
     from collections import defaultdict
     from pathlib import PurePosixPath
@@ -357,7 +375,6 @@ def _(l_available_datasets, mo):
 
 @app.cell(hide_code=True)
 def _(
-    hf_token_ui,
     l_deselect_ui,
     l_method_ui,
     l_model_ui,
@@ -367,19 +384,7 @@ def _(
     mo,
 ):
     mo.vstack([
-        mo.md("---\n## Interactive Demo — Latent Space Exploration\n\nLoad latent representations from a chosen model and benchmark, project them to 2D with **PCA / t-SNE / UMAP**, and select points to inspect the original images. A **parallel coordinates** view lets you brush along principal axes to reveal hierarchical semantic structure."),
-        mo.callout(mo.md(r"""
-    **A HuggingFace token is required** to access the SEMASIA datasets.
-
-    For this demo we recommend creating a **dedicated, short-lived token** with minimal permissions:
-
-    1. Open [huggingface.co/settings/tokens/new](https://huggingface.co/settings/tokens/new)
-    2. Choose **Fine-grained**, give it a name like *semasia-demo*
-    3. Under *Repository permissions* set **Read access to contents of all public gated repos you can access** — nothing else
-    4. Copy the token below — it is held **only in memory** for this session and is never written to disk or to this notebook file
-    5. **Revoke it** from [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens) once the demo is over
-    """), kind="warn"),
-        hf_token_ui,
+        mo.md("---\n## Interactive Demo — Latent Space Exploration\n\nLoad latent representations from a chosen model and benchmark, project them to 2D with **PCA / t-SNE / UMAP**, and select points to inspect the original images. A **parallel coordinates** view lets you brush along principal axes to reveal hierarchical semantic structure.\n\n↓ Configure dataset, model, and reduction method below."),
         mo.hstack([l_model_ui, l_method_ui, l_n_samples_ui, l_show_legend_ui], gap=2),
         mo.md("**Split per dataset:**"),
         mo.hstack(list(l_split_uis.values()), gap=2, wrap=True),
