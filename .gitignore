@@ -222,9 +222,6 @@ data/*
 results/*
 *.ipynb
 
-# Others
-img/
-
 *.img
 *.jpeg
 *.jpg

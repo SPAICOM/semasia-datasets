@@ -118,9 +118,7 @@ def _proto_transmit(
     ls_b.prewhiten(inplace=True)
     ls_b.compute_injected_prototypes(indices_a, apply_parseval=True)
 
-    b_hat = ls_b.apply_dewhitening_operator(
-        ls_b.apply_synthesis_operator(a_test_proto)
-    )
+    b_hat = ls_b.apply_dewhitening_operator(ls_b.apply_synthesis_operator(a_test_proto))
     return b_hat
 
 
@@ -159,7 +157,7 @@ def _linear_transmit(
     k = min(k, len(s))
     s_k = np.zeros_like(s)
     s_k[:k] = s[:k]
-    M_k = (U * s_k) @ Vt                               # (d_a, d_b)
+    M_k = (U * s_k) @ Vt  # (d_a, d_b)
     la_test_w = ls_a.apply_whitening_operator(la_test)
     return ls_b.apply_dewhitening_operator((la_test_w @ M_k).astype(np.float32))
 
@@ -214,8 +212,8 @@ def _cca_transmit(
     then reconstructs in B's original space via the pseudo-inverse of W_b.
     """
     W_a, W_b, x_mean, y_mean = _fit_cca(la_train, lb_train, k)
-    a_test_c = (la_test - x_mean) @ W_a          # (n_test, k)
-    W_b_pinv = np.linalg.pinv(W_b)               # (k, d_b)
+    a_test_c = (la_test - x_mean) @ W_a  # (n_test, k)
+    W_b_pinv = np.linalg.pinv(W_b)  # (k, d_b)
     return (a_test_c @ W_b_pinv + y_mean).astype(np.float32)
 
 
@@ -273,14 +271,21 @@ def main(cfg: DictConfig) -> None:
                     tqdm.write(f'[SKIP] {model_a} → {model_b} ({out_path.name})')
                     continue
 
-            tqdm.write(f'\n{"="*60}')
+            tqdm.write(f'\n{"=" * 60}')
             tqdm.write(f'[PAIR] {model_a}  →  {model_b}')
 
             if cfg.get('save_results', True):
-                nm_row = pl.DataFrame([{
-                    'model_a': model_a, 'model_b': model_b,
-                    'method': 'no_mismatch', 'k': 0, **nm_metrics,
-                }])
+                nm_row = pl.DataFrame(
+                    [
+                        {
+                            'model_a': model_a,
+                            'model_b': model_b,
+                            'method': 'no_mismatch',
+                            'k': 0,
+                            **nm_metrics,
+                        }
+                    ]
+                )
                 if out_path.exists():
                     df = pl.concat([pl.read_parquet(out_path), nm_row], how='diagonal')
                     df.write_parquet(out_path)
@@ -299,7 +304,9 @@ def main(cfg: DictConfig) -> None:
             )
 
             results: list[AlignmentResult] = []
-            results.append(AlignmentResult(model_a, model_b, 'no_mismatch', 0, nm_metrics))
+            results.append(
+                AlignmentResult(model_a, model_b, 'no_mismatch', 0, nm_metrics)
+            )
 
             linear_svd = None
             if 'linear' in selected_methods:
@@ -313,37 +320,63 @@ def main(cfg: DictConfig) -> None:
                     tqdm.write('    proto: transmitting...')
                     b_hat_proto = _proto_transmit(la_train, lb_train, la_test, k, seed)
                     m_proto = _compute_metrics(
-                        selected_metrics, b_hat_proto, lb_test,
-                        lb_train, labels_train, labels_test, device,
+                        selected_metrics,
+                        b_hat_proto,
+                        lb_test,
+                        lb_train,
+                        labels_train,
+                        labels_test,
+                        device,
                     )
                     tqdm.write(f'    proto: {m_proto}')
-                    results.append(AlignmentResult(model_a, model_b, 'proto', k, m_proto))
+                    results.append(
+                        AlignmentResult(model_a, model_b, 'proto', k, m_proto)
+                    )
 
                 if 'cca' in selected_methods:
                     tqdm.write('    cca:   transmitting...')
                     b_hat_cca = _cca_transmit(la_train, lb_train, la_test, k)
                     m_cca = _compute_metrics(
-                        selected_metrics, b_hat_cca, lb_test,
-                        lb_train, labels_train, labels_test, device,
+                        selected_metrics,
+                        b_hat_cca,
+                        lb_test,
+                        lb_train,
+                        labels_train,
+                        labels_test,
+                        device,
                     )
                     tqdm.write(f'    cca:   {m_cca}')
                     results.append(AlignmentResult(model_a, model_b, 'cca', k, m_cca))
 
                 if linear_svd is not None:
                     U, s, Vt, ls_a_lin, ls_b_lin = linear_svd
-                    b_hat_lin = _linear_transmit(la_test, U, s, Vt, ls_a_lin, ls_b_lin, k)
+                    b_hat_lin = _linear_transmit(
+                        la_test, U, s, Vt, ls_a_lin, ls_b_lin, k
+                    )
                     m_lin = _compute_metrics(
-                        selected_metrics, b_hat_lin, lb_test,
-                        lb_train, labels_train, labels_test, device,
+                        selected_metrics,
+                        b_hat_lin,
+                        lb_test,
+                        lb_train,
+                        labels_train,
+                        labels_test,
+                        device,
                     )
                     tqdm.write(f'    linear: {m_lin}')
-                    results.append(AlignmentResult(model_a, model_b, 'linear', k, m_lin))
+                    results.append(
+                        AlignmentResult(model_a, model_b, 'linear', k, m_lin)
+                    )
 
             # ── Save parquet ───────────────────────────────────────────────────
             if cfg.get('save_results', True):
                 rows = []
                 for r in results:
-                    row = {'model_a': r.model_a, 'model_b': r.model_b, 'method': r.method, 'k': r.k}
+                    row = {
+                        'model_a': r.model_a,
+                        'model_b': r.model_b,
+                        'method': r.method,
+                        'k': r.k,
+                    }
                     row.update(r.metrics)
                     rows.append(row)
                 df = pl.DataFrame(rows)

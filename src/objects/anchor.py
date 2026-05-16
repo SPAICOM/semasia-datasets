@@ -198,7 +198,9 @@ class Anchor:
             mask = cluster_labels == c
             in_cluster = data_for_centroids[mask]
 
-            n_use = min(n_samples, in_cluster.shape[0]) if n_samples is not None else None
+            n_use = (
+                min(n_samples, in_cluster.shape[0]) if n_samples is not None else None
+            )
 
             if n_use is None:
                 anchors[i] = in_cluster.mean(axis=0)
@@ -227,6 +229,7 @@ class Anchor:
         self._anchors = data[idx].astype(np.float32)
         # Voronoi partition: assign each point to its nearest anchor
         from scipy.spatial.distance import cdist
+
         dists = cdist(self._point_cloud, self._anchors, metric='euclidean')
         labels = dists.argmin(axis=1)
         for i in range(n_anchors):

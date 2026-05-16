@@ -34,8 +34,33 @@ model-registry:
 tda-extraction:
     uv run scripts/tda_extraction.py
 
+# Run the TSP (graph-based) signature extraction for all timm models
 tsp-extraction:
     uv run scripts/tsp_extraction.py
+
+# Compute pairwise TDA distances for a dataset (bottleneck by default)
+tda-compare DATASET:
+    uv run scripts/tda_comparison.py dataset={{DATASET}}
+
+# Compute pairwise TDA distances with a specific distance metric (bottleneck | wasserstein | hausdorff | betti_curve)
+tda-compare-distance DATASET DISTANCE:
+    uv run scripts/tda_comparison.py dataset={{DATASET}} comparison.distance={{DISTANCE}}
+
+# Plot persistence diagrams and images for all models
+tda-diagrams:
+    uv run scripts/tda.py
+
+# Plot persistence diagrams and images for a specific dataset
+tda-diagrams-dataset DATASET:
+    uv run scripts/tda.py dataset={{DATASET}}
+
+# Plot TDA model distance graph (uses tda_plot config defaults)
+tda-graph:
+    uv run scripts/tda_plot.py
+
+# Plot TDA distance graph for a specific dataset
+tda-graph-dataset DATASET:
+    uv run scripts/tda_plot.py dataset={{DATASET}}
 
 # Phase 1: Download all model latents (no computation)
 compute-download:
@@ -117,3 +142,15 @@ proto-alignment-dataset DATASET:
 # Run prototype alignment with custom models
 proto-alignment-models MODEL_A MODEL_B:
     uv run scripts/proto_alignment.py model_a={{MODEL_A}} model_b={{MODEL_B}}
+
+# Run semantic alignment evaluation across model pairs and datasets
+alignment:
+    uv run scripts/alignment.py
+
+# Plot alignment metrics vs compression ratio (k) for all datasets and methods
+alignment-plot:
+    uv run scripts/plot_alignment.py
+
+# Plot PC correlation heatmap between two models on a dataset
+plot-heatmap MODEL_A MODEL_B DATASET:
+    uv run scripts/plot_correlation_heatmap.py {{MODEL_A}} {{MODEL_B}} {{DATASET}}

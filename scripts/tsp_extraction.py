@@ -87,9 +87,14 @@ def main(cfg: DictConfig) -> None:
             if split not in cfg.splits:
                 continue
 
-            out_path = RESULTS / f'{cfg.repo_id}__{cfg.prefix}{dataset_id}__{split}__{model}.parquet'
+            out_path = (
+                RESULTS
+                / f'{cfg.repo_id}__{cfg.prefix}{dataset_id}__{split}__{model}.parquet'
+            )
             if out_path.exists():
-                print(f"Skipping model '{model}', split '{split}': signature already exists")
+                print(
+                    f"Skipping model '{model}', split '{split}': signature already exists"
+                )
                 continue
 
             temp: dict[str, any] = {
@@ -147,7 +152,9 @@ def main(cfg: DictConfig) -> None:
                 graph.compute_laplacian(cfg.graph.laplacian_normalization)
                 raw_metrics = graph.compute_metrics(eigengap_k=cfg.graph.eigengap_k)
 
-                pl.DataFrame(temp | _serialize_metrics(raw_metrics)).write_parquet(out_path)
+                pl.DataFrame(temp | _serialize_metrics(raw_metrics)).write_parquet(
+                    out_path
+                )
 
                 remove_matching('~/.cache/huggingface/datasets/', f'{cache_pattern}*')
                 remove_matching('~/.cache/huggingface/hub/', hub_pattern)

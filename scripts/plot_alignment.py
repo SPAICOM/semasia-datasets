@@ -49,12 +49,11 @@ def main(cfg: DictConfig) -> None:
     for path in parquet_files:
         parts = path.stem.split('__')
         dataset = parts[2] if len(parts) >= 3 else path.stem
-        df = (
-            pl.read_parquet(path)
-            .with_columns([
+        df = pl.read_parquet(path).with_columns(
+            [
                 pl.lit(dataset).alias('dataset'),
                 (pl.col('model_a') + ' → ' + pl.col('model_b')).alias('pair'),
-            ])
+            ]
         )
         frames.append(df)
 
@@ -79,7 +78,9 @@ def main(cfg: DictConfig) -> None:
     log_x: bool = bool(cfg.get('log_x', False))
 
     datasets = data['dataset'].unique()
-    print(f'[INFO] Datasets: {list(datasets)}  |  Methods: {present_methods}  |  Metrics: {available}')
+    print(
+        f'[INFO] Datasets: {list(datasets)}  |  Methods: {present_methods}  |  Metrics: {available}'
+    )
 
     sns.set_theme(style='whitegrid', font='serif', font_scale=1.1)
 
@@ -106,11 +107,17 @@ def main(cfg: DictConfig) -> None:
 
             # No Mismatch baseline: horizontal line (mean ± SE across pairs)
             has_nm = False
-            nm_subset = nm_data[(nm_data['dataset'] == dataset) & nm_data[metric].notna()]
+            nm_subset = nm_data[
+                (nm_data['dataset'] == dataset) & nm_data[metric].notna()
+            ]
             if metric != 'mse' and not nm_subset.empty:
                 nm_mean = nm_subset[metric].mean()
                 ax.axhline(
-                    nm_mean, color=_NM_COLOR, linestyle='--', linewidth=1.5, label='No Mismatch',
+                    nm_mean,
+                    color=_NM_COLOR,
+                    linestyle='--',
+                    linewidth=1.5,
+                    label='No Mismatch',
                 )
                 has_nm = True
 
@@ -127,7 +134,12 @@ def main(cfg: DictConfig) -> None:
             if metric == 'accuracy':
                 ax.set_ylim(None, 1)
 
-            _LABEL_MAP = {'proto': 'Proto', 'cca': 'CCA', 'linear': 'Linear', 'No Mismatch': 'No Mismatch'}
+            _LABEL_MAP = {
+                'proto': 'Proto',
+                'cca': 'CCA',
+                'linear': 'Linear',
+                'No Mismatch': 'No Mismatch',
+            }
             handles, labels = ax.get_legend_handles_labels()
             labels = [_LABEL_MAP.get(l, l) for l in labels]
             ncol = len(present_methods) + (1 if has_nm else 0)
