@@ -2,10 +2,10 @@
 # requires-python = ">=3.12"
 # dependencies = [
 #     "datasets>=4.8.5",
-#     "huggingface-hub==1.15.0",
+#     "huggingface-hub>=1.15.0",
 #     "marimo>=0.23.6",
 #     "matplotlib>=3.10.9",
-#     "numpy==2.4.5",
+#     "numpy>=2.4.5",
 #     "plotly>=6.7.0",
 #     "polars>=1.40.1",
 #     "scikit-learn>=1.8.0",
@@ -14,6 +14,7 @@
 #     "wigglystuff>=0.5.0",
 # ]
 # ///
+
 import marimo
 
 __generated_with = "0.23.5"
@@ -257,18 +258,30 @@ def _(mo):
 
 
 @app.cell(hide_code=True)
-def _(HF_REPO, mo):
+def _(mo):
+    hf_token_ui = mo.ui.text(placeholder="hf_...", label="HuggingFace Token", kind="password")
+    return (hf_token_ui,)
+
+
+@app.cell(hide_code=True)
+def _(HF_REPO, hf_token_ui, mo):
+    import os as _os
     from collections import defaultdict
     from pathlib import PurePosixPath
     from huggingface_hub import HfApi
     from huggingface_hub.utils import get_token
 
-    def collect_models_by_split(repo_id: str) -> dict[str, set[str]] | None:
-        token = get_token()
-        if token is None:
-            print("[WARN] No HF token found. Run `huggingface-cli login` or set HF_TOKEN.")
+    if hf_token_ui.value:
+        _os.environ["HF_TOKEN"] = hf_token_ui.value
+    else:
+        _os.environ.pop("HF_TOKEN", None)
+
+    def collect_models_by_split(repo_id: str, token: str | None = None) -> dict[str, set[str]] | None:
+        _tok = token or get_token()
+        if _tok is None:
+            print("[WARN] No HF token found. Enter your token above or run `huggingface-cli login`.")
             return None
-        api = HfApi(token=token)
+        api = HfApi(token=_tok)
         files = api.list_repo_files(repo_id=repo_id, repo_type="dataset")
         models_by_split: dict = defaultdict(set)
         for f in files:
@@ -278,14 +291,17 @@ def _(HF_REPO, mo):
             models_by_split[path.parts[0]].add(path.parts[1])
         return dict(models_by_split)
 
+    _token = hf_token_ui.value or None
     _ds_options = ["cifar10", "cifar100", "mnist", "fashion_mnist", "oxford-flowers", "tiny-imagenet"]
 
     with mo.status.spinner(title="Fetching available models for all datasets…"):
         l_all_info: dict = {}
         for _ds in _ds_options:
-            _mbs = collect_models_by_split(HF_REPO + _ds)
+            _mbs = collect_models_by_split(HF_REPO + _ds, token=_token)
             if _mbs:
                 l_all_info[_ds] = _mbs
+
+    del _token  # don't keep the raw token in cell scope longer than needed
 
     l_all_models = sorted(
         set().union(*(set().union(*splits.values()) for splits in l_all_info.values()))
@@ -341,6 +357,7 @@ def _(l_available_datasets, mo):
 
 @app.cell(hide_code=True)
 def _(
+    hf_token_ui,
     l_deselect_ui,
     l_method_ui,
     l_model_ui,
@@ -350,7 +367,19 @@ def _(
     mo,
 ):
     mo.vstack([
-        mo.md("---\n## Interactive Demo — Latent Space Exploration\n\nLoad latent representations from a chosen model and benchmark, project them to 2D with **PCA / t-SNE / UMAP**, and select points to inspect the original images. A **parallel coordinates** view lets you brush along principal axes to reveal hierarchical semantic structure.\n\n↓ Configure dataset, model, and reduction method below."),
+        mo.md("---\n## Interactive Demo — Latent Space Exploration\n\nLoad latent representations from a chosen model and benchmark, project them to 2D with **PCA / t-SNE / UMAP**, and select points to inspect the original images. A **parallel coordinates** view lets you brush along principal axes to reveal hierarchical semantic structure."),
+        mo.callout(mo.md(r"""
+    **A HuggingFace token is required** to access the SEMASIA datasets.
+
+    For this demo we recommend creating a **dedicated, short-lived token** with minimal permissions:
+
+    1. Open [huggingface.co/settings/tokens/new](https://huggingface.co/settings/tokens/new)
+    2. Choose **Fine-grained**, give it a name like *semasia-demo*
+    3. Under *Repository permissions* set **Read access to contents of all public gated repos you can access** — nothing else
+    4. Copy the token below — it is held **only in memory** for this session and is never written to disk or to this notebook file
+    5. **Revoke it** from [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens) once the demo is over
+    """), kind="warn"),
+        hf_token_ui,
         mo.hstack([l_model_ui, l_method_ui, l_n_samples_ui, l_show_legend_ui], gap=2),
         mo.md("**Split per dataset:**"),
         mo.hstack(list(l_split_uis.values()), gap=2, wrap=True),
