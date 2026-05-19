@@ -13,6 +13,14 @@ format:
 # Run formatting and linting (CI-style target)
 clean: format check
 
+# Check if parquet files on HuggingFace are readable for all datasets
+check-hf:
+    uv run scripts/check_hf_parquet.py
+
+# Check if parquet files on HuggingFace are readable for a specific dataset
+check-hf-dataset DATASET:
+    uv run scripts/check_hf_parquet.py 'datasets=[{{DATASET}}]'
+
 # Generate or Update all readme on HF (Update yaml)
 readme:
     uv run scripts/generate_readme.py

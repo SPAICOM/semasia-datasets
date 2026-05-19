@@ -220,6 +220,7 @@ trash/
 tmp/
 data/*
 results/*
+check/*
 *.ipynb
 
 *.img

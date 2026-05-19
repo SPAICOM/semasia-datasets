@@ -1,0 +1,13 @@
+datasets:
+    - cifar10
+    - cifar100
+    - mnist
+    - fashion_mnist
+    - tiny_imagenet
+    - oxford-flowers
+    - celeba
+    - imagenet-1k
+
+hf:
+    namespace: spaicom-lab
+    repo_prefix: semasia-
