@@ -101,12 +101,12 @@ def load_existing_models(path: Path) -> set[str]:
 
 def main() -> None:
     """Extract timm model metadata and push to HuggingFace."""
-    repo_id = 'spaicom-lab/model-registry'
-    local_path = Path('data/model-registry')
+    repo_id = 'spaicom-lab/semasia-model-registry'
+    local_path = Path('data/semasia-model-registry')
     temp_dir = local_path / 'temp'
     local_path.mkdir(parents=True, exist_ok=True)
 
-    parquet_path = local_path / 'model_registry.parquet'
+    parquet_path = local_path / 'semasia_model_registry.parquet'
     failed_path = local_path / 'failed_models.json'
 
     if parquet_path.exists() and temp_dir.exists():

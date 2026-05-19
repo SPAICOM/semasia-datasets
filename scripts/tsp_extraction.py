@@ -74,7 +74,7 @@ def main(cfg: DictConfig) -> None:
     hub_pattern: str = f'datasets--{cfg.repo_id}--{cfg.prefix}{dataset_id}*'
 
     models: list[str] = (
-        pl.read_parquet('hf://datasets/spaicom-lab/model-registry/**/*.parquet')
+        pl.read_parquet('hf://datasets/spaicom-lab/semasia-model-registry/**/*.parquet')
         .filter((cfg.model is None) | pl.col('model_name').str.contains(cfg.model))
         .select('model_name')
         .unique()

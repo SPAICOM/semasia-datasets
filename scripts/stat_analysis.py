@@ -155,7 +155,7 @@ def main(cfg: DictConfig) -> None:
             raise ValueError(f'Invalid split {split!r} for dataset {ds!r}.')
 
     print('\n[INFO] Loading model registry...')
-    model_df = pl.read_parquet('hf://datasets/spaicom-lab/model-registry/**/*.parquet')
+    model_df = pl.read_parquet('hf://datasets/spaicom-lab/semasia-model-registry/**/*.parquet')
     model_df = model_df.with_columns(
         pl.col('model_name').str.split('.').list.first().alias('arch_key')
     )
