@@ -22,7 +22,7 @@ def _():
     def _check_models_in_registry(model_a: str, model_b: str) -> None:
         """Check if models exist in the model registry."""
         model_df = pl.read_parquet(
-            'hf://datasets/spaicom-lab/model-registry/**/*.parquet'
+            'hf://datasets/spaicom-lab/semasia-model-registry/**/*.parquet'
         )
         available_models = set(model_df['model_name'].unique().to_list())
         missing = []
@@ -74,7 +74,7 @@ def _():
         n_anchors: int | None = None,
         output_path: str | None = None,
         repo_id: str = 'spaicom-lab',
-        prefix: str = 'semantic-',
+        prefix: str = 'semasia-',
     ) -> None:
         """Plot correlation heatmap between principal components of two models."""
         _check_models_in_registry(model_a, model_b)
@@ -129,7 +129,7 @@ def _():
 @app.cell
 def _():
     # repo_id = 'spaicom-lab'
-    # prefix = 'semantic-'
+    # prefix = 'semasia-'
     # dataset_id: str = cfg.dataset.name.split('/')[-1]
     # dataset: str = f'{cfg.repo_id}/{cfg.prefix}{dataset_id}'
     # cache_pattern: str = f'{cfg.repo_id}___{cfg.prefix}{dataset_id}'
@@ -414,7 +414,7 @@ def _(
         n_anchors: int | None = None,
         output_path: str | None = None,
         repo_id: str = 'spaicom-lab',
-        prefix: str = 'semantic-',
+        prefix: str = 'semasia-',
         figsize: tuple[float, float] = (20, 8),
         cmap: str = 'coolwarm',
     ) -> tuple[plt.Figure, np.ndarray]:

@@ -20,7 +20,7 @@ def _():
     sys.path.insert(0, str(_root))
     from src import collect_models_by_split
 
-    HF_REPO = 'spaicom-lab/semantic-'
+    HF_REPO = 'spaicom-lab/semasia-'
 
     DATASETS = [
         'cifar10',

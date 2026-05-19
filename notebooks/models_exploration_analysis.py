@@ -15,7 +15,7 @@ def _():
 
 @app.cell(hide_code=True)
 def _(load_dataset, pl):
-    dataset = load_dataset('spaicom-lab/model-registry', split='train')
+    dataset = load_dataset('spaicom-lab/semasia-model-registry', split='train')
     df = pl.from_arrow(dataset.data.table)
     df
     return (df,)

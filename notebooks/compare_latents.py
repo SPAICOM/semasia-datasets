@@ -102,7 +102,7 @@ def compare_latents(
     n_anchors: int | None = None,
     output_path: str | None = None,
     repo_id: str = 'spaicom-lab',
-    prefix: str = 'semantic-',
+    prefix: str = 'semasia-',
     figsize: tuple[float, float] = (20, 8),
     cmap: str = 'coolwarm',
 ) -> tuple[plt.Figure, np.ndarray]:

@@ -28,7 +28,7 @@ def _():
     )
     from src.objects import LatentSpace
 
-    HF_REPO = 'spaicom-lab/semantic-'
+    HF_REPO = 'spaicom-lab/semasia-'
 
     DATASETS = [
         'cifar10',

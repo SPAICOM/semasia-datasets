@@ -18,7 +18,7 @@ with app.setup:
     sys.path.insert(0, str(Path(__file__).parent.parent))
     from src import collect_models_by_split
 
-    HF_REPO = 'spaicom-lab/semantic-'
+    HF_REPO = 'spaicom-lab/semasia-'
 
     # ── class-name registry ───────────────────────────────────────────────────
     CLASS_NAMES: dict[str, list[str]] = {
