@@ -5,8 +5,8 @@ For each dataset, uses collect_models_by_split to discover available
 splits and models, then tries pl.scan_parquet over the hf:// URI.
 
 Results are written incrementally (after each model) to:
-    check/<dataset>_working.parquet  — rows: dataset, model, split
-    check/<dataset>_failing.parquet  — rows: dataset, model, error
+    check/<dataset>_working.parquet  — rows: dataset, model  (all splits passed)
+    check/<dataset>_failing.parquet  — rows: dataset, model, error  (any split failed)
 
 Usage:
     uv run scripts/check_hf_parquet.py
@@ -59,8 +59,11 @@ def main(cfg: DictConfig) -> None:
         failing_path = check_dir / f'{dataset}_failing.parquet'
 
         # Load previously saved results to avoid re-checking
+        # Select only dataset/model to handle old files that included a split column
         working: list[dict] = (
-            pl.read_parquet(working_path).to_dicts() if working_path.exists() else []
+            pl.read_parquet(working_path).select(['dataset', 'model']).to_dicts()
+            if working_path.exists()
+            else []
         )
         failing: list[dict] = (
             pl.read_parquet(failing_path).to_dicts() if failing_path.exists() else []
@@ -83,13 +86,14 @@ def main(cfg: DictConfig) -> None:
                 uri = f'hf://datasets/{repo_id}/{split}/{model}/*.parquet'
                 try:
                     pl.scan_parquet(uri).limit(1).collect()
-                    working.append({'dataset': dataset, 'model': model, 'split': split})
                 except Exception as e:
                     model_ok = False
                     model_error = str(e)
                     print(f'[FAIL] {dataset}/{split}/{model}: {e}')
 
-            if not model_ok:
+            if model_ok:
+                working.append({'dataset': dataset, 'model': model})
+            else:
                 failing.append({'dataset': dataset, 'model': model, 'error': model_error})
 
             _save(working_path, working)
