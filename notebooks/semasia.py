@@ -253,6 +253,41 @@ def _(mo):
     Z_b = torch.vstack(list(ds_b["embedding"]))  # (N, d_b)
     # rows i in Z_a and Z_b correspond to the same image
     ```
+
+    ---
+
+    ### Alternative: loading with Polars
+
+    > *This is the approach used by this notebook.*
+
+    SEMASIA is stored as Parquet files on HuggingFace and can be read directly with
+    [**Polars**](https://docs.pola.rs/) via the `hf://` URI scheme — **no data is written to disk**.
+    Unlike `load_dataset`, which caches the full split under `~/.cache/huggingface/datasets/`,
+    `pl.read_parquet` loads directly into memory and leaves no local copy behind.
+
+    See the [HuggingFace Parquet documentation](https://huggingface.co/docs/hub/en/datasets-polars) for full details on the `hf://` protocol and authentication options.
+
+    ```python
+    import polars as pl
+
+    df = pl.read_parquet(
+        "hf://datasets/spaicom-lab/semasia-cifar10/test/resnet50.a1_in1k/*.parquet"
+    )
+
+    embeddings = df["embedding"].to_numpy()  # shape (N, d)
+    labels     = df["label"].to_numpy()      # shape (N,)
+    ```
+
+    To load two models and align them on `id`:
+
+    ```python
+    df_a = pl.read_parquet("hf://datasets/spaicom-lab/semasia-cifar10/test/resnet50.a1_in1k/*.parquet")
+    df_b = pl.read_parquet("hf://datasets/spaicom-lab/semasia-cifar10/test/vit_base_patch16_224.augreg_in1k/*.parquet")
+
+    aligned = df_a.join(df_b, on="id", suffix="_b")
+    Z_a = aligned["embedding"].to_numpy()    # (N, d_a)
+    Z_b = aligned["embedding_b"].to_numpy()  # (N, d_b)
+    ```
     """)
     return
 
