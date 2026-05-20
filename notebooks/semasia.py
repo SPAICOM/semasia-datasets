@@ -117,6 +117,13 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.vstack([
+        mo.md(
+            "**TL;DR** — We release **Semasia**, a benchmark of latent representations from"
+            " **~1,700 pretrained vision models** across **8 image-classification datasets**, paired"
+            " with rich architectural and training metadata. We use it to study how model"
+            " choices shape embedding geometry, to evaluate latent space alignment methods,"
+            " and to perform large-scale regression analysis of representation structure."
+        ),
         mo.Html("""
     <div align="center">
     <img src="https://drive.google.com/thumbnail?id=15_vmbozAH-w9X2dwZQJF4gcl3zDcW43X&sz=w1200" height="400">
@@ -160,12 +167,12 @@ def _(mo):
 
     ## The SEMASIA Dataset
 
-    SEMASIA is a large-scale collection of latent representations extracted from **~1 697 models**
+    SEMASIA is a large-scale collection of latent representations extracted from **~1 700 models**
     from the vision state-of-the-art (`timm` library), across **8 standard benchmarks**.
 
     | Dimension | Detail |
     |---|---|
-    | Models | **~1 697** pretrained architectures (`timm`) |
+    | Models | **~1 700** pretrained architectures (`timm`) |
     | Benchmarks | **8** standard image-classification datasets |
     | Total rows | **> 1 billion** (input, model, embedding) pairs |
     | Storage | Parquet, one file per (model × split) |
@@ -304,6 +311,22 @@ def _(mo):
 
 
 @app.cell(hide_code=True)
+def _(mo):
+    mo.callout(
+        mo.md(
+            "**Select** a model, dataset(s), split, and reduction method from the controls. "
+            "Adjust **Samples / dataset** to trade off speed and coverage — data is pre-fetched "
+            "at 1 600 samples so changing the slider never triggers a re-download. "
+            "**Select points** in the scatter plot to inspect their original images."
+            "Switch to the **Parallel Coordinates** view to brush along principal axes and reveal "
+            "hierarchical semantic structure."
+        ),
+        kind="info",
+    )
+    return
+
+
+@app.cell(hide_code=True)
 def _():
     None
     return
@@ -346,8 +369,7 @@ def _(HF_REPO, mo):
     )
     l_method_ui = mo.ui.dropdown(options=['PCA', 't-SNE', 'UMAP'], value='t-SNE', label='Reduction')
     l_n_samples_ui = mo.ui.slider(start=200, stop=1600, step=100, value=800, label='Samples / dataset', show_value=True)
-
-    return l_all_info, l_method_ui, l_model_ui, l_n_samples_ui
+    return l_all_info, l_all_models, l_method_ui, l_model_ui, l_n_samples_ui
 
 
 @app.cell(hide_code=True)
@@ -397,7 +419,6 @@ def _(
         mo.hstack(list(l_split_uis.values()), gap=2, wrap=True),
         l_deselect_ui,
     ])
-
     return
 
 
@@ -565,7 +586,6 @@ def _(l_X2d, l_all_sample_info, l_selected_datasets, l_y_ds, mo, np):
     )
     l_chart = mo.ui.plotly(_fig)
     l_chart
-
     return l_chart, l_trace_to_global
 
 
@@ -850,6 +870,339 @@ def _(
             mo.image(_buf_pc.getvalue()),
         ]
     )
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Interactive Demo - Latent Space Alignment
+
+    Neural networks trained on the same data but with different architectures, initialisations, or training regimes produce embeddings that are **semantically equivalent yet geometrically incompatible** — a phenomenon known as **semantic mismatch**. Two models may assign the same concept to very similar regions of their respective spaces, yet a direct coordinate comparison yields no meaningful signal because each model defines its own arbitrary basis.
+
+    **Semantic alignment** is the problem of finding a mapping between two such spaces that brings semantically corresponding regions into geometric correspondence — ideally without label supervision and without retraining either model.
+
+    Here we study alignment through **semantic prototypes**: cluster centres that summarise the coarse structure of a latent space. Prototype correspondence is measured via **Jaccard similarity** — the sample-level overlap between clusters — and optimal matching is solved by the **Hungarian algorithm**.
+
+    Given prototype matrices $P_A, P_B \in \mathbb{R}^{k \times d}$, we construct a **Parseval frame** $F = UV^\top$ (thin SVD of $P$) and project embeddings into a shared $k$-dimensional analysis space via $X \mapsto XF^\top$. The Hungarian algorithm then finds the permutation $\sigma : [k] \to [k]$, mapping prototype indices of Model A (rows) to prototype indices of Model B (columns), that maximises
+
+    $$\sigma^* = \arg\max_{\sigma \in S_k} \sum_{i=1}^k J\bigl(i,\, \sigma(i)\bigr),$$
+
+    thereby aligning Model B's prototypes to Model A without any supervision.
+
+    > **Note.** In semantic communication a full semantic alignment pipeline would prepend a **pre-whitening** step — standardising each space to zero mean and unit covariance before frame construction — to remove scale and correlation biases. This demo omits pre-whitening to keep the exposition focused on the alignment mechanism itself.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.callout(
+        mo.md(
+            "**Select** a dataset and two models to compare, then set the number of prototypes *k*. "
+            "Embeddings for both models are fetched automatically. "
+            "The **Jaccard heatmap** shows prototype-level overlap before alignment; "
+            "the **scatter plots** show how the Hungarian permutation brings the two spaces into correspondence."
+        ),
+        kind="info",
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(l_all_info: dict, l_all_models, mo):
+    _align_ds_options = sorted(l_all_info.keys())
+    _default_a = "vit_base_patch16_224.augreg_in1k"
+    _default_b = "vit_small_patch16_224.augreg_in1k"
+
+    align_dataset_ui = mo.ui.dropdown(
+        options=_align_ds_options,
+        value="cifar10" if "cifar10" in _align_ds_options else _align_ds_options[0],
+        label="Dataset",
+    )
+    align_model_a_ui = mo.ui.dropdown(
+        options=l_all_models,
+        value=_default_a if _default_a in l_all_models else l_all_models[0],
+        label="Model A",
+    )
+    align_model_b_ui = mo.ui.dropdown(
+        options=l_all_models,
+        value=_default_b if _default_b in l_all_models else (l_all_models[1] if len(l_all_models) > 1 else l_all_models[0]),
+        label="Model B",
+    )
+    align_n_proto_ui = mo.ui.slider(
+        start=2, stop=20, step=1, value=10, label="Prototypes (k)", show_value=True
+    )
+    mo.hstack([
+        mo.vstack([align_dataset_ui, align_n_proto_ui]),
+        align_model_a_ui,
+        align_model_b_ui,
+    ], justify="start", gap=2)
+    return (
+        align_dataset_ui,
+        align_model_a_ui,
+        align_model_b_ui,
+        align_n_proto_ui,
+    )
+
+
+@app.cell(hide_code=True)
+def _(
+    HF_REPO,
+    align_dataset_ui,
+    align_model_a_ui,
+    align_model_b_ui,
+    l_all_info: dict,
+    mo,
+    np,
+):
+    import polars as _pl_align
+
+    _align_ds = align_dataset_ui.value
+    _align_model_a = align_model_a_ui.value
+    _align_model_b = align_model_b_ui.value
+
+    mo.stop(
+        _align_model_a == _align_model_b,
+        mo.callout(mo.md("Please select two **different** models."), kind="warn"),
+    )
+
+    _align_mbs = l_all_info.get(_align_ds, {})
+    _align_splits = sorted(_align_mbs.keys())
+    _align_split = (
+        "test" if "test" in _align_splits
+        else "val" if "val" in _align_splits
+        else _align_splits[0] if _align_splits else "test"
+    )
+
+    _uri_a = f"hf://datasets/{HF_REPO}{_align_ds}/{_align_split}/{_align_model_a}/*.parquet"
+    _uri_b = f"hf://datasets/{HF_REPO}{_align_ds}/{_align_split}/{_align_model_b}/*.parquet"
+
+    with mo.status.spinner(title=f"Loading embeddings for {_align_ds}/{_align_split}..."):
+        _df_a = _pl_align.scan_parquet(_uri_a).limit(1600).collect()
+        _df_b = _pl_align.scan_parquet(_uri_b).limit(1600).collect()
+
+    _ids_a = set(_df_a["id"].to_list())
+    _ids_b = set(_df_b["id"].to_list())
+    _common_ids = sorted(_ids_a & _ids_b)
+
+    _df_a = _df_a.filter(_pl_align.col("id").is_in(_common_ids)).sort("id")
+    _df_b = _df_b.filter(_pl_align.col("id").is_in(_common_ids)).sort("id")
+
+    align_X_a = np.array(_df_a["embedding"].to_list(), dtype=np.float32)
+    align_X_b = np.array(_df_b["embedding"].to_list(), dtype=np.float32)
+    align_true_labels = [int(x) for x in _df_a["label"].to_list()]
+
+    mo.callout(
+        mo.md(f"Loaded **{len(align_X_a)}** shared samples · split `{_align_split}` · dim `{align_X_a.shape[1]}`"),
+        kind="success",
+    )
+    return align_X_a, align_X_b
+
+
+@app.cell(hide_code=True)
+def _(align_X_a, align_X_b, align_n_proto_ui, mo, np):
+    from sklearn.cluster import KMeans as _KMeans_align
+    from scipy.optimize import linear_sum_assignment as _lsa_align
+
+    _k = align_n_proto_ui.value
+
+    with mo.status.spinner(title=f"Running K-Means (k={_k}) on both models..."):
+        _km_a = _KMeans_align(n_clusters=_k, random_state=42, n_init="auto").fit(align_X_a)
+        _km_b = _KMeans_align(n_clusters=_k, random_state=42, n_init="auto").fit(align_X_b)
+
+    align_cluster_a = _km_a.labels_
+    align_cluster_b = _km_b.labels_
+    align_proto_a = _km_a.cluster_centers_.astype(np.float32)
+    align_proto_b = _km_b.cluster_centers_.astype(np.float32)
+
+    # Parseval frame: orthonormal frame from SVD of prototype matrix
+    def _parseval_frame(P):
+        U, _, Vh = np.linalg.svd(P, full_matrices=False)
+        return (U @ Vh).astype(np.float32)
+
+    align_F_a = _parseval_frame(align_proto_a)  # (k, d)
+    align_F_b = _parseval_frame(align_proto_b)
+
+    # Project embeddings into k-dim analysis space
+    align_coords_a = align_X_a @ align_F_a.T  # (n, k)
+    align_coords_b = align_X_b @ align_F_b.T
+
+    # Jaccard similarity between prototype memberships
+    _J = np.zeros((_k, _k), dtype=np.float32)
+    _ci_a = {i: set(np.where(align_cluster_a == i)[0].tolist()) for i in range(_k)}
+    _ci_b = {i: set(np.where(align_cluster_b == i)[0].tolist()) for i in range(_k)}
+    for _i in range(_k):
+        for _j in range(_k):
+            _u = len(_ci_a[_i] | _ci_b[_j])
+            _J[_i, _j] = len(_ci_a[_i] & _ci_b[_j]) / _u if _u else 0.0
+
+    # Hungarian matching: find permutation of B that best aligns with A
+    _, _perm = _lsa_align(-_J)
+    align_perm = _perm
+
+    # Permute B prototypes and recompute
+    align_proto_b_matched = align_proto_b[align_perm]
+    align_F_b_matched = _parseval_frame(align_proto_b_matched)
+    align_coords_b_matched = align_X_b @ align_F_b_matched.T
+
+    # Permute cluster labels for B
+    _inv_perm = np.argsort(align_perm)
+    align_cluster_b_matched = _inv_perm[align_cluster_b]
+
+    # MSE before and after alignment
+    align_jaccard_matrix = _J
+    align_mse_before = float(np.mean((align_coords_a - align_coords_b) ** 2))
+    align_mse_after = float(np.mean((align_coords_a - align_coords_b_matched) ** 2))
+    align_jaccard_mean = float(np.mean(_J.max(axis=1)))
+    return (
+        align_coords_a,
+        align_coords_b,
+        align_coords_b_matched,
+        align_jaccard_matrix,
+        align_jaccard_mean,
+        align_mse_after,
+        align_mse_before,
+    )
+
+
+@app.cell(hide_code=True)
+def _(
+    align_jaccard_matrix,
+    align_jaccard_mean,
+    align_model_a_ui,
+    align_model_b_ui,
+    align_mse_after,
+    align_mse_before,
+    align_n_proto_ui,
+    mo,
+):
+    import plotly.graph_objects as _go_align
+
+    _model_a_name = align_model_a_ui.value
+    _model_b_name = align_model_b_ui.value
+    _k = align_n_proto_ui.value
+
+    _fig_J = _go_align.Figure(
+        data=_go_align.Heatmap(
+            z=align_jaccard_matrix.tolist(),
+            x=[f"B-{j}" for j in range(_k)],
+            y=[f"A-{i}" for i in range(_k)],
+            colorscale="magma",
+            zmin=0, zmax=1,
+            colorbar=dict(title="Jaccard"),
+        )
+    )
+    _fig_J.update_layout(
+        title="Jaccard Similarity Matrix",
+        xaxis_title="Model B prototypes",
+        yaxis_title="Model A prototypes",
+        width=500,
+        height=500,
+        margin=dict(l=60, r=20, t=50, b=50),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        yaxis=dict(scaleanchor='x', scaleratio=1),
+    )
+
+    _delta_mse = (align_mse_before - align_mse_after) / align_mse_before * 100
+    _caption_text = (
+        r"**Jaccard similarity** $J(i,j) = \frac{|C_A^i \cap C_B^j|}{|C_A^i \cup C_B^j|}$"
+        " measures the sample-level overlap between prototype $i$ of Model A and prototype $j$"
+        " of Model B. Each entry ranges from 0 (no shared samples) to 1 (identical membership)."
+        " A bright diagonal — or a permuted-diagonal pattern — means both models have learned"
+        " semantically consistent clusters. The **Hungarian algorithm** finds the permutation on the $j$ indices"
+        r" $\sigma$ that maximises $\sum_i J(i, \sigma(i))$, aligning Model B's prototypes"
+        " to Model A without any label supervision.  \n"
+        f"\n**Jaccard mean (best match per A-prototype):** {align_jaccard_mean:.3f} · "
+        f"**MSE before:** {align_mse_before:.3f} · "
+        f"**MSE after:** {align_mse_after:.3f} · "
+        f"**reduction:** {_delta_mse:.1f}%"
+    )
+    _caption = mo.md(_caption_text)
+
+    mo.vstack([
+        mo.ui.plotly(_fig_J),
+        _caption,
+    ])
+    return
+
+
+@app.cell(hide_code=True)
+def _(
+    align_coords_a,
+    align_coords_b,
+    align_coords_b_matched,
+    align_model_a_ui,
+    align_model_b_ui,
+    align_n_proto_ui,
+    mo,
+):
+    from sklearn.decomposition import PCA as _PCA_align
+    import plotly.graph_objects as _go_align2
+    from plotly.subplots import make_subplots as _make_subplots_align
+
+    _k = align_n_proto_ui.value
+    _model_a_name = align_model_a_ui.value
+    _model_b_name = align_model_b_ui.value
+
+    # Fit PCA on model A coords; transform all spaces with the same projection
+    _pca2 = _PCA_align(n_components=2).fit(align_coords_a)
+    _xy_a = _pca2.transform(align_coords_a)
+    _xy_b_before = _pca2.transform(align_coords_b)
+    _xy_b_after = _pca2.transform(align_coords_b_matched)
+
+    _color_a = "#636EFA"
+    _color_b = "#EF553B"
+
+    _transparent = dict(
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+    )
+
+    _fig_scatter = _make_subplots_align(
+        rows=1, cols=2,
+        subplot_titles=["Before alignment", "After Hungarian alignment"],
+    )
+
+    for _col, (_xy_b, _show) in enumerate([
+        (_xy_b_before, True), (_xy_b_after, False)
+    ], start=1):
+        _fig_scatter.add_trace(
+            _go_align2.Scatter(
+                x=_xy_a[:, 0].tolist(), y=_xy_a[:, 1].tolist(),
+                mode="markers",
+                marker=dict(size=3, color=_color_a, opacity=0.5),
+                name=_model_a_name,
+                legendgroup="A",
+                showlegend=_show,
+            ),
+            row=1, col=_col,
+        )
+        _fig_scatter.add_trace(
+            _go_align2.Scatter(
+                x=_xy_b[:, 0].tolist(), y=_xy_b[:, 1].tolist(),
+                mode="markers",
+                marker=dict(size=3, color=_color_b, opacity=0.5),
+                name=_model_b_name,
+                legendgroup="B",
+                showlegend=_show,
+            ),
+            row=1, col=_col,
+        )
+
+    _fig_scatter.update_layout(
+        height=420,
+        title_text="Analysis-space embeddings projected via PCA(2) of Model A",
+        legend=dict(itemsizing="constant"),
+        margin=dict(l=40, r=20, t=80, b=40),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+    )
+    _fig_scatter.update_xaxes(showticklabels=False, showgrid=False, zeroline=False)
+    _fig_scatter.update_yaxes(showticklabels=False, showgrid=False, zeroline=False)
+
+    mo.ui.plotly(_fig_scatter)
     return
 
 
