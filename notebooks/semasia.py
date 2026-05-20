@@ -17,7 +17,7 @@
 
 import marimo
 
-__generated_with = "0.23.5"
+__generated_with = "0.23.6"
 app = marimo.App(width="medium")
 
 
@@ -102,7 +102,7 @@ def _(mo):
     <h2>A Large-Scale Dataset of Semantically Structured Latent Representations</h2>
     <br>
     <p>
-    <strong>Mario E. Pandolfo* &nbsp;·&nbsp; Enrico Grimaldi* &nbsp;·&nbsp; Lorenzo Marinucci</strong><br>
+    <strong>Mario Edoardo Pandolfo* &nbsp;·&nbsp; Enrico Grimaldi* &nbsp;·&nbsp; Lorenzo Marinucci</strong><br>
     <strong>Leonardo Di Nino &nbsp;·&nbsp; Simone Fiorellino &nbsp;·&nbsp; Sergio Barbarossa &nbsp;·&nbsp; Paolo Di Lorenzo</strong><br>
     <em>Sapienza University of Rome — CNIT</em>
     </p>
@@ -269,68 +269,37 @@ def _(mo):
 
 
 @app.cell(hide_code=True)
-def _(mo):
-    hf_token_ui = mo.ui.text(placeholder="hf_...", label="HuggingFace Token", kind="password")
-    mo.vstack([
-        mo.callout(mo.md(r"""
-    **A HuggingFace token is required** to access the SEMASIA datasets.
-
-    We recommend creating a **dedicated, short-lived token** with minimal permissions:
-
-    1. Open [huggingface.co/settings/tokens/new](https://huggingface.co/settings/tokens/new)
-    2. Choose **Fine-grained**, give it a name like *semasia-demo*
-    3. Under *Repository permissions* set only **Read access to contents of all public gated repos you can access**
-    4. Paste it below — held **only in memory**, never written to disk or to this notebook file
-    5. **Revoke it** from [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens) once the demo is over
-    """), kind="warn"),
-        hf_token_ui,
-    ])
-    return (hf_token_ui,)
+def _():
+    None
+    return
 
 
 @app.cell(hide_code=True)
-def _(HF_REPO, hf_token_ui, mo):
-    mo.stop(
-        not hf_token_ui.value,
-        mo.callout(mo.md("Enter your HuggingFace token above to load the model list."), kind="info"),
-    )
+def _(HF_REPO, mo):
     import os as _os
     from collections import defaultdict
     from pathlib import PurePosixPath
     from huggingface_hub import HfApi
-    from huggingface_hub.utils import get_token
 
-    if hf_token_ui.value:
-        _os.environ["HF_TOKEN"] = hf_token_ui.value
-    else:
-        _os.environ.pop("HF_TOKEN", None)
-
-    def collect_models_by_split(repo_id: str, token: str | None = None) -> dict[str, set[str]] | None:
-        _tok = token or get_token()
-        if _tok is None:
-            print("[WARN] No HF token found. Enter your token above or run `huggingface-cli login`.")
-            return None
-        api = HfApi(token=_tok)
-        files = api.list_repo_files(repo_id=repo_id, repo_type="dataset")
+    def collect_models_by_split(repo_id: str) -> dict[str, set[str]]:
+        api = HfApi()
+        files = api.list_repo_files(repo_id=repo_id, repo_type='dataset')
         models_by_split: dict = defaultdict(set)
         for f in files:
             path = PurePosixPath(f)
-            if len(path.parts) < 3 or path.suffix != ".parquet":
+            if len(path.parts) < 3 or path.suffix != '.parquet':
                 continue
             models_by_split[path.parts[0]].add(path.parts[1])
         return dict(models_by_split)
 
-    _token = hf_token_ui.value or None
-    _ds_options = ["cifar10", "cifar100", "mnist", "fashion_mnist", "oxford-flowers", "tiny-imagenet"]
+    _ds_options = ['cifar10', 'cifar100', 'mnist', 'fashion_mnist', 'oxford-flowers', 'tiny-imagenet']
 
-    with mo.status.spinner(title="Fetching available models for all datasets…"):
+    with mo.status.spinner(title='Fetching available models for all datasets...'):
         l_all_info: dict = {}
         for _ds in _ds_options:
-            _mbs = collect_models_by_split(HF_REPO + _ds, token=_token)
+            _mbs = collect_models_by_split(HF_REPO + _ds)
             if _mbs:
                 l_all_info[_ds] = _mbs
-
-    del _token  # don't keep the raw token in cell scope longer than needed
 
     l_all_models = sorted(
         set().union(*(set().union(*splits.values()) for splits in l_all_info.values()))
@@ -338,18 +307,12 @@ def _(HF_REPO, hf_token_ui, mo):
     l_model_ui = mo.ui.dropdown(
         options=l_all_models,
         value=l_all_models[0] if l_all_models else None,
-        label="Model",
+        label='Model',
     )
-    l_method_ui = mo.ui.dropdown(options=["PCA", "t-SNE", "UMAP"], value="t-SNE", label="Reduction")
-    l_n_samples_ui = mo.ui.slider(start=200, stop=3000, step=100, value=800, label="Samples / dataset", show_value=True)
-    l_show_legend_ui = mo.ui.switch(value=True, label="Legend")
-    return (
-        l_all_info,
-        l_method_ui,
-        l_model_ui,
-        l_n_samples_ui,
-        l_show_legend_ui,
-    )
+    l_method_ui = mo.ui.dropdown(options=['PCA', 't-SNE', 'UMAP'], value='t-SNE', label='Reduction')
+    l_n_samples_ui = mo.ui.slider(start=200, stop=1600, step=100, value=800, label='Samples / dataset', show_value=True)
+
+    return l_all_info, l_method_ui, l_model_ui, l_n_samples_ui
 
 
 @app.cell(hide_code=True)
@@ -390,16 +353,16 @@ def _(
     l_method_ui,
     l_model_ui,
     l_n_samples_ui,
-    l_show_legend_ui,
     l_split_uis: dict,
     mo,
 ):
     mo.vstack([
-        mo.hstack([l_model_ui, l_method_ui, l_n_samples_ui, l_show_legend_ui], gap=2),
-        mo.md("**Split per dataset:**"),
+        mo.hstack([l_model_ui, l_method_ui, l_n_samples_ui], gap=2),
+        mo.md('**Split per dataset:**'),
         mo.hstack(list(l_split_uis.values()), gap=2, wrap=True),
         l_deselect_ui,
     ])
+
     return
 
 
@@ -409,56 +372,110 @@ def _(
     l_available_datasets,
     l_deselect_ui,
     l_model_ui,
-    l_n_samples_ui,
     l_split_uis: dict,
     mo,
     np,
 ):
-    from datasets import load_dataset as _load_dataset
-    import torch as _torch
+    import polars as _pl
 
-    l_selected_datasets = [d for d in l_available_datasets if d not in l_deselect_ui.value]
-    mo.stop(not l_selected_datasets, mo.callout(mo.md("Select at least one dataset."), kind="warn"))
+    l_selected_datasets = [
+        d for d in l_available_datasets if d not in l_deselect_ui.value
+    ]
+    mo.stop(
+        not l_selected_datasets,
+        mo.callout(mo.md('Select at least one dataset.'), kind='warn'),
+    )
 
-    _rng = np.random.default_rng(42)
     _all_embeddings = []
     _all_ds_labels = []
-    l_all_sample_info = []
+    l_all_sample_info_full = []
 
     for _ds in l_selected_datasets:
         _split = l_split_uis[_ds].value
-        _repo = HF_REPO + _ds
-        with mo.status.spinner(title=f"Loading {_ds} ({_split})…"):
-            _loaded = _load_dataset(_repo, l_model_ui.value, split=_split).with_format("torch")
-        _latent = _torch.vstack(list(_loaded["embedding"]))
-        _n = min(l_n_samples_ui.value, len(_latent))
-        _idx = _rng.choice(len(_latent), size=_n, replace=False)
-        _all_embeddings.append(_latent[_idx].numpy())
+        _uri = (
+            f'hf://datasets/{HF_REPO}{_ds}/{_split}/{l_model_ui.value}/*.parquet'
+        )
+        with mo.status.spinner(title=f'Loading {_ds} ({_split})...'):
+            _loaded = _pl.scan_parquet(_uri).limit(1600).collect()
+        _latent = np.array(_loaded['embedding'].to_list())
+        _n = len(_loaded)
+        _all_embeddings.append(_latent)
         _all_ds_labels.extend([_ds] * _n)
-        l_all_sample_info.extend([(_ds, int(i)) for i in _idx])
+        l_all_sample_info_full.extend(
+            [(_ds, int(i)) for i in _loaded['id'].to_list()]
+        )
 
-    l_X_all = np.vstack(_all_embeddings)
-    l_y_ds = np.array(_all_ds_labels)
-    return l_X_all, l_all_sample_info, l_selected_datasets, l_y_ds
+    l_X_all_full = np.vstack(_all_embeddings)
+    l_y_ds_full = np.array(_all_ds_labels)
+    return (
+        l_X_all_full,
+        l_all_sample_info_full,
+        l_selected_datasets,
+        l_y_ds_full,
+    )
+
+
+@app.cell(hide_code=True)
+def _(
+    l_X_all_full,
+    l_all_sample_info_full,
+    l_n_samples_ui,
+    l_selected_datasets,
+    l_y_ds_full,
+    np,
+):
+    _n = l_n_samples_ui.value
+    _idx = []
+    for _ds in l_selected_datasets:
+        _ds_idx = np.where(l_y_ds_full == _ds)[0][:_n]
+        _idx.extend(_ds_idx.tolist())
+    _idx = np.array(_idx)
+    l_X_all = l_X_all_full[_idx]
+    l_y_ds = l_y_ds_full[_idx]
+    l_all_sample_info = [l_all_sample_info_full[i] for i in _idx]
+    return l_X_all, l_all_sample_info, l_y_ds
 
 
 @app.cell(hide_code=True)
 def _(DATASET_CONFIGS: dict, l_selected_datasets, l_split_uis: dict, mo):
-    from datasets import load_dataset as _load_orig
+    import polars as _pl_orig
+    from huggingface_hub import HfApi as _HfApi
+
+    _api = _HfApi()
+
+
+    def _orig_parquet_glob(repo_id: str, split: str) -> str:
+        files = [
+            f
+            for f in _api.list_repo_files(repo_id, repo_type='dataset')
+            if f.endswith('.parquet')
+        ]
+        matches = [f for f in files if f.rsplit('/', 1)[-1].startswith(split)]
+        if not matches:
+            raise FileNotFoundError(f'No parquet for split={split!r} in {repo_id}')
+        config_dir = '/'.join(matches[0].split('/')[:-1])
+        return f'hf://datasets/{repo_id}/{config_dir}/{split}-*.parquet'
+
 
     l_orig_datasets: dict = {}
     for _ds in l_selected_datasets:
         _cfg = DATASET_CONFIGS.get(_ds, {})
-        _orig_repo = _cfg.get("name", "")
+        _orig_repo = _cfg.get('name', '')
         if not _orig_repo:
             continue
         _split = l_split_uis[_ds].value
-        with mo.status.spinner(title=f"Loading original images for {_ds} ({_split})…"):
+        _orig_split = 'validation' if _split in ('valid', 'val') else _split
+        with mo.status.spinner(
+            title=f'Loading original images for {_ds} ({_orig_split})...'
+        ):
             try:
-                l_orig_datasets[_ds] = _load_orig(_orig_repo, split=_split)
+                _uri = _orig_parquet_glob(_orig_repo, _orig_split)
+                _df = _pl_orig.scan_parquet(_uri).limit(1600).collect()
             except Exception:
-                _fallback = "validation" if _split in ("valid", "val") else "test"
-                l_orig_datasets[_ds] = _load_orig(_orig_repo, split=_fallback)
+                _fallback = 'test' if _orig_split != 'test' else 'validation'
+                _uri = _orig_parquet_glob(_orig_repo, _fallback)
+                _df = _pl_orig.scan_parquet(_uri).limit(1600).collect()
+        l_orig_datasets[_ds] = _df
     return (l_orig_datasets,)
 
 
@@ -479,23 +496,15 @@ def _(l_X_all, l_method_ui, mo):
 
 
 @app.cell(hide_code=True)
-def _(
-    l_X2d,
-    l_all_sample_info,
-    l_selected_datasets,
-    l_show_legend_ui,
-    l_y_ds,
-    mo,
-    np,
-):
+def _(l_X2d, l_all_sample_info, l_selected_datasets, l_y_ds, mo, np):
     import plotly.graph_objects as _go
 
     _PALETTE = [
-        "#2A9D8F", "#E9C46A", "#8E6BBE", "#F4A261", "#457B9D",
-        "#6D9B3A", "#E76F51", "#9B72AA", "#3ABEFF", "#C5956B",
+        '#2A9D8F', '#E9C46A', '#8E6BBE', '#F4A261', '#457B9D',
+        '#6D9B3A', '#E76F51', '#9B72AA', '#3ABEFF', '#C5956B',
     ]
-    _MARKERS = ["circle", "square", "diamond", "cross", "star", "triangle-up", "triangle-down", "pentagon", "hexagram"]
-    _axis = dict(showticklabels=False, showgrid=False, zeroline=False, showline=False, ticks="")
+    _MARKERS = ['circle', 'square', 'diamond', 'cross', 'star', 'triangle-up', 'triangle-down', 'pentagon', 'hexagram']
+    _axis = dict(showticklabels=False, showgrid=False, zeroline=False, showline=False, ticks='')
 
     l_trace_to_global = []
     _fig = _go.Figure()
@@ -506,21 +515,22 @@ def _(
         _orig_indices = np.array([l_all_sample_info[g][1] for g in _global_pts])
         _customdata = np.stack([_global_pts, _orig_indices], axis=1)
         _fig.add_trace(_go.Scatter(
-            x=l_X2d[_mask, 0], y=l_X2d[_mask, 1], mode="markers", name=_ds,
+            x=l_X2d[_mask, 0], y=l_X2d[_mask, 1], mode='markers', name=_ds,
             marker=dict(size=5, opacity=0.9, color=_PALETTE[_i % len(_PALETTE)], symbol=_MARKERS[_i % len(_MARKERS)]),
             customdata=_customdata,
-            hovertemplate=f"<b>{_ds}</b><br>orig_idx: %{{customdata[1]}}<br>C1: %{{x:.3f}}  C2: %{{y:.3f}}<extra></extra>",
+            hovertemplate=f'<b>{_ds}</b><br>orig_idx: %{{customdata[1]}}<br>C1: %{{x:.3f}}  C2: %{{y:.3f}}<extra></extra>',
         ))
 
     _fig.update_layout(
-        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
         xaxis=_axis, yaxis=_axis,
-        showlegend=l_show_legend_ui.value,
-        legend=dict(title="Dataset", bgcolor="rgba(255,255,255,0.6)", borderwidth=1),
+        showlegend=True,
+        legend=dict(title='Dataset', bgcolor='rgba(255,255,255,0.6)', borderwidth=1),
         width=900, height=520, margin=dict(t=10, b=10, l=10, r=10),
     )
     l_chart = mo.ui.plotly(_fig)
     l_chart
+
     return l_chart, l_trace_to_global
 
 
@@ -536,19 +546,23 @@ def _(
     mo,
     show_images,
 ):
+    from PIL import Image as _PILImage
+
     _pts = l_chart.value
     mo.stop(
         not _pts,
         mo.callout(
-            mo.md("**Try making a selection with your mouse!**\nBox- or lasso-select points on the scatter plot above."),
-            kind="info",
+            mo.md(
+                '**Try making a selection with your mouse!**\nBox- or lasso-select points on the scatter plot above.'
+            ),
+            kind='info',
         ),
     )
 
     _images_by_ds: dict = {}
     for _pt in _pts:
-        _curve = int(_pt.get("curveNumber", 0))
-        _point_idx = int(_pt.get("pointIndex", _pt.get("pointNumber", 0)))
+        _curve = int(_pt.get('curveNumber', 0))
+        _point_idx = int(_pt.get('pointIndex', _pt.get('pointNumber', 0)))
         if _curve >= len(l_selected_datasets):
             continue
         _ds_name = l_selected_datasets[_curve]
@@ -581,23 +595,37 @@ def _(
         if not _ds_indices or _ds_name not in l_orig_datasets:
             continue
         _cfg = DATASET_CONFIGS.get(_ds_name, {})
-        _img_field = _cfg.get("data", "image")
-        _selected = l_orig_datasets[_ds_name].select(_ds_indices)
-        for _row, _oi in zip(_selected, _ds_indices):
-            _pil_images.append(_row[_img_field])
-            _titles.append(f"{_ds_name}\n#{_oi}")
+        _img_field = _cfg.get('data', 'image')
+        _orig_df = l_orig_datasets[_ds_name]
+        for _oi in _ds_indices:
+            if _oi >= len(_orig_df):
+                continue
+            _row = _orig_df.row(_oi, named=True)
+            _pil_images.append(
+                _PILImage.open(io.BytesIO(_row[_img_field]['bytes']))
+            )
+            _titles.append(f'{_ds_name}\n#{_oi}')
 
-    mo.stop(not _pil_images, mo.callout(mo.md("No images available for selection."), kind="warn"))
+    mo.stop(
+        not _pil_images,
+        mo.callout(mo.md('No images available for selection.'), kind='warn'),
+    )
 
     _fig = show_images(_pil_images, _titles)
     _buf = io.BytesIO()
-    _fig.savefig(_buf, format="png", bbox_inches="tight", dpi=150)
+    _fig.savefig(_buf, format='png', bbox_inches='tight', dpi=150)
     _buf.seek(0)
-    import matplotlib.pyplot as _plt; _plt.close(_fig)
-    mo.vstack([
-        mo.md(f"**{len(_pts)} points selected** — showing up to {_max_images} images ({len(_ds_list)} dataset(s)):"),
-        mo.image(_buf.getvalue()),
-    ])
+    import matplotlib.pyplot as _plt
+
+    _plt.close(_fig)
+    mo.vstack(
+        [
+            mo.md(
+                f'**{len(_pts)} points selected** — showing up to {_max_images} images ({len(_ds_list)} dataset(s)):'
+            ),
+            mo.image(_buf.getvalue()),
+        ]
+    )
     return
 
 
@@ -642,50 +670,56 @@ def _(mo, pc_dataset_ui, pc_label_ui, pc_method_ui):
 
 
 @app.cell(hide_code=True)
+def _(HF_REPO, l_model_ui, l_split_uis: dict, mo, pc_dataset_ui):
+    import polars as _pl2
+
+    _pc_ds_name = pc_dataset_ui.value
+    _pc_split = l_split_uis[_pc_ds_name].value
+
+    _pc_uri = f'hf://datasets/{HF_REPO}{_pc_ds_name}/{_pc_split}/{l_model_ui.value}/*.parquet'
+    with mo.status.spinner(title=f'Loading {_pc_ds_name} ({_pc_split})...'):
+        pc_raw_full = _pl2.scan_parquet(_pc_uri).limit(1600).collect()
+    return (pc_raw_full,)
+
+
+@app.cell(hide_code=True)
 def _(
     CLASS_NAMES: dict[str, dict[str, list[str]]],
-    HF_REPO,
-    l_model_ui,
     l_n_samples_ui,
-    l_split_uis: dict,
     mo,
     np,
     pc_dataset_ui,
     pc_label_ui,
     pc_method_ui,
     pc_n_dims_ui,
+    pc_raw_full,
 ):
-    import polars as _pl2
+    import polars as _pl2r
     import umap as _umap_pc
-    import torch as _torch_pc
     from sklearn.decomposition import PCA as _PCA_pc
     from sklearn.manifold import TSNE as _TSNE_pc
-    from datasets import load_dataset as _load_pc
 
-    _n_pc = pc_n_dims_ui.value
-    _method_pc = pc_method_ui.value
     _pc_ds_name = pc_dataset_ui.value
     _pc_label_col = pc_label_ui.value
-    _pc_split = l_split_uis[_pc_ds_name].value
+    _n_pc = pc_n_dims_ui.value
+    _method_pc = pc_method_ui.value
 
-    with mo.status.spinner(title=f"Loading {_pc_ds_name} ({_pc_split})…"):
-        _pc_raw = _load_pc(HF_REPO + _pc_ds_name, l_model_ui.value, split=_pc_split)
+    _n = min(l_n_samples_ui.value, len(pc_raw_full))
+    _rng = np.random.default_rng(42)
+    _idx = _rng.choice(len(pc_raw_full), size=_n, replace=False)
+    _pc_sampled = pc_raw_full[_idx]
 
-    _rng_pc = np.random.default_rng(42)
-    _pc_n = min(l_n_samples_ui.value, len(_pc_raw))
-    _pc_idx = _rng_pc.choice(len(_pc_raw), size=_pc_n, replace=False)
-    _pc_sampled = _pc_raw.select(_pc_idx.tolist())
-
-    _pc_embeddings = _torch_pc.vstack([_torch_pc.tensor(e) for e in _pc_sampled["embedding"]]).numpy()
-    _pc_labels_sampled = [int(x) for x in _pc_sampled[_pc_label_col]]
+    _pc_n = len(_pc_sampled)
+    _pc_embeddings = np.array(_pc_sampled['embedding'].to_list())
+    _pc_labels_sampled = [int(x) for x in _pc_sampled[_pc_label_col].to_list()]
     _pc_name_map = CLASS_NAMES.get(_pc_ds_name, {}).get(_pc_label_col)
     if _pc_name_map:
         _pc_labels_sampled = [_pc_name_map[x] for x in _pc_labels_sampled]
 
-    with mo.status.spinner(title=f"Running {_method_pc} ({_n_pc} components)…"):
-        if _method_pc == "PCA":
+    with mo.status.spinner(title=f'Running {_method_pc} ({_n_pc} components)...'):
+        if _method_pc == 'PCA':
             _reducer_pc = _PCA_pc(n_components=_n_pc)
-        elif _method_pc == "t-SNE":
+        elif _method_pc == 't-SNE':
             _reducer_pc = _TSNE_pc(
                 n_components=_n_pc,
                 perplexity=max(5, min(30, _pc_n - 1)),
@@ -696,10 +730,10 @@ def _(
         _pc_components = _reducer_pc.fit_transform(_pc_embeddings)
 
     pc_label_col = _pc_label_col
-    df_pc = _pl2.DataFrame(
-        {f"PC{i+1}": _pc_components[:, i] for i in range(_n_pc)}
-    ).with_columns(_pl2.Series(pc_label_col, _pc_labels_sampled))
-    pc_ds_indices = [(_pc_ds_name, int(_pc_idx[i])) for i in range(_pc_n)]
+    df_pc = _pl2r.DataFrame(
+        {f'PC{i + 1}': _pc_components[:, i] for i in range(_n_pc)}
+    ).with_columns(_pl2r.Series(pc_label_col, _pc_labels_sampled))
+    pc_ds_indices = [(_pc_ds_name, int(i)) for i in _pc_sampled['id'].to_list()]
     return df_pc, pc_ds_indices, pc_label_col
 
 
@@ -724,10 +758,14 @@ def _(
     pc_widget,
     show_images,
 ):
+    from PIL import Image as _PILImage_pc
+
     _uids = pc_widget.widget.selected_uids
     mo.stop(
         not _uids,
-        mo.callout(mo.md("**Brush an axis** — images update as you drag."), kind="info"),
+        mo.callout(
+            mo.md('**Brush an axis** — images update as you drag.'), kind='info'
+        ),
     )
 
     _filtered = sorted(int(u) for u in _uids)
@@ -746,23 +784,37 @@ def _(
         if _pc_ds_name not in l_orig_datasets:
             continue
         _cfg = DATASET_CONFIGS.get(_pc_ds_name, {})
-        _img_field = _cfg.get("data", "image")
-        _selected = l_orig_datasets[_pc_ds_name].select(_pc_ds_indices_list)
-        for _row, _orig_idx in zip(_selected, _pc_ds_indices_list):
-            _pc_pil_images.append(_row[_img_field])
-            _pc_titles.append(f"{_pc_ds_name}\n#{_orig_idx}")
+        _img_field = _cfg.get('data', 'image')
+        _orig_df = l_orig_datasets[_pc_ds_name]
+        for _orig_idx in _pc_ds_indices_list:
+            if _orig_idx >= len(_orig_df):
+                continue
+            _row = _orig_df.row(_orig_idx, named=True)
+            _pc_pil_images.append(
+                _PILImage_pc.open(io.BytesIO(_row[_img_field]['bytes']))
+            )
+            _pc_titles.append(f'{_pc_ds_name}\n#{_orig_idx}')
 
-    mo.stop(not _pc_pil_images, mo.callout(mo.md("No images available for selection."), kind="warn"))
+    mo.stop(
+        not _pc_pil_images,
+        mo.callout(mo.md('No images available for selection.'), kind='warn'),
+    )
 
     _fig_pc = show_images(_pc_pil_images, _pc_titles)
     _buf_pc = io.BytesIO()
-    _fig_pc.savefig(_buf_pc, format="png", bbox_inches="tight", dpi=150)
+    _fig_pc.savefig(_buf_pc, format='png', bbox_inches='tight', dpi=150)
     _buf_pc.seek(0)
-    import matplotlib.pyplot as _plt_pc; _plt_pc.close(_fig_pc)
-    mo.vstack([
-        mo.md(f"**{len(_filtered)} / {len(pc_ds_indices)} selected** — showing first {len(_sample)}:"),
-        mo.image(_buf_pc.getvalue()),
-    ])
+    import matplotlib.pyplot as _plt_pc
+
+    _plt_pc.close(_fig_pc)
+    mo.vstack(
+        [
+            mo.md(
+                f'**{len(_filtered)} / {len(pc_ds_indices)} selected** — showing first {len(_sample)}:'
+            ),
+            mo.image(_buf_pc.getvalue()),
+        ]
+    )
     return
 
 
