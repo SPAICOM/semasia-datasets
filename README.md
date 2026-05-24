@@ -116,6 +116,28 @@ just proto-alignment-dataset DATASET          # override dataset
 just proto-alignment-models MODEL_A MODEL_B   # override model pair
 ```
 
+## Notebooks
+
+Interactive marimo notebooks for exploring the dataset and results are located in the `notebooks/` directory:
+
+| Notebook | Description |
+|---|---|
+| `semasia.py` | Main dataset overview and exploration |
+| `latent_exploration.py` | Visualize and explore individual latent spaces |
+| `compare_latents.py` | Side-by-side comparison of latent spaces |
+| `model_semantics.py` | Semantic structure of a model's latent space sampled across multiple datasets |
+| `models_exploration_analysis.py` | Model registry EDA |
+| `prototype_alignment.py` | Interactive prototype-based alignment walkthrough |
+| `section2.py` | Experiments from Section 2 of the paper |
+
+To launch the marimo editor for all notebooks, run:
+
+```bash
+just marimo
+```
+
+This opens the marimo notebook editor (`marimo edit .`) via `uv`, letting you browse and run any notebook in the project. Alternatively, you can open the main notebook directly in the browser via the badge at the top of this README.
+
 ## Citation
 
 If you find this code useful for your research, please consider citing the following paper:

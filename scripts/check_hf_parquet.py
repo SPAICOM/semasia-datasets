@@ -94,7 +94,9 @@ def main(cfg: DictConfig) -> None:
             if model_ok:
                 working.append({'dataset': dataset, 'model': model})
             else:
-                failing.append({'dataset': dataset, 'model': model, 'error': model_error})
+                failing.append(
+                    {'dataset': dataset, 'model': model, 'error': model_error}
+                )
 
             _save(working_path, working)
             _save(failing_path, failing)

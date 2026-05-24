@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.23.0"
+__generated_with = '0.23.0'
 app = marimo.App()
 
 
@@ -18,7 +18,6 @@ def _():
     from src.objects.latent import DimReductionMethod
     from src.plotting.latent import plot_pc_correlation_heatmap
 
-
     def _check_models_in_registry(model_a: str, model_b: str) -> None:
         """Check if models exist in the model registry."""
         model_df = pl.read_parquet(
@@ -34,7 +33,6 @@ def _():
             raise ValueError(
                 f'Model(s) not found in model registry: {missing}\nAvailable models: {sorted(available_models)[:20]}... (showing first 20)'
             )
-
 
     def _check_models_in_dataset(model_a: str, model_b: str, dataset: str) -> None:
         """Check if models have embeddings in the dataset."""
@@ -56,13 +54,11 @@ def _():
                 raise
             raise ValueError(f'Error checking dataset {dataset}: {e}') from e
 
-
     def _load_latent(model: str, dataset: str) -> LatentSpace:
         """Load latent embeddings from HuggingFace dataset."""
         data = load_dataset(dataset, model, split='test').with_format('torch')
         latent = torch.vstack(list(data['embedding']))
         return LatentSpace(latent, seed=42)
-
 
     def main(
         model_a: str,
@@ -83,9 +79,7 @@ def _():
         latent_a = _load_latent(model_a, full_dataset)
         latent_b = _load_latent(model_b, full_dataset)
         if n_anchors is not None:
-            print(
-                f'Aligning via relative representation (n_anchors={n_anchors}) ...'
-            )
+            print(f'Aligning via relative representation (n_anchors={n_anchors}) ...')
             latent_a, latent_b = AlignmentProblem(latent_a, latent_b).align(
                 'relative', strategy='prototype', n_anchors=n_anchors
             )
@@ -135,7 +129,6 @@ def _():
     # cache_pattern: str = f'{cfg.repo_id}___{cfg.prefix}{dataset_id}'
     # hub_pattern: str = f'datasets--{cfg.repo_id}--{cfg.prefix}{dataset_id}*'
 
-
     # import polars as pl
 
     # model = "vit_base"
@@ -161,7 +154,15 @@ def _(main):
     _method = 'pca'
     n_components = 20
     k = 20
-    main(model_a=_model_a, model_b=_model_b, dataset=dataset, method=_method, n_components=n_components, k=k, output_path=None)
+    main(
+        model_a=_model_a,
+        model_b=_model_b,
+        dataset=dataset,
+        method=_method,
+        n_components=n_components,
+        k=k,
+        output_path=None,
+    )
     return
 
 
@@ -173,7 +174,16 @@ def _(main):
     _method = 'pca'
     n_components_1 = 20
     k_1 = 20
-    main(model_a=_model_a, model_b=_model_b, dataset=dataset_1, method=_method, n_components=n_components_1, k=k_1, n_anchors=20, output_path=None)
+    main(
+        model_a=_model_a,
+        model_b=_model_b,
+        dataset=dataset_1,
+        method=_method,
+        n_components=n_components_1,
+        k=k_1,
+        n_anchors=20,
+        output_path=None,
+    )
     return
 
 
@@ -185,7 +195,15 @@ def _(main):
     _method = 'eigen_laplacian'
     n_components_2 = 20
     k_2 = 20
-    main(model_a=_model_a, model_b=_model_b, dataset=dataset_2, method=_method, n_components=n_components_2, k=k_2, output_path=None)
+    main(
+        model_a=_model_a,
+        model_b=_model_b,
+        dataset=dataset_2,
+        method=_method,
+        n_components=n_components_2,
+        k=k_2,
+        output_path=None,
+    )
     return
 
 
@@ -197,7 +215,16 @@ def _(main):
     _method = 'eigen_laplacian'
     n_components_3 = 20
     k_3 = 20
-    main(model_a=_model_a, model_b=_model_b, dataset=dataset_3, method=_method, n_components=n_components_3, k=k_3, n_anchors=20, output_path=None)
+    main(
+        model_a=_model_a,
+        model_b=_model_b,
+        dataset=dataset_3,
+        method=_method,
+        n_components=n_components_3,
+        k=k_3,
+        n_anchors=20,
+        output_path=None,
+    )
     return
 
 
@@ -209,7 +236,15 @@ def _(main):
     _method = 'pca'
     n_components_4 = 20
     k_4 = 20
-    main(model_a=_model_a, model_b=_model_b, dataset=dataset_4, method=_method, n_components=n_components_4, k=k_4, output_path=None)
+    main(
+        model_a=_model_a,
+        model_b=_model_b,
+        dataset=dataset_4,
+        method=_method,
+        n_components=n_components_4,
+        k=k_4,
+        output_path=None,
+    )
     return
 
 
@@ -221,7 +256,15 @@ def _(main):
     _method = 'eigen_laplacian'
     n_components_5 = 20
     k_5 = 20
-    main(model_a=_model_a, model_b=_model_b, dataset=dataset_5, method=_method, n_components=n_components_5, k=k_5, output_path=None)
+    main(
+        model_a=_model_a,
+        model_b=_model_b,
+        dataset=dataset_5,
+        method=_method,
+        n_components=n_components_5,
+        k=k_5,
+        output_path=None,
+    )
     return
 
 
@@ -233,7 +276,15 @@ def _(main):
     _method = 'pca'
     n_components_6 = 20
     k_6 = 20
-    main(model_a=_model_a, model_b=_model_b, dataset=dataset_6, method=_method, n_components=n_components_6, k=k_6, output_path=None)
+    main(
+        model_a=_model_a,
+        model_b=_model_b,
+        dataset=dataset_6,
+        method=_method,
+        n_components=n_components_6,
+        k=k_6,
+        output_path=None,
+    )
     return
 
 
@@ -247,7 +298,6 @@ def _(Path, pl, sys):
     import numpy as np
     from src.plotting.tda import plot_persistence_diagram, plot_persistence_images
 
-
     def plot_tda_results(repo_id, prefix, dataset, model_pattern):
         RESULTS_DIR = _PROJECT_ROOT / Path('results/tda_signatures')
         OUTPUT_DIR = _PROJECT_ROOT / Path('results/tda_plots')
@@ -260,9 +310,7 @@ def _(Path, pl, sys):
             df = df.filter(pl.col('model').str.contains(model_pattern))
         if df.is_empty():
             print(f'No rows left after filtering model ~ {model_pattern!r}')
-        print(
-            f'Plotting {len(df)} row(s) | model filter: {model_pattern or "none"}'
-        )
+        print(f'Plotting {len(df)} row(s) | model filter: {model_pattern or "none"}')
         max_dim = 2
         n_dims = max_dim + 1
         for row in df.iter_rows(named=True):
@@ -301,7 +349,12 @@ def _(plot_tda_results):
     _prefix = 'semasia-'
     dataset_7 = 'cifar10'
     _model_pattern = 'pit_ti_distilled_224.in1k'
-    plot_tda_results(repo_id=_repo_id, prefix=_prefix, dataset=dataset_7, model_pattern=_model_pattern)
+    plot_tda_results(
+        repo_id=_repo_id,
+        prefix=_prefix,
+        dataset=dataset_7,
+        model_pattern=_model_pattern,
+    )
     return
 
 
@@ -312,7 +365,12 @@ def _(logging, plot_tda_results):
     _prefix = 'semasia-'
     dataset_8 = 'cifar10'
     _model_pattern = 'pit_ti_224.in1k'
-    plot_tda_results(repo_id=_repo_id, prefix=_prefix, dataset=dataset_8, model_pattern=_model_pattern)
+    plot_tda_results(
+        repo_id=_repo_id,
+        prefix=_prefix,
+        dataset=dataset_8,
+        model_pattern=_model_pattern,
+    )
     return
 
 
@@ -323,7 +381,12 @@ def _(logging, plot_tda_results):
     _prefix = 'semasia-'
     dataset_9 = 'cifar10'
     _model_pattern = 'skresnet34.ra_in1k'
-    plot_tda_results(repo_id=_repo_id, prefix=_prefix, dataset=dataset_9, model_pattern=_model_pattern)
+    plot_tda_results(
+        repo_id=_repo_id,
+        prefix=_prefix,
+        dataset=dataset_9,
+        model_pattern=_model_pattern,
+    )
     return
 
 
@@ -348,7 +411,6 @@ def _(
         _pearson_cross_correlation as pearson_cross_correlation,
     )
 
-
     def _check_models_in_registry(models: list[str]) -> None:
         model_df = pl.read_parquet(
             'hf://datasets/spaicom-lab/model-registry/**/*.parquet'
@@ -359,7 +421,6 @@ def _(
             raise ValueError(
                 f'Model(s) not found in model registry: {missing}\nAvailable models: {sorted(available_models)[:20]}... (showing first 20)'
             )
-
 
     def _check_models_in_dataset(models: list[str], dataset: str) -> None:
         from datasets import get_dataset_config_names
@@ -376,12 +437,10 @@ def _(
                 raise
             raise ValueError(f'Error checking dataset {dataset}: {e}') from e
 
-
     def _load_raw(model: str, dataset: str) -> np.ndarray:
         """Load embeddings as a plain float32 numpy array (no LatentSpace wrapper)."""
         data = load_dataset(dataset, model, split='test').with_format('torch')
         return torch.vstack(list(data['embedding'])).float().numpy()
-
 
     def _correlation_matrix(
         latent_a: LatentSpace,
@@ -403,7 +462,6 @@ def _(
         return pearson_cross_correlation(
             latent_a.pc_embedding[:, :k_use], latent_b.pc_embedding[:, :k_use]
         )
-
 
     def compare_latents(
         models: list[str],
@@ -433,9 +491,7 @@ def _(
         full_dataset = f'{repo_id}/{prefix}{dataset}'
         _check_models_in_dataset(models, full_dataset)
         print(f'Loading {len(models)} latent spaces...')
-        raw: dict[str, np.ndarray] = {
-            m: _load_raw(m, full_dataset) for m in models
-        }
+        raw: dict[str, np.ndarray] = {m: _load_raw(m, full_dataset) for m in models}
         pairs = list(itertools.combinations(models, 2))
         n_pairs = len(pairs)
         n_cols = 5
@@ -455,9 +511,7 @@ def _(
         fig, axes = plt.subplots(n_rows, n_cols, figsize=figsize)
         axes_flat = axes.ravel()
         title_suffix = f'  [relative, {n_anchors} anchors]' if n_anchors else ''
-        fig.suptitle(
-            f'PC correlation  [{method}]{title_suffix}', fontsize=13, y=1.01
-        )
+        fig.suptitle(f'PC correlation  [{method}]{title_suffix}', fontsize=13, y=1.01)
         im = None
         for idx, (ma, mb, C) in enumerate(matrices):
             ax = axes_flat[idx]
@@ -469,9 +523,7 @@ def _(
         for idx in range(n_pairs, len(axes_flat)):
             axes_flat[idx].set_visible(False)
         fig.tight_layout()
-        cbar = fig.colorbar(
-            im, ax=axes_flat[:n_pairs].tolist(), shrink=0.7, pad=0.02
-        )
+        cbar = fig.colorbar(im, ax=axes_flat[:n_pairs].tolist(), shrink=0.7, pad=0.02)
         cbar.set_label('Pearson r', fontsize=10)
         cbar.ax.tick_params(labelsize=9)
         if output_path:
@@ -487,25 +539,50 @@ def _(
 @app.cell
 def _(compare_latents):
     dataset_10 = 'cifar10'
-    models = ['beit3_base_patch16_224.in22k_ft_in1k', 'vit_base_patch16_224.augreg_in1k', 'vit_base_patch16_384.augreg_in1k', 'vit_base_patch16_224.augreg_in21k', 'vit_base_patch32_224.augreg_in21k']
+    models = [
+        'beit3_base_patch16_224.in22k_ft_in1k',
+        'vit_base_patch16_224.augreg_in1k',
+        'vit_base_patch16_384.augreg_in1k',
+        'vit_base_patch16_224.augreg_in21k',
+        'vit_base_patch32_224.augreg_in21k',
+    ]
     _method = 'pca'
     n_components_7 = 20
     k_7 = 20
-    compare_latents(models=models, dataset=dataset_10, method=_method, n_components=n_components_7, k=k_7)
+    compare_latents(
+        models=models,
+        dataset=dataset_10,
+        method=_method,
+        n_components=n_components_7,
+        k=k_7,
+    )
     return dataset_10, k_7, models, n_components_7
 
 
 @app.cell
 def _(compare_latents, dataset_10, k_7, models, n_components_7):
-    compare_latents(models=models, dataset=dataset_10, method='eigen_laplacian', n_components=n_components_7, k=k_7)
+    compare_latents(
+        models=models,
+        dataset=dataset_10,
+        method='eigen_laplacian',
+        n_components=n_components_7,
+        k=k_7,
+    )
     return
 
 
 @app.cell
 def _(compare_latents, dataset_10, k_7, models, n_components_7):
-    compare_latents(models=models, dataset=dataset_10, method='eigen_laplacian', n_components=n_components_7, k=k_7, n_anchors=60)
+    compare_latents(
+        models=models,
+        dataset=dataset_10,
+        method='eigen_laplacian',
+        n_components=n_components_7,
+        k=k_7,
+        n_anchors=60,
+    )
     return
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     app.run()

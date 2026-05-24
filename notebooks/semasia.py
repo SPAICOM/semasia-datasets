@@ -17,8 +17,8 @@
 
 import marimo
 
-__generated_with = "0.23.6"
-app = marimo.App(width="medium")
+__generated_with = '0.23.6'
+app = marimo.App(width='medium')
 
 
 @app.cell(hide_code=True)
@@ -28,54 +28,201 @@ def _():
     import marimo as mo
     import numpy as np
 
-    HF_REPO = "spaicom-lab/semasia-"
+    HF_REPO = 'spaicom-lab/semasia-'
 
     CLASS_NAMES: dict[str, dict[str, list[str]]] = {
-        "cifar10": {
-            "label": ["airplane","automobile","bird","cat","deer","dog","frog","horse","ship","truck"],
-        },
-        "cifar100": {
-            "coarse_label": [
-                "aquatic_mammals","fish","flowers","food_containers","fruit_and_vegetables",
-                "household_electrical_devices","household_furniture","insects","large_carnivores",
-                "large_man-made_outdoor_things","large_natural_outdoor_scenes",
-                "large_omnivores_and_herbivores","medium_mammals","non-insect_invertebrates",
-                "people","reptiles","small_mammals","trees","vehicles_1","vehicles_2",
-            ],
-            "fine_label": [
-                "apple","aquarium_fish","baby","bear","beaver","bed","bee","beetle","bicycle","bottle",
-                "bowl","boy","bridge","bus","butterfly","camel","can","castle","caterpillar","cattle",
-                "chair","chimpanzee","clock","cloud","cockroach","couch","crab","crocodile","cup","dinosaur",
-                "dolphin","elephant","flatfish","forest","fox","girl","hamster","house","kangaroo","keyboard",
-                "lamp","lawn_mower","leopard","lion","lizard","lobster","man","maple_tree","motorcycle",
-                "mountain","mouse","mushroom","oak_tree","orange","orchid","otter","palm_tree","pear",
-                "pickup_truck","pine_tree","plain","plate","poppy","porcupine","possum","rabbit","raccoon",
-                "ray","road","rocket","rose","sea","seal","shark","shrew","skunk","skyscraper","snail",
-                "snake","spider","squirrel","streetcar","sunflower","sweet_pepper","table","tank",
-                "telephone","television","tiger","tractor","train","trout","tulip","turtle","wardrobe",
-                "whale","willow_tree","wolf","woman","worm",
+        'cifar10': {
+            'label': [
+                'airplane',
+                'automobile',
+                'bird',
+                'cat',
+                'deer',
+                'dog',
+                'frog',
+                'horse',
+                'ship',
+                'truck',
             ],
         },
-        "mnist": {
-            "label": [str(i) for i in range(10)],
+        'cifar100': {
+            'coarse_label': [
+                'aquatic_mammals',
+                'fish',
+                'flowers',
+                'food_containers',
+                'fruit_and_vegetables',
+                'household_electrical_devices',
+                'household_furniture',
+                'insects',
+                'large_carnivores',
+                'large_man-made_outdoor_things',
+                'large_natural_outdoor_scenes',
+                'large_omnivores_and_herbivores',
+                'medium_mammals',
+                'non-insect_invertebrates',
+                'people',
+                'reptiles',
+                'small_mammals',
+                'trees',
+                'vehicles_1',
+                'vehicles_2',
+            ],
+            'fine_label': [
+                'apple',
+                'aquarium_fish',
+                'baby',
+                'bear',
+                'beaver',
+                'bed',
+                'bee',
+                'beetle',
+                'bicycle',
+                'bottle',
+                'bowl',
+                'boy',
+                'bridge',
+                'bus',
+                'butterfly',
+                'camel',
+                'can',
+                'castle',
+                'caterpillar',
+                'cattle',
+                'chair',
+                'chimpanzee',
+                'clock',
+                'cloud',
+                'cockroach',
+                'couch',
+                'crab',
+                'crocodile',
+                'cup',
+                'dinosaur',
+                'dolphin',
+                'elephant',
+                'flatfish',
+                'forest',
+                'fox',
+                'girl',
+                'hamster',
+                'house',
+                'kangaroo',
+                'keyboard',
+                'lamp',
+                'lawn_mower',
+                'leopard',
+                'lion',
+                'lizard',
+                'lobster',
+                'man',
+                'maple_tree',
+                'motorcycle',
+                'mountain',
+                'mouse',
+                'mushroom',
+                'oak_tree',
+                'orange',
+                'orchid',
+                'otter',
+                'palm_tree',
+                'pear',
+                'pickup_truck',
+                'pine_tree',
+                'plain',
+                'plate',
+                'poppy',
+                'porcupine',
+                'possum',
+                'rabbit',
+                'raccoon',
+                'ray',
+                'road',
+                'rocket',
+                'rose',
+                'sea',
+                'seal',
+                'shark',
+                'shrew',
+                'skunk',
+                'skyscraper',
+                'snail',
+                'snake',
+                'spider',
+                'squirrel',
+                'streetcar',
+                'sunflower',
+                'sweet_pepper',
+                'table',
+                'tank',
+                'telephone',
+                'television',
+                'tiger',
+                'tractor',
+                'train',
+                'trout',
+                'tulip',
+                'turtle',
+                'wardrobe',
+                'whale',
+                'willow_tree',
+                'wolf',
+                'woman',
+                'worm',
+            ],
         },
-        "fashion_mnist": {
-            "label": ["T-shirt/top","Trouser","Pullover","Dress","Coat","Sandal","Shirt","Sneaker","Bag","Ankle boot"],
+        'mnist': {
+            'label': [str(i) for i in range(10)],
+        },
+        'fashion_mnist': {
+            'label': [
+                'T-shirt/top',
+                'Trouser',
+                'Pullover',
+                'Dress',
+                'Coat',
+                'Sandal',
+                'Shirt',
+                'Sneaker',
+                'Bag',
+                'Ankle boot',
+            ],
         },
     }
 
     DATASET_CONFIGS: dict = {
-        "cifar10":        {"data": "img",   "extras": ["label"],                     "name": "uoft-cs/cifar10"},
-        "cifar100":       {"data": "img",   "extras": ["fine_label","coarse_label"], "name": "uoft-cs/cifar100"},
-        "mnist":          {"data": "image", "extras": ["label"],                     "name": "ylecun/mnist"},
-        "fashion_mnist":  {"data": "image", "extras": ["label"],                     "name": "zalando-datasets/fashion_mnist"},
-        "fashion-mnist":  {"data": "image", "extras": ["label"],                     "name": "zalando-datasets/fashion_mnist"},
-        "oxford-flowers": {"data": "image", "extras": ["label"],                     "name": "nkirschi/oxford-flowers"},
-        "tiny-imagenet":  {"data": "image", "extras": ["label"],                     "name": "zh-plus/tiny-imagenet"},
+        'cifar10': {'data': 'img', 'extras': ['label'], 'name': 'uoft-cs/cifar10'},
+        'cifar100': {
+            'data': 'img',
+            'extras': ['fine_label', 'coarse_label'],
+            'name': 'uoft-cs/cifar100',
+        },
+        'mnist': {'data': 'image', 'extras': ['label'], 'name': 'ylecun/mnist'},
+        'fashion_mnist': {
+            'data': 'image',
+            'extras': ['label'],
+            'name': 'zalando-datasets/fashion_mnist',
+        },
+        'fashion-mnist': {
+            'data': 'image',
+            'extras': ['label'],
+            'name': 'zalando-datasets/fashion_mnist',
+        },
+        'oxford-flowers': {
+            'data': 'image',
+            'extras': ['label'],
+            'name': 'nkirschi/oxford-flowers',
+        },
+        'tiny-imagenet': {
+            'data': 'image',
+            'extras': ['label'],
+            'name': 'zh-plus/tiny-imagenet',
+        },
     }
 
     def show_images(pil_images, titles, max_images=10):
         import matplotlib.pyplot as plt
+
         pil_images = pil_images[:max_images]
         titles = titles[:max_images]
         n = len(pil_images)
@@ -84,7 +231,7 @@ def _():
         fig, axes = plt.subplots(1, n, squeeze=False)
         fig.set_size_inches(n * 1.6, 2.0)
         for ax, img, title in zip(axes[0], pil_images, titles):
-            ax.imshow(img if img.mode == "RGB" else img.convert("RGB"))
+            ax.imshow(img if img.mode == 'RGB' else img.convert('RGB'))
             ax.set_title(title, fontsize=7, pad=3)
             ax.set_xticks([])
             ax.set_yticks([])
@@ -116,20 +263,21 @@ def _(mo):
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.vstack([
-        mo.md(
-            "**TL;DR** — We release **Semasia**, a benchmark of latent representations from"
-            " **~1,700 pretrained vision models** across **8 image-classification datasets**, paired"
-            " with rich architectural and training metadata. We use it to study how model"
-            " choices shape embedding geometry, to evaluate latent space alignment methods,"
-            " and to perform large-scale regression analysis of representation structure."
-        ),
-        mo.Html("""
+    mo.vstack(
+        [
+            mo.md(
+                '**TL;DR** — We release **Semasia**, a benchmark of latent representations from'
+                ' **~1,700 pretrained vision models** across **8 image-classification datasets**, paired'
+                ' with rich architectural and training metadata. We use it to study how model'
+                ' choices shape embedding geometry, to evaluate latent space alignment methods,'
+                ' and to perform large-scale regression analysis of representation structure.'
+            ),
+            mo.Html("""
     <div align="center">
     <img src="https://drive.google.com/thumbnail?id=15_vmbozAH-w9X2dwZQJF4gcl3zDcW43X&sz=w1200" height="400">
     </div>
     """),
-        mo.md(r"""
+            mo.md(r"""
     Modern neural networks learn **latent representations** with semantic structure:
     conceptual similarity is reflected in geometric proximity in embedding space.
 
@@ -156,7 +304,8 @@ def _(mo):
 
     Answering this at scale requires a large-scale benchmark of standardised latent representations paired with structured metadata — this is exactly what **SEMASIA** provides.
     """),
-    ])
+        ]
+    )
     return
 
 
@@ -314,14 +463,14 @@ def _(mo):
 def _(mo):
     mo.callout(
         mo.md(
-            "**Select** a model, dataset(s), split, and reduction method from the controls. "
-            "Adjust **Samples / dataset** to trade off speed and coverage — data is pre-fetched "
-            "at 1 600 samples so changing the slider never triggers a re-download. "
-            "**Select points** in the scatter plot to inspect their original images."
-            "Switch to the **Parallel Coordinates** view to brush along principal axes and reveal "
-            "hierarchical semantic structure."
+            '**Select** a model, dataset(s), split, and reduction method from the controls. '
+            'Adjust **Samples / dataset** to trade off speed and coverage — data is pre-fetched '
+            'at 1 600 samples so changing the slider never triggers a re-download. '
+            '**Select points** in the scatter plot to inspect their original images.'
+            'Switch to the **Parallel Coordinates** view to brush along principal axes and reveal '
+            'hierarchical semantic structure.'
         ),
-        kind="info",
+        kind='info',
     )
     return
 
@@ -350,7 +499,14 @@ def _(HF_REPO, mo):
             models_by_split[path.parts[0]].add(path.parts[1])
         return dict(models_by_split)
 
-    _ds_options = ['cifar10', 'cifar100', 'mnist', 'fashion_mnist', 'oxford-flowers', 'tiny-imagenet']
+    _ds_options = [
+        'cifar10',
+        'cifar100',
+        'mnist',
+        'fashion_mnist',
+        'oxford-flowers',
+        'tiny-imagenet',
+    ]
 
     with mo.status.spinner(title='Fetching available models for all datasets...'):
         l_all_info: dict = {}
@@ -367,8 +523,17 @@ def _(HF_REPO, mo):
         value=l_all_models[0] if l_all_models else None,
         label='Model',
     )
-    l_method_ui = mo.ui.dropdown(options=['PCA', 't-SNE', 'UMAP'], value='t-SNE', label='Reduction')
-    l_n_samples_ui = mo.ui.slider(start=200, stop=1600, step=100, value=800, label='Samples / dataset', show_value=True)
+    l_method_ui = mo.ui.dropdown(
+        options=['PCA', 't-SNE', 'UMAP'], value='t-SNE', label='Reduction'
+    )
+    l_n_samples_ui = mo.ui.slider(
+        start=200,
+        stop=1600,
+        step=100,
+        value=800,
+        label='Samples / dataset',
+        show_value=True,
+    )
     return l_all_info, l_all_models, l_method_ui, l_model_ui, l_n_samples_ui
 
 
@@ -378,11 +543,11 @@ def _(l_all_info: dict, l_model_ui, mo):
     for _ds, _mbs in l_all_info.items():
         _avail = sorted(s for s, models in _mbs.items() if l_model_ui.value in models)
         if _avail:
-            if _ds == "tiny-imagenet":
-                _preferred = "train" if "train" in _avail else _avail[0]
+            if _ds == 'tiny-imagenet':
+                _preferred = 'train' if 'train' in _avail else _avail[0]
             else:
                 _preferred = next(
-                    (s for s in ["test", "val", "valid", "validation"] if s in _avail),
+                    (s for s in ['test', 'val', 'valid', 'validation'] if s in _avail),
                     _avail[0],
                 )
             l_split_uis[_ds] = mo.ui.dropdown(
@@ -399,7 +564,7 @@ def _(l_available_datasets, mo):
     l_deselect_ui = mo.ui.multiselect(
         options=l_available_datasets,
         value=[],
-        label="Exclude datasets",
+        label='Exclude datasets',
     )
     return (l_deselect_ui,)
 
@@ -413,12 +578,14 @@ def _(
     l_split_uis: dict,
     mo,
 ):
-    mo.vstack([
-        mo.hstack([l_model_ui, l_method_ui, l_n_samples_ui], gap=2),
-        mo.md('**Split per dataset:**'),
-        mo.hstack(list(l_split_uis.values()), gap=2, wrap=True),
-        l_deselect_ui,
-    ])
+    mo.vstack(
+        [
+            mo.hstack([l_model_ui, l_method_ui, l_n_samples_ui], gap=2),
+            mo.md('**Split per dataset:**'),
+            mo.hstack(list(l_split_uis.values()), gap=2, wrap=True),
+            l_deselect_ui,
+        ]
+    )
     return
 
 
@@ -448,18 +615,14 @@ def _(
 
     for _ds in l_selected_datasets:
         _split = l_split_uis[_ds].value
-        _uri = (
-            f'hf://datasets/{HF_REPO}{_ds}/{_split}/{l_model_ui.value}/*.parquet'
-        )
+        _uri = f'hf://datasets/{HF_REPO}{_ds}/{_split}/{l_model_ui.value}/*.parquet'
         with mo.status.spinner(title=f'Loading {_ds} ({_split})...'):
             _loaded = _pl.scan_parquet(_uri).limit(1600).collect()
         _latent = np.array(_loaded['embedding'].to_list())
         _n = len(_loaded)
         _all_embeddings.append(_latent)
         _all_ds_labels.extend([_ds] * _n)
-        l_all_sample_info_full.extend(
-            [(_ds, int(i)) for i in _loaded['id'].to_list()]
-        )
+        l_all_sample_info_full.extend([(_ds, int(i)) for i in _loaded['id'].to_list()])
 
     l_X_all_full = np.vstack(_all_embeddings)
     l_y_ds_full = np.array(_all_ds_labels)
@@ -499,7 +662,6 @@ def _(DATASET_CONFIGS: dict, l_selected_datasets, l_split_uis: dict, mo):
 
     _api = _HfApi()
 
-
     def _orig_parquet_glob(repo_id: str, split: str) -> str:
         files = [
             f
@@ -511,7 +673,6 @@ def _(DATASET_CONFIGS: dict, l_selected_datasets, l_split_uis: dict, mo):
             raise FileNotFoundError(f'No parquet for split={split!r} in {repo_id}')
         config_dir = '/'.join(matches[0].split('/')[:-1])
         return f'hf://datasets/{repo_id}/{config_dir}/{split}-*.parquet'
-
 
     l_orig_datasets: dict = {}
     for _ds in l_selected_datasets:
@@ -541,11 +702,15 @@ def _(l_X_all, l_method_ui, mo):
     from sklearn.decomposition import PCA as _PCA
     from sklearn.manifold import TSNE as _TSNE
 
-    with mo.status.spinner(title=f"Running {l_method_ui.value} on {len(l_X_all):,} points…"):
-        if l_method_ui.value == "PCA":
+    with mo.status.spinner(
+        title=f'Running {l_method_ui.value} on {len(l_X_all):,} points…'
+    ):
+        if l_method_ui.value == 'PCA':
             l_X2d = _PCA(n_components=2).fit_transform(l_X_all)
-        elif l_method_ui.value == "t-SNE":
-            l_X2d = _TSNE(n_components=2, perplexity=30, random_state=42, n_jobs=-1).fit_transform(l_X_all)
+        elif l_method_ui.value == 't-SNE':
+            l_X2d = _TSNE(
+                n_components=2, perplexity=30, random_state=42, n_jobs=-1
+            ).fit_transform(l_X_all)
         else:
             l_X2d = _umap.UMAP(n_components=2, random_state=42).fit_transform(l_X_all)
     return (l_X2d,)
@@ -556,11 +721,31 @@ def _(l_X2d, l_all_sample_info, l_selected_datasets, l_y_ds, mo, np):
     import plotly.graph_objects as _go
 
     _PALETTE = [
-        '#2A9D8F', '#E9C46A', '#8E6BBE', '#F4A261', '#457B9D',
-        '#6D9B3A', '#E76F51', '#9B72AA', '#3ABEFF', '#C5956B',
+        '#2A9D8F',
+        '#E9C46A',
+        '#8E6BBE',
+        '#F4A261',
+        '#457B9D',
+        '#6D9B3A',
+        '#E76F51',
+        '#9B72AA',
+        '#3ABEFF',
+        '#C5956B',
     ]
-    _MARKERS = ['circle', 'square', 'diamond', 'cross', 'star', 'triangle-up', 'triangle-down', 'pentagon', 'hexagram']
-    _axis = dict(showticklabels=False, showgrid=False, zeroline=False, showline=False, ticks='')
+    _MARKERS = [
+        'circle',
+        'square',
+        'diamond',
+        'cross',
+        'star',
+        'triangle-up',
+        'triangle-down',
+        'pentagon',
+        'hexagram',
+    ]
+    _axis = dict(
+        showticklabels=False, showgrid=False, zeroline=False, showline=False, ticks=''
+    )
 
     l_trace_to_global = []
     _fig = _go.Figure()
@@ -570,19 +755,33 @@ def _(l_X2d, l_all_sample_info, l_selected_datasets, l_y_ds, mo, np):
         l_trace_to_global.append(_global_pts)
         _orig_indices = np.array([l_all_sample_info[g][1] for g in _global_pts])
         _customdata = np.stack([_global_pts, _orig_indices], axis=1)
-        _fig.add_trace(_go.Scatter(
-            x=l_X2d[_mask, 0], y=l_X2d[_mask, 1], mode='markers', name=_ds,
-            marker=dict(size=5, opacity=0.9, color=_PALETTE[_i % len(_PALETTE)], symbol=_MARKERS[_i % len(_MARKERS)]),
-            customdata=_customdata,
-            hovertemplate=f'<b>{_ds}</b><br>orig_idx: %{{customdata[1]}}<br>C1: %{{x:.3f}}  C2: %{{y:.3f}}<extra></extra>',
-        ))
+        _fig.add_trace(
+            _go.Scatter(
+                x=l_X2d[_mask, 0],
+                y=l_X2d[_mask, 1],
+                mode='markers',
+                name=_ds,
+                marker=dict(
+                    size=5,
+                    opacity=0.9,
+                    color=_PALETTE[_i % len(_PALETTE)],
+                    symbol=_MARKERS[_i % len(_MARKERS)],
+                ),
+                customdata=_customdata,
+                hovertemplate=f'<b>{_ds}</b><br>orig_idx: %{{customdata[1]}}<br>C1: %{{x:.3f}}  C2: %{{y:.3f}}<extra></extra>',
+            )
+        )
 
     _fig.update_layout(
-        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-        xaxis=_axis, yaxis=_axis,
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        xaxis=_axis,
+        yaxis=_axis,
         showlegend=True,
         legend=dict(title='Dataset', bgcolor='rgba(255,255,255,0.6)', borderwidth=1),
-        width=900, height=520, margin=dict(t=10, b=10, l=10, r=10),
+        width=900,
+        height=520,
+        margin=dict(t=10, b=10, l=10, r=10),
     )
     l_chart = mo.ui.plotly(_fig)
     l_chart
@@ -656,9 +855,7 @@ def _(
             if _oi >= len(_orig_df):
                 continue
             _row = _orig_df.row(_oi, named=True)
-            _pil_images.append(
-                _PILImage.open(io.BytesIO(_row[_img_field]['bytes']))
-            )
+            _pil_images.append(_PILImage.open(io.BytesIO(_row[_img_field]['bytes'])))
             _titles.append(f'{_ds_name}\n#{_oi}')
 
     mo.stop(
@@ -688,11 +885,13 @@ def _(
 def _(l_available_datasets, mo):
     pc_dataset_ui = mo.ui.dropdown(
         options=l_available_datasets,
-        value="cifar10" if "cifar10" in l_available_datasets else l_available_datasets[0],
-        label="Dataset",
+        value='cifar10'
+        if 'cifar10' in l_available_datasets
+        else l_available_datasets[0],
+        label='Dataset',
     )
     pc_method_ui = mo.ui.dropdown(
-        options=["PCA", "t-SNE", "UMAP"], value="UMAP", label="Reduction"
+        options=['PCA', 't-SNE', 'UMAP'], value='UMAP', label='Reduction'
     )
     return pc_dataset_ui, pc_method_ui
 
@@ -700,27 +899,40 @@ def _(l_available_datasets, mo):
 @app.cell(hide_code=True)
 def _(mo, pc_dataset_ui):
     _pc_label_map = {
-        "cifar10": ["label"],
-        "cifar100": ["fine_label", "coarse_label"],
-        "mnist": ["label"],
-        "fashion_mnist": ["label"],
-        "oxford-flowers": ["label"],
-        "tiny-imagenet": ["label"],
+        'cifar10': ['label'],
+        'cifar100': ['fine_label', 'coarse_label'],
+        'mnist': ['label'],
+        'fashion_mnist': ['label'],
+        'oxford-flowers': ['label'],
+        'tiny-imagenet': ['label'],
     }
-    _pc_opts = _pc_label_map.get(pc_dataset_ui.value, ["label"])
-    _pc_def = "coarse_label" if "coarse_label" in _pc_opts else _pc_opts[0]
-    pc_label_ui = mo.ui.dropdown(options=_pc_opts, value=_pc_def, label="Color by")
+    _pc_opts = _pc_label_map.get(pc_dataset_ui.value, ['label'])
+    _pc_def = 'coarse_label' if 'coarse_label' in _pc_opts else _pc_opts[0]
+    pc_label_ui = mo.ui.dropdown(options=_pc_opts, value=_pc_def, label='Color by')
     return (pc_label_ui,)
 
 
 @app.cell(hide_code=True)
 def _(mo, pc_dataset_ui, pc_label_ui, pc_method_ui):
-    _max_dims = 3 if pc_method_ui.value == "t-SNE" else 10
+    _max_dims = 3 if pc_method_ui.value == 't-SNE' else 10
     pc_n_dims_ui = mo.ui.slider(
-        start=2, stop=_max_dims, step=1,
-        value=min(6, _max_dims), label="Components", show_value=True,
+        start=2,
+        stop=_max_dims,
+        step=1,
+        value=min(6, _max_dims),
+        label='Components',
+        show_value=True,
     )
-    mo.hstack([mo.md("### Parallel Coordinates"), pc_dataset_ui, pc_label_ui, pc_method_ui, pc_n_dims_ui], gap=2)
+    mo.hstack(
+        [
+            mo.md('### Parallel Coordinates'),
+            pc_dataset_ui,
+            pc_label_ui,
+            pc_method_ui,
+            pc_n_dims_ui,
+        ],
+        gap=2,
+    )
     return (pc_n_dims_ui,)
 
 
@@ -731,7 +943,9 @@ def _(HF_REPO, l_model_ui, l_split_uis: dict, mo, pc_dataset_ui):
     _pc_ds_name = pc_dataset_ui.value
     _pc_split = l_split_uis[_pc_ds_name].value
 
-    _pc_uri = f'hf://datasets/{HF_REPO}{_pc_ds_name}/{_pc_split}/{l_model_ui.value}/*.parquet'
+    _pc_uri = (
+        f'hf://datasets/{HF_REPO}{_pc_ds_name}/{_pc_split}/{l_model_ui.value}/*.parquet'
+    )
     with mo.status.spinner(title=f'Loading {_pc_ds_name} ({_pc_split})...'):
         pc_raw_full = _pl2.scan_parquet(_pc_uri).limit(1600).collect()
     return (pc_raw_full,)
@@ -899,12 +1113,12 @@ def _(mo):
 def _(mo):
     mo.callout(
         mo.md(
-            "**Select** a dataset and two models to compare, then set the number of prototypes *k*. "
-            "Embeddings for both models are fetched automatically. "
-            "The **Jaccard heatmap** shows prototype-level overlap before alignment; "
-            "the **scatter plots** show how the Hungarian permutation brings the two spaces into correspondence."
+            '**Select** a dataset and two models to compare, then set the number of prototypes *k*. '
+            'Embeddings for both models are fetched automatically. '
+            'The **Jaccard heatmap** shows prototype-level overlap before alignment; '
+            'the **scatter plots** show how the Hungarian permutation brings the two spaces into correspondence.'
         ),
-        kind="info",
+        kind='info',
     )
     return
 
@@ -912,32 +1126,38 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(l_all_info: dict, l_all_models, mo):
     _align_ds_options = sorted(l_all_info.keys())
-    _default_a = "vit_base_patch16_224.augreg_in1k"
-    _default_b = "vit_small_patch16_224.augreg_in1k"
+    _default_a = 'vit_base_patch16_224.augreg_in1k'
+    _default_b = 'vit_small_patch16_224.augreg_in1k'
 
     align_dataset_ui = mo.ui.dropdown(
         options=_align_ds_options,
-        value="cifar10" if "cifar10" in _align_ds_options else _align_ds_options[0],
-        label="Dataset",
+        value='cifar10' if 'cifar10' in _align_ds_options else _align_ds_options[0],
+        label='Dataset',
     )
     align_model_a_ui = mo.ui.dropdown(
         options=l_all_models,
         value=_default_a if _default_a in l_all_models else l_all_models[0],
-        label="Model A",
+        label='Model A',
     )
     align_model_b_ui = mo.ui.dropdown(
         options=l_all_models,
-        value=_default_b if _default_b in l_all_models else (l_all_models[1] if len(l_all_models) > 1 else l_all_models[0]),
-        label="Model B",
+        value=_default_b
+        if _default_b in l_all_models
+        else (l_all_models[1] if len(l_all_models) > 1 else l_all_models[0]),
+        label='Model B',
     )
     align_n_proto_ui = mo.ui.slider(
-        start=2, stop=20, step=1, value=10, label="Prototypes (k)", show_value=True
+        start=2, stop=20, step=1, value=10, label='Prototypes (k)', show_value=True
     )
-    mo.hstack([
-        mo.vstack([align_dataset_ui, align_n_proto_ui]),
-        align_model_a_ui,
-        align_model_b_ui,
-    ], justify="start", gap=2)
+    mo.hstack(
+        [
+            mo.vstack([align_dataset_ui, align_n_proto_ui]),
+            align_model_a_ui,
+            align_model_b_ui,
+        ],
+        justify='start',
+        gap=2,
+    )
     return (
         align_dataset_ui,
         align_model_a_ui,
@@ -964,38 +1184,50 @@ def _(
 
     mo.stop(
         _align_model_a == _align_model_b,
-        mo.callout(mo.md("Please select two **different** models."), kind="warn"),
+        mo.callout(mo.md('Please select two **different** models.'), kind='warn'),
     )
 
     _align_mbs = l_all_info.get(_align_ds, {})
     _align_splits = sorted(_align_mbs.keys())
     _align_split = (
-        "test" if "test" in _align_splits
-        else "val" if "val" in _align_splits
-        else _align_splits[0] if _align_splits else "test"
+        'test'
+        if 'test' in _align_splits
+        else 'val'
+        if 'val' in _align_splits
+        else _align_splits[0]
+        if _align_splits
+        else 'test'
     )
 
-    _uri_a = f"hf://datasets/{HF_REPO}{_align_ds}/{_align_split}/{_align_model_a}/*.parquet"
-    _uri_b = f"hf://datasets/{HF_REPO}{_align_ds}/{_align_split}/{_align_model_b}/*.parquet"
+    _uri_a = (
+        f'hf://datasets/{HF_REPO}{_align_ds}/{_align_split}/{_align_model_a}/*.parquet'
+    )
+    _uri_b = (
+        f'hf://datasets/{HF_REPO}{_align_ds}/{_align_split}/{_align_model_b}/*.parquet'
+    )
 
-    with mo.status.spinner(title=f"Loading embeddings for {_align_ds}/{_align_split}..."):
+    with mo.status.spinner(
+        title=f'Loading embeddings for {_align_ds}/{_align_split}...'
+    ):
         _df_a = _pl_align.scan_parquet(_uri_a).limit(1600).collect()
         _df_b = _pl_align.scan_parquet(_uri_b).limit(1600).collect()
 
-    _ids_a = set(_df_a["id"].to_list())
-    _ids_b = set(_df_b["id"].to_list())
+    _ids_a = set(_df_a['id'].to_list())
+    _ids_b = set(_df_b['id'].to_list())
     _common_ids = sorted(_ids_a & _ids_b)
 
-    _df_a = _df_a.filter(_pl_align.col("id").is_in(_common_ids)).sort("id")
-    _df_b = _df_b.filter(_pl_align.col("id").is_in(_common_ids)).sort("id")
+    _df_a = _df_a.filter(_pl_align.col('id').is_in(_common_ids)).sort('id')
+    _df_b = _df_b.filter(_pl_align.col('id').is_in(_common_ids)).sort('id')
 
-    align_X_a = np.array(_df_a["embedding"].to_list(), dtype=np.float32)
-    align_X_b = np.array(_df_b["embedding"].to_list(), dtype=np.float32)
-    align_true_labels = [int(x) for x in _df_a["label"].to_list()]
+    align_X_a = np.array(_df_a['embedding'].to_list(), dtype=np.float32)
+    align_X_b = np.array(_df_b['embedding'].to_list(), dtype=np.float32)
+    align_true_labels = [int(x) for x in _df_a['label'].to_list()]
 
     mo.callout(
-        mo.md(f"Loaded **{len(align_X_a)}** shared samples · split `{_align_split}` · dim `{align_X_a.shape[1]}`"),
-        kind="success",
+        mo.md(
+            f'Loaded **{len(align_X_a)}** shared samples · split `{_align_split}` · dim `{align_X_a.shape[1]}`'
+        ),
+        kind='success',
     )
     return align_X_a, align_X_b
 
@@ -1007,9 +1239,13 @@ def _(align_X_a, align_X_b, align_n_proto_ui, mo, np):
 
     _k = align_n_proto_ui.value
 
-    with mo.status.spinner(title=f"Running K-Means (k={_k}) on both models..."):
-        _km_a = _KMeans_align(n_clusters=_k, random_state=42, n_init="auto").fit(align_X_a)
-        _km_b = _KMeans_align(n_clusters=_k, random_state=42, n_init="auto").fit(align_X_b)
+    with mo.status.spinner(title=f'Running K-Means (k={_k}) on both models...'):
+        _km_a = _KMeans_align(n_clusters=_k, random_state=42, n_init='auto').fit(
+            align_X_a
+        )
+        _km_b = _KMeans_align(n_clusters=_k, random_state=42, n_init='auto').fit(
+            align_X_b
+        )
 
     align_cluster_a = _km_a.labels_
     align_cluster_b = _km_b.labels_
@@ -1086,45 +1322,48 @@ def _(
     _fig_J = _go_align.Figure(
         data=_go_align.Heatmap(
             z=align_jaccard_matrix.tolist(),
-            x=[f"B-{j}" for j in range(_k)],
-            y=[f"A-{i}" for i in range(_k)],
-            colorscale="magma",
-            zmin=0, zmax=1,
-            colorbar=dict(title="Jaccard"),
+            x=[f'B-{j}' for j in range(_k)],
+            y=[f'A-{i}' for i in range(_k)],
+            colorscale='magma',
+            zmin=0,
+            zmax=1,
+            colorbar=dict(title='Jaccard'),
         )
     )
     _fig_J.update_layout(
-        title="Jaccard Similarity Matrix",
-        xaxis_title="Model B prototypes",
-        yaxis_title="Model A prototypes",
+        title='Jaccard Similarity Matrix',
+        xaxis_title='Model B prototypes',
+        yaxis_title='Model A prototypes',
         width=500,
         height=500,
         margin=dict(l=60, r=20, t=50, b=50),
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
         yaxis=dict(scaleanchor='x', scaleratio=1),
     )
 
     _delta_mse = (align_mse_before - align_mse_after) / align_mse_before * 100
     _caption_text = (
-        r"**Jaccard similarity** $J(i,j) = \frac{|C_A^i \cap C_B^j|}{|C_A^i \cup C_B^j|}$"
-        " measures the sample-level overlap between prototype $i$ of Model A and prototype $j$"
-        " of Model B. Each entry ranges from 0 (no shared samples) to 1 (identical membership)."
-        " A bright diagonal — or a permuted-diagonal pattern — means both models have learned"
-        " semantically consistent clusters. The **Hungarian algorithm** finds the permutation on the $j$ indices"
+        r'**Jaccard similarity** $J(i,j) = \frac{|C_A^i \cap C_B^j|}{|C_A^i \cup C_B^j|}$'
+        ' measures the sample-level overlap between prototype $i$ of Model A and prototype $j$'
+        ' of Model B. Each entry ranges from 0 (no shared samples) to 1 (identical membership).'
+        ' A bright diagonal — or a permuted-diagonal pattern — means both models have learned'
+        ' semantically consistent clusters. The **Hungarian algorithm** finds the permutation on the $j$ indices'
         r" $\sigma$ that maximises $\sum_i J(i, \sigma(i))$, aligning Model B's prototypes"
-        " to Model A without any label supervision.  \n"
-        f"\n**Jaccard mean (best match per A-prototype):** {align_jaccard_mean:.3f} · "
-        f"**MSE before:** {align_mse_before:.3f} · "
-        f"**MSE after:** {align_mse_after:.3f} · "
-        f"**reduction:** {_delta_mse:.1f}%"
+        ' to Model A without any label supervision.  \n'
+        f'\n**Jaccard mean (best match per A-prototype):** {align_jaccard_mean:.3f} · '
+        f'**MSE before:** {align_mse_before:.3f} · '
+        f'**MSE after:** {align_mse_after:.3f} · '
+        f'**reduction:** {_delta_mse:.1f}%'
     )
     _caption = mo.md(_caption_text)
 
-    mo.vstack([
-        mo.ui.plotly(_fig_J),
-        _caption,
-    ])
+    mo.vstack(
+        [
+            mo.ui.plotly(_fig_J),
+            _caption,
+        ]
+    )
     return
 
 
@@ -1152,52 +1391,57 @@ def _(
     _xy_b_before = _pca2.transform(align_coords_b)
     _xy_b_after = _pca2.transform(align_coords_b_matched)
 
-    _color_a = "#636EFA"
-    _color_b = "#EF553B"
+    _color_a = '#636EFA'
+    _color_b = '#EF553B'
 
     _transparent = dict(
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
     )
 
     _fig_scatter = _make_subplots_align(
-        rows=1, cols=2,
-        subplot_titles=["Before alignment", "After Hungarian alignment"],
+        rows=1,
+        cols=2,
+        subplot_titles=['Before alignment', 'After Hungarian alignment'],
     )
 
-    for _col, (_xy_b, _show) in enumerate([
-        (_xy_b_before, True), (_xy_b_after, False)
-    ], start=1):
+    for _col, (_xy_b, _show) in enumerate(
+        [(_xy_b_before, True), (_xy_b_after, False)], start=1
+    ):
         _fig_scatter.add_trace(
             _go_align2.Scatter(
-                x=_xy_a[:, 0].tolist(), y=_xy_a[:, 1].tolist(),
-                mode="markers",
+                x=_xy_a[:, 0].tolist(),
+                y=_xy_a[:, 1].tolist(),
+                mode='markers',
                 marker=dict(size=3, color=_color_a, opacity=0.5),
                 name=_model_a_name,
-                legendgroup="A",
+                legendgroup='A',
                 showlegend=_show,
             ),
-            row=1, col=_col,
+            row=1,
+            col=_col,
         )
         _fig_scatter.add_trace(
             _go_align2.Scatter(
-                x=_xy_b[:, 0].tolist(), y=_xy_b[:, 1].tolist(),
-                mode="markers",
+                x=_xy_b[:, 0].tolist(),
+                y=_xy_b[:, 1].tolist(),
+                mode='markers',
                 marker=dict(size=3, color=_color_b, opacity=0.5),
                 name=_model_b_name,
-                legendgroup="B",
+                legendgroup='B',
                 showlegend=_show,
             ),
-            row=1, col=_col,
+            row=1,
+            col=_col,
         )
 
     _fig_scatter.update_layout(
         height=420,
-        title_text="Analysis-space embeddings projected via PCA(2) of Model A",
-        legend=dict(itemsizing="constant"),
+        title_text='Analysis-space embeddings projected via PCA(2) of Model A',
+        legend=dict(itemsizing='constant'),
         margin=dict(l=40, r=20, t=80, b=40),
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
     )
     _fig_scatter.update_xaxes(showticklabels=False, showgrid=False, zeroline=False)
     _fig_scatter.update_yaxes(showticklabels=False, showgrid=False, zeroline=False)
@@ -1206,5 +1450,5 @@ def _(
     return
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     app.run()
