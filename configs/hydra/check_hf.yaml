@@ -3,7 +3,7 @@ datasets:
     - cifar100
     - mnist
     - fashion_mnist
-    - tiny_imagenet
+    - tiny-imagenet
     - oxford-flowers
     - celeba
     - imagenet-1k
