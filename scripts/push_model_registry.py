@@ -174,6 +174,7 @@ def main() -> None:
             dfs = [pl.read_parquet(f) for f in batch_files]
             df = pl.concat(dfs)
             df = df.unique(subset='model_name', keep='first')
+            df = df.sort('model_name')
             df.write_parquet(parquet_path)
             print(f'Saved {len(df)} total models to {parquet_path}')
 

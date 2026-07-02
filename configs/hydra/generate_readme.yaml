@@ -10,6 +10,40 @@ hf:
     repo_prefix: semasia- # will create repos like "<namespace>/semasia-cifar10"
     private: false # set to true if you want private repos
     commit_message: "Add/update readme"
+    model_registry_repo_id: spaicom-lab/semasia-model-registry
+
+code_repo_url: https://github.com/SPAICOM/semasia-datasets
+
+badges:
+    - "[![arXiv](https://img.shields.io/badge/Arxiv-2605.09485-b31b1b.svg?logo=arXiv)](https://arxiv.org/abs/2605.09485)"
+    - "[![GitHub](https://img.shields.io/badge/GitHub-Code-181717.svg?logo=github)](https://github.com/SPAICOM/semasia-datasets)"
+    - "[![HuggingFace](https://img.shields.io/badge/HuggingFace-SEMASIA-white?logo=huggingface&logoColor=FF9D00)](https://huggingface.co/collections/spaicom-lab/semasia)"
+    - "[![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/SPAICOM/semasia-datasets/blob/main/notebooks/semasia.py)"
+
+# --------------------------
+# Hugging Face Hub tags (controls discoverability/filters on the Hub)
+# --------------------------
+task_categories:
+    - feature-extraction
+
+tags:
+    - semantic-communication
+    - explainability
+    - latent-space-alignment
+    - interpretability
+    - image-classification
+    - timm
+
+citation_bibtex: |
+    @misc{pandolfo2026semasialargescaledatasetsemantically,
+          title={SEMASIA: A Large-Scale Dataset of Semantically Structured Latent Representations},
+          author={Mario Edoardo Pandolfo and Enrico Grimaldi and Lorenzo Marinucci and Leonardo Di Nino and Simone Fiorellino and Sergio Barbarossa and Paolo Di Lorenzo},
+          year={2026},
+          eprint={2605.09485},
+          archivePrefix={arXiv},
+          primaryClass={cs.LG},
+          url={https://arxiv.org/abs/2605.09485},
+    }
 
 hydra:
     mode: MULTIRUN

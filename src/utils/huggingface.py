@@ -265,6 +265,13 @@ def generate_readme_with_configs(
     pretty_name: str | None = None,
     extra_markdown: str = '',
     original_dataset_id: str | None = None,
+    code_repo_url: str | None = None,
+    model_registry_repo_id: str | None = None,
+    extra_fields: list[str] | None = None,
+    badges: list[str] | None = None,
+    task_categories: list[str] | None = None,
+    tags: list[str] | None = None,
+    citation_bibtex: str | None = None,
     push_online: bool = True,
     commit_message: str = 'Update README configs (online models only)',
 ) -> None:
@@ -285,6 +292,32 @@ def generate_readme_with_configs(
         Additional markdown content to append to the Notes section.
     original_dataset_id : str, optional
         Original dataset ID to link to (e.g., "uoft-cs/cifar10").
+    code_repo_url : str, optional
+        URL of the code repository used to generate this dataset. If None,
+        the link is omitted.
+    model_registry_repo_id : str, optional
+        Hugging Face repo ID of the timm model metadata registry
+        (e.g., "org_name/semantic-model-registry"). If None, the link
+        is omitted.
+    extra_fields : list[str], optional
+        Names of the non-embedding columns stored alongside `embedding`
+        in each Parquet file (e.g., ["label"] or ["fine_label",
+        "coarse_label"]), matching this dataset's `extras` config.
+        If None, a "Fields" section is not rendered and the usage
+        examples fall back to a generic "label" column.
+    badges : list[str], optional
+        Markdown badge snippets (e.g., shields.io badges) to render
+        under the title. If None, no badges are rendered.
+    task_categories : list[str], optional
+        Hugging Face task category tags (e.g., ["feature-extraction"]).
+        If None, the field is omitted from the YAML front-matter.
+    tags : list[str], optional
+        Free-form Hugging Face discoverability tags (e.g.,
+        ["semantic-communication", "explainability"]). If None, the
+        field is omitted from the YAML front-matter.
+    citation_bibtex : str, optional
+        BibTeX citation to include in a "Citation" section. If None,
+        the section is omitted.
     push_online : bool, optional
         Whether to upload the README to Hugging Face. Defaults to True.
     commit_message : str, optional
@@ -327,18 +360,101 @@ def generate_readme_with_configs(
 
     yaml_top = {
         'pretty_name': pretty_name or f'Latents for {dataset_name} (timm)',
-        'configs': config_entries,
     }
+    if task_categories:
+        yaml_top['task_categories'] = list(task_categories)
+    if tags:
+        yaml_top['tags'] = list(tags)
+    yaml_top['configs'] = config_entries
     yaml_text = '---\n' + yaml.safe_dump(yaml_top, sort_keys=False) + '---\n'
 
-    example_model = online_models[0] if online_models else 'resnet50'
+    example_model = online_models[0]
     available_splits = sorted(models_by_split.keys())
-    usage_lines = [
-        f'    ds_{split} = load_dataset("{repo_id}", '
-        f'"{example_model}", split="{split}")'
-        for split in available_splits
-    ]
-    usage_code = '\n'.join(usage_lines)
+    example_split = (
+        'test'
+        if 'test' in available_splits
+        else available_splits[0]
+        if available_splits
+        else 'train'
+    )
+
+    example_field = extra_fields[0] if extra_fields else 'label'
+
+    torch_usage = '\n'.join([
+        '    from datasets import load_dataset',
+        '    import torch',
+        '',
+        '    ds = load_dataset(',
+        f'        "{repo_id}",  # repository  →  which benchmark',
+        f'        "{example_model}",  # config      →  which model',
+        f'        split="{example_split}",  # split       →  which partition',
+        '    ).with_format("torch")',
+        '',
+        '    embeddings = torch.vstack(list(ds["embedding"]))  # (N, d)',
+        f'    {example_field} = torch.tensor(ds["{example_field}"])  # (N,)',
+    ])
+
+    polars_usage = '\n'.join([
+        '    import polars as pl',
+        '',
+        '    df = pl.read_parquet(',
+        f'        "hf://datasets/{repo_id}/{example_split}/'
+        f'{example_model}/*.parquet"',
+        '    )',
+        '',
+        '    embeddings = df["embedding"].to_numpy()  # shape (N, d)',
+        f'    {example_field} = df["{example_field}"].to_numpy()  # shape (N,)',
+    ])
+
+    embedding_dim_note = (
+        f'(dimensionality depends on config; see [model registry]'
+        f'(https://huggingface.co/datasets/{model_registry_repo_id})).'
+        if model_registry_repo_id
+        else '(dimensionality depends on config).'
+    )
+    id_note = (
+        f'row order matches the original [{original_dataset_id}]'
+        f'(https://huggingface.co/datasets/{original_dataset_id}) split, '
+        'so `id` can be used to map a row back to its source sample.'
+        if original_dataset_id
+        else 'row order matches the corresponding split of the '
+        'source dataset, so `id` can be used to map a row back to '
+        'its source sample.'
+    )
+    fields_section = '\n'.join(
+        [
+            '    ## Fields',
+            '',
+            '    Columns available in each Parquet file for this '
+            'dataset:',
+            '',
+            '    | Field | Description |',
+            '    |-------|-------------|',
+            '    | `id` | Row index within the shard '
+            '(unique per split/model, not across models); the '
+            f'{id_note} |',
+            '    | `model_name` | `timm` model that produced this '
+            'row\'s embedding (constant within a config). |',
+            '    | `embedding` | Precomputed latent representation '
+            f'extracted by the model {embedding_dim_note} |',
+        ]
+        + [
+            f'    | `{field}` | Original dataset field, copied '
+            'as-is from the source dataset. |'
+            for field in (extra_fields or [])
+        ]
+    )
+
+    model_counts_table = '\n'.join(
+        [
+            '    | Split | # Models |',
+            '    |-------|----------|',
+        ]
+        + [
+            f'    | {split} | {len(models_by_split[split])} |'
+            for split in available_splits
+        ]
+    )
 
     original_dataset_link = (
         f'- Based on [{original_dataset_id}]'
@@ -346,11 +462,62 @@ def generate_readme_with_configs(
         if original_dataset_id
         else ''
     )
+    code_repo_link = (
+        f'- Code: [{code_repo_url.split("://")[-1]}]({code_repo_url})'
+        if code_repo_url
+        else ''
+    )
+    model_registry_link = (
+        '- Model metadata (architecture family, parameter count, '
+        'embedding dimension, pretraining details, ...) for every model '
+        f'in this dataset is available in the [model registry]'
+        f'(https://huggingface.co/datasets/{model_registry_repo_id}).'
+        if model_registry_repo_id
+        else ''
+    )
 
-    dataset_desc = f'**precomputed embeddings** for `{dataset_name}` '
-    dataset_desc += 'across many `timm` models.'
+    citation_section = ''
+    if citation_bibtex:
+        bibtex_lines = [
+            '    ' + line for line in citation_bibtex.strip('\n').splitlines()
+        ]
+        citation_section = '\n'.join(
+            [
+                '    ## Citation',
+                '',
+                '    If you use this dataset, please cite:',
+                '',
+                '    ```bibtex',
+            ]
+            + bibtex_lines
+            + ['    ```']
+        )
+
+    badges_block = ''
+    if badges:
+        badges_block = '\n'.join(
+            [
+                '    <h5 align="center">',
+                '',
+                '    ' + '&nbsp;'.join(badges),
+                '',
+                '     <br>',
+                '',
+                '    </h5>',
+            ]
+        )
+
+    dataset_desc = (
+        f'**precomputed latent representations (embeddings)** extracted from '
+        f'`timm` image-classification backbones on `{dataset_name}`, '
+        'released as part of SEMASIA — a large-scale resource for studying '
+        'semantic communication, cross-model latent space alignment, '
+        'and explainability.'
+    )
     md_body = textwrap.dedent(f"""
     # {pretty_name or f'Latents for {dataset_name} (timm)'}
+
+{badges_block}
 
     This repository hosts {dataset_desc}
     Each **config** corresponds to a single model;
@@ -358,17 +525,35 @@ def generate_readme_with_configs(
 
     ## Usage
 
-    ```python
-    from datasets import load_dataset
+    Load with `datasets` and convert to `torch`:
 
-{usage_code}
+    ```python
+{torch_usage}
     ```
+
+    Or read the Parquet files directly with `polars`:
+
+    ```python
+{polars_usage}
+    ```
+
+{fields_section}
+
+    ## Available Models
+
+    Number of models with precomputed embeddings, per split:
+
+{model_counts_table}
 
     ## Notes
     - Configs are generated from what is actually
       uploaded on the Hub (parquet presence).
     {original_dataset_link}
+    {code_repo_link}
+    {model_registry_link}
     {extra_markdown}
+
+{citation_section}
     """)
 
     out_path = repo_dir / 'README.md'

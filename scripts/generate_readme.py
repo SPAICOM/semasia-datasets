@@ -47,6 +47,13 @@ def main(cfg: DictConfig) -> None:
         dataset_name=dataset_name,
         repo_id=repo_id,
         original_dataset_id=cfg.dataset.name,
+        code_repo_url=cfg.get('code_repo_url'),
+        model_registry_repo_id=cfg.hf.get('model_registry_repo_id'),
+        extra_fields=cfg.dataset.get('extras'),
+        badges=cfg.get('badges'),
+        task_categories=cfg.get('task_categories'),
+        tags=cfg.get('tags'),
+        citation_bibtex=cfg.get('citation_bibtex'),
         push_online=True,
     )
 
