@@ -1,5 +1,8 @@
 name: zalando-datasets/fashion_mnist
 
+split:
+    - train
+    - test
 data: image
 extras:
     - label

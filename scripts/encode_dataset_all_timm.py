@@ -90,11 +90,11 @@ def main(cfg: DictConfig) -> None:
     dataset = load_dataset(cfg.dataset.name)
 
     dataset_export_root = export_root / dataset_name
-    for split in dataset:
+    for split in cfg.dataset.split:
         (dataset_export_root / split).mkdir(parents=True, exist_ok=True)
 
     data: dict[str, dict[str, list[Any]]] = {}
-    for split in dataset:
+    for split in cfg.dataset.split:
         data[split] = {col: list(dataset[split][col]) for col in cfg.dataset.extras}
 
     token = get_token()
@@ -145,7 +145,7 @@ def main(cfg: DictConfig) -> None:
             continue
         print('[OK]')
 
-        for split in dataset:
+        for split in cfg.dataset.split:
             if cfg.encode:
                 if (
                     model_name in already_loaded_models.get(split, set())

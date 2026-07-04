@@ -1,5 +1,9 @@
 name: flwrlabs/celeba
 
+split:
+    - train
+    - valid
+    - test
 data: image
 extras:
     - celeb_id

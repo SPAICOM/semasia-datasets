@@ -1,5 +1,8 @@
 name: uoft-cs/cifar10
 
+split:
+    - train
+    - test
 data: img
 extras:
     - label

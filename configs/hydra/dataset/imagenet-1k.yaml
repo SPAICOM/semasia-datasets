@@ -1,5 +1,8 @@
 name: ILSVRC/imagenet-1k
 
+split:
+    - validation
+    - test
 data: image
 extras:
     - label

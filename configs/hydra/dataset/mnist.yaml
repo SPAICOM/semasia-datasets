@@ -1,5 +1,8 @@
 name: ylecun/mnist
 
+split:
+    - train
+    - test
 data: image
 extras:
     - label

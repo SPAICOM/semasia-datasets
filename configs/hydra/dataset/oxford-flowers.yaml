@@ -1,5 +1,8 @@
 name: nkirschi/oxford-flowers
 
+split:
+    - train
+    - test
 data: image
 extras:
     - label

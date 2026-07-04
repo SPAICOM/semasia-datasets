@@ -1,5 +1,8 @@
 name: zh-plus/tiny-imagenet
 
+split:
+    - train
+    - valid
 data: image
 extras:
     - label

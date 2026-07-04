@@ -1,5 +1,8 @@
 name: uoft-cs/cifar100
 
+split:
+    - train
+    - test
 data: img
 extras:
     - fine_label
