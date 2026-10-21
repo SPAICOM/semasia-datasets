@@ -10,7 +10,7 @@
 [Sergio Barbarossa](https://scholar.google.com/citations?user=2woHFu8AAAAJ)<sup>1</sup>,
 [Paolo Di Lorenzo](https://scholar.google.com/citations?user=VZYvspQAAAAJ)<sup>1</sup>
 
-<sup>1</sup>University of Sapienza
+<sup>1</sup>Sapienza University of Rome
 
 <p><sup>§</sup>Equal contribution</p>
 
