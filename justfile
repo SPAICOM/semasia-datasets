@@ -80,15 +80,15 @@ compute-compute:
 
 # Compute stat metrics only (default)
 compute-metrics DATASET:
-    uv run scripts/compute_metrics.py dataset={{DATASET}}
+    uv run scripts/compute_metrics.py dataset_name={{DATASET}}
 
 # Compute stat + TDA metrics
 compute-metrics-tda DATASET:
-    uv run scripts/compute_metrics.py dataset={{DATASET}} compute_tda=true
+    uv run scripts/compute_metrics.py dataset_name={{DATASET}} compute_tda=true
 
 # Compute metrics with limited models (for testing)
 compute-metrics-test DATASET:
-    uv run scripts/compute_metrics.py dataset={{DATASET}} limit_models=5
+    uv run scripts/compute_metrics.py dataset_name={{DATASET}} limit_models=5
 
 # Run stat analysis (loads precomputed metrics, runs regression)
 stat:

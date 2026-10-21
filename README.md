@@ -158,7 +158,7 @@ This opens the marimo notebook editor (`marimo edit .`) via `uv`, letting you br
 
 If you find this code useful for your research, please consider citing the following paper:
 
-```
+```bibtex
 @misc{pandolfo2026semasialargescaledatasetsemantically,
       title={SEMASIA: A Large-Scale Dataset of Semantically Structured Latent Representations}, 
       author={Mario Edoardo Pandolfo and Enrico Grimaldi and Lorenzo Marinucci and Leonardo Di Nino and Simone Fiorellino and Sergio Barbarossa and Paolo Di Lorenzo},

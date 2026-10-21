@@ -4,7 +4,7 @@ defaults:
 
 repo_id: "spaicom-lab"
 prefix: "semasia-"
-dataset: mnist
+dataset_name: mnist
 split: train
 model: null
 

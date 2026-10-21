@@ -1,7 +1,7 @@
 """Compute metrics for latent embeddings: stat metrics + TDA persistence diagrams.
 
 Usage:
-    python scripts/compute_metrics.py dataset=cifar10
+    python scripts/compute_metrics.py dataset_name=cifar10
 """
 
 import logging
@@ -15,7 +15,6 @@ import numpy as np
 import polars as pl
 import torch
 import torch.nn as nn
-from datasets import load_dataset
 from joblib import Parallel, delayed
 from omegaconf import DictConfig
 from sklearn.metrics import (
@@ -117,12 +116,12 @@ def main(cfg: DictConfig) -> None:
 
     results_dir.mkdir(parents=True, exist_ok=True)
 
-    dataset: str = f'{cfg.repo_id}/{cfg.prefix}{cfg.dataset}'
+    dataset: str = f'{cfg.repo_id}/{cfg.prefix}{cfg.dataset_name}'
 
     split = cfg.split
-    valid_splits = DATASET_SPLITS.get(cfg.dataset, {'train'})
+    valid_splits = DATASET_SPLITS.get(cfg.dataset_name, {'train'})
     if split not in valid_splits:
-        raise ValueError(f'Invalid split {split!r} for dataset {cfg.dataset}.')
+        raise ValueError(f'Invalid split {split!r} for dataset {cfg.dataset_name}.')
 
     print('\n[INFO] Loading model registry...')
     model_df = pl.read_parquet(
@@ -152,7 +151,7 @@ def main(cfg: DictConfig) -> None:
         print(f'  Limited to {limit_models} models for testing')
 
     output_path = (
-        results_dir / f'{cfg.repo_id}__{cfg.prefix}{cfg.dataset}__{split}.parquet'
+        results_dir / f'{cfg.repo_id}__{cfg.prefix}{cfg.dataset_name}__{split}.parquet'
     )
     output_path_stat = output_path.with_name(output_path.stem + '_stat.parquet')
     output_path_tda = output_path.with_name(output_path.stem + '_tda.parquet')
@@ -427,11 +426,15 @@ def main(cfg: DictConfig) -> None:
         print(f'[COMPLETE] Probing results saved to {output_path_probing}')
 
 
+def _read_latent_df(dataset: str, model: str, split: str) -> pl.DataFrame:
+    """Read one model/split directly from the Hugging Face Hub (no local cache)."""
+    return pl.read_parquet(f'hf://datasets/{dataset}/{split}/{model}/*.parquet')
+
+
 def load_latent(dataset: str, model: str, split: str) -> np.ndarray:
-    """Load latent embeddings from HuggingFace dataset."""
-    data = load_dataset(dataset, model, split=split).with_format('torch')
-    latent: torch.Tensor = torch.vstack(list(data['embedding']))
-    return latent.detach().cpu().float().numpy()
+    """Load latent embeddings straight from the Hub with polars."""
+    df = _read_latent_df(dataset, model, split)
+    return df['embedding'].to_numpy().astype(np.float32, copy=False)
 
 
 def load_latent_with_labels(
@@ -440,11 +443,10 @@ def load_latent_with_labels(
     split: str,
     label_col: str,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Load latent embeddings and labels from HuggingFace dataset."""
-    data = load_dataset(dataset, model, split=split).with_format('torch')
-    latent: torch.Tensor = torch.vstack(list(data['embedding']))
-    labels: np.ndarray = np.array(data[label_col])
-    return latent.detach().cpu().float().numpy(), labels
+    """Load latent embeddings and labels straight from the Hub with polars."""
+    df = _read_latent_df(dataset, model, split)
+    latent = df['embedding'].to_numpy().astype(np.float32, copy=False)
+    return latent, df[label_col].to_numpy()
 
 
 def _compute_probing_metrics(
@@ -465,14 +467,25 @@ def _compute_probing_metrics(
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     if method == 'lstsq':
-        X_t = torch.tensor(X_train, dtype=torch.float32).to(device)
-        y_t = torch.tensor(y_train, dtype=torch.long).to(device)
-        Y_onehot = torch.nn.functional.one_hot(y_t, n_classes).float()
+        # float64 + CPU + rank-revealing driver (gelsd) + centred inputs with intercept.
+        # The previous float32 CUDA `gels` solve returned NaN weights for some models
+        # (argmax(NaN)=0 -> chance-level accuracy).
+        X_t = torch.tensor(X_train, dtype=torch.float64)
+        mu = X_t.mean(0, keepdim=True)
+        ones = torch.ones(len(X_t), 1, dtype=torch.float64)
+        X_t = torch.cat([X_t - mu, ones], dim=1)
+        y_t = torch.tensor(y_train, dtype=torch.long)
+        Y_onehot = torch.nn.functional.one_hot(y_t, n_classes).double()
 
-        W = torch.linalg.lstsq(X_t, Y_onehot).solution
+        W = torch.linalg.lstsq(X_t, Y_onehot, driver='gelsd').solution
+        if not torch.isfinite(W).all():
+            raise RuntimeError('non-finite least-squares probe weights')
 
-        X_test_t = torch.tensor(X_test, dtype=torch.float32).to(device)
-        y_pred = (X_test_t @ W).argmax(dim=1).cpu().numpy()
+        X_test_t = torch.tensor(X_test, dtype=torch.float64)
+        X_test_t = torch.cat(
+            [X_test_t - mu, torch.ones(len(X_test_t), 1, dtype=torch.float64)], dim=1
+        )
+        y_pred = (X_test_t @ W).argmax(dim=1).numpy()
     else:
         train_ds = TensorDataset(
             torch.tensor(X_train, dtype=torch.float32),
@@ -716,13 +729,13 @@ def process_model(
 
     compute_probing = cfg.get('compute_probing', False)
     if compute_probing:
-        probe_test_split = cfg.get('probe_test_split', 'test')
+        probe_test_split = cfg.get('probing_test_split', 'test')
         probe_batch_size = cfg.get('probing_batch_size', 256)
         probe_epochs = cfg.get('probing_epochs', 100)
         probe_lr = cfg.get('probing_lr', 0.001)
         probe_method = cfg.get('probing_method', 'autodiff')
-        label_col = get_label_column(cfg.dataset)
-        valid_splits = DATASET_SPLITS.get(cfg.dataset, {'train'})
+        label_col = get_label_column(cfg.dataset_name)
+        valid_splits = DATASET_SPLITS.get(cfg.dataset_name, {'train'})
         if probe_test_split not in valid_splits:
             if 'validation' in valid_splits:
                 probe_test_split = 'validation'
