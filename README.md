@@ -2,8 +2,8 @@
 
 # SEMASIA: A Large-Scale Dataset of Semantically Structured Latent Representations
 
-[Mario Edoardo Pandolfo](https://scholar.google.com/citations?user=wAeScL8AAAAJ)<sup>1,*</sup>,
-[Enrico Grimaldi](https://scholar.google.com/citations?user=Y-31eCwAAAAJ)<sup>1,*</sup>,
+[Mario Edoardo Pandolfo](https://scholar.google.com/citations?user=wAeScL8AAAAJ)<sup>1,§</sup>,
+[Enrico Grimaldi](https://scholar.google.com/citations?user=Y-31eCwAAAAJ)<sup>1,§</sup>,
 [Lorenzo Marinucci](https://scholar.google.com/citations?user=_VdGlLoAAAAJ)<sup>1</sup>,
 [Leonardo Di Nino](https://scholar.google.com/citations?user=4UdFEvAAAAAJ)<sup>1</sup>,
 [Simone Fiorellino](https://scholar.google.com/citations?user=nKMc4GQAAAAJ)<sup>1</sup>,
@@ -12,7 +12,7 @@
 
 <sup>1</sup>University of Sapienza
 
-<p><sup>*</sup>Equal contribution</p>
+<p><sup>§</sup>Equal contribution</p>
 
 </div>
 
