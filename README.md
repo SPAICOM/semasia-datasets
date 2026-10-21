@@ -1,5 +1,20 @@
+<div align="center">
+
 # SEMASIA: A Large-Scale Dataset of Semantically Structured Latent Representations
 
+[Mario Edoardo Pandolfo](https://scholar.google.com/citations?user=wAeScL8AAAAJ)<sup>1,*</sup>,
+[Enrico Grimaldi](https://scholar.google.com/citations?user=Y-31eCwAAAAJ)<sup>1,*</sup>,
+[Lorenzo Marinucci](https://scholar.google.com/citations?user=_VdGlLoAAAAJ)<sup>1</sup>,
+[Leonardo Di Nino](https://scholar.google.com/citations?user=4UdFEvAAAAAJ)<sup>1</sup>,
+[Simone Fiorellino](https://scholar.google.com/citations?user=nKMc4GQAAAAJ)<sup>1</sup>,
+[Sergio Barbarossa](https://scholar.google.com/citations?user=2woHFu8AAAAJ)<sup>1</sup>,
+[Paolo Di Lorenzo](https://scholar.google.com/citations?user=VZYvspQAAAAJ)<sup>1</sup>
+
+<sup>1</sup>University of Sapienza
+
+<p><sup>*</sup>Equal contribution</p>
+
+</div>
 
 <h5 align="center">
     
@@ -154,16 +169,6 @@ If you find this code useful for your research, please consider citing the follo
       url={https://arxiv.org/abs/2605.09485}, 
 }
 ```
-
-## Authors
-
-- [Mario Edoardo Pandolfo](https://scholar.google.com/citations?user=wAeScL8AAAAJ)
-- [Enrico Grimaldi](https://scholar.google.com/citations?user=Y-31eCwAAAAJ)
-- [Lorenzo Marinucci](https://scholar.google.com/citations?user=_VdGlLoAAAAJ)
-- [Leonardo Di Nino](https://scholar.google.com/citations?user=4UdFEvAAAAAJ)
-- [Simone Fiorellino](https://scholar.google.com/citations?user=nKMc4GQAAAAJ)
-- [Sergio Barbarossa](https://scholar.google.com/citations?user=2woHFu8AAAAJ)
-- [Paolo Di Lorenzo](https://scholar.google.com/citations?user=VZYvspQAAAAJ)
 
 ## Used Technologies
 
