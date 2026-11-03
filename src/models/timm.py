@@ -16,11 +16,41 @@ def call_model(
     return {'hidden': sample_encodings}
 
 
+def check_embedding(
+    latents: torch.Tensor,
+    model_name: str,
+    expected_dim: int | None,
+) -> None:
+    """Raise ``ValueError`` if the embeddings cannot be written to a dataset.
+
+    The embedding must be 2-D, non-empty (length > 0), finite, and its length must
+    equal the registry ``latent_dim`` when that value is known.
+    """
+    if latents.ndim != 2 or latents.shape[0] == 0:
+        raise ValueError(
+            f'{model_name}: unexpected embedding shape {tuple(latents.shape)}'
+        )
+    if latents.shape[1] == 0:
+        raise ValueError(f'{model_name}: empty embedding (length 0)')
+    if expected_dim is not None and latents.shape[1] != expected_dim:
+        raise ValueError(
+            f'{model_name}: embedding length {latents.shape[1]} != registry latent_dim '
+            f'{expected_dim}'
+        )
+    if not torch.isfinite(latents).all():
+        raise ValueError(f'{model_name}: non-finite values in the embedding')
+
+
 def load_model(
     model_name: str,
 ) -> Module:
     """Load a timm model as an embedding extractor (no classifier)."""
     model = timm.create_model(model_name, pretrained=True, num_classes=0)
+    # InceptionNeXt: num_classes=0 leaves head.fc2 = Linear(hidden, 0), so the
+    # forward returns an empty (B, 0) embedding. Drop it to keep the hidden pre-logits.
+    fc2 = getattr(getattr(model, 'head', None), 'fc2', None)
+    if isinstance(fc2, torch.nn.Linear) and fc2.out_features == 0:
+        model.head.fc2 = torch.nn.Identity()
     return model.requires_grad_(False).eval()
 
 

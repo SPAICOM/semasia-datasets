@@ -380,31 +380,35 @@ def generate_readme_with_configs(
 
     example_field = extra_fields[0] if extra_fields else 'label'
 
-    torch_usage = '\n'.join([
-        '    from datasets import load_dataset',
-        '    import torch',
-        '',
-        '    ds = load_dataset(',
-        f'        "{repo_id}",  # repository  →  which benchmark',
-        f'        "{example_model}",  # config      →  which model',
-        f'        split="{example_split}",  # split       →  which partition',
-        '    ).with_format("torch")',
-        '',
-        '    embeddings = torch.vstack(list(ds["embedding"]))  # (N, d)',
-        f'    {example_field} = torch.tensor(ds["{example_field}"])  # (N,)',
-    ])
+    torch_usage = '\n'.join(
+        [
+            '    from datasets import load_dataset',
+            '    import torch',
+            '',
+            '    ds = load_dataset(',
+            f'        "{repo_id}",  # repository  →  which benchmark',
+            f'        "{example_model}",  # config      →  which model',
+            f'        split="{example_split}",  # split       →  which partition',
+            '    ).with_format("torch")',
+            '',
+            '    embeddings = torch.vstack(list(ds["embedding"]))  # (N, d)',
+            f'    {example_field} = torch.tensor(ds["{example_field}"])  # (N,)',
+        ]
+    )
 
-    polars_usage = '\n'.join([
-        '    import polars as pl',
-        '',
-        '    df = pl.read_parquet(',
-        f'        "hf://datasets/{repo_id}/{example_split}/'
-        f'{example_model}/*.parquet"',
-        '    )',
-        '',
-        '    embeddings = df["embedding"].to_numpy()  # shape (N, d)',
-        f'    {example_field} = df["{example_field}"].to_numpy()  # shape (N,)',
-    ])
+    polars_usage = '\n'.join(
+        [
+            '    import polars as pl',
+            '',
+            '    df = pl.read_parquet(',
+            f'        "hf://datasets/{repo_id}/{example_split}/'
+            f'{example_model}/*.parquet"',
+            '    )',
+            '',
+            '    embeddings = df["embedding"].to_numpy()  # shape (N, d)',
+            f'    {example_field} = df["{example_field}"].to_numpy()  # shape (N,)',
+        ]
+    )
 
     embedding_dim_note = (
         f'(dimensionality depends on config; see [model registry]'
@@ -425,8 +429,7 @@ def generate_readme_with_configs(
         [
             '    ## Fields',
             '',
-            '    Columns available in each Parquet file for this '
-            'dataset:',
+            '    Columns available in each Parquet file for this dataset:',
             '',
             '    | Field | Description |',
             '    |-------|-------------|',
@@ -434,7 +437,7 @@ def generate_readme_with_configs(
             '(unique per split/model, not across models); the '
             f'{id_note} |',
             '    | `model_name` | `timm` model that produced this '
-            'row\'s embedding (constant within a config). |',
+            "row's embedding (constant within a config). |",
             '    | `embedding` | Precomputed latent representation '
             f'extracted by the model {embedding_dim_note} |',
         ]
@@ -574,6 +577,200 @@ def generate_readme_with_configs(
         print(f'[OK] Updated README online: https://huggingface.co/datasets/{repo_id}')
 
 
+# Columns of the model registry, by thematic group, for the generated README.
+_MODEL_REGISTRY_FIELDS: list[tuple[str, list[tuple[str, str]]]] = [
+    (
+        'Identity',
+        [
+            (
+                'model_name',
+                'Full `timm` model identifier, e.g., `vit_large_patch14_clip_224.openai_ft_in1k`. '
+                'Primary key, joined with the `model_name` column of every SEMASIA dataset.',
+            ),
+        ],
+    ),
+    (
+        'Architecture',
+        [
+            (
+                'family',
+                'High-level class: ViT, ConvNeXt, ResNet, Swin, DeiT, EfficientNet, ...',
+            ),
+            (
+                'macro_family',
+                'Coarse architectural category: Convolutional, Vision Transformer, '
+                'Hybrid CNN-Transformer, Hierarchical Vision Transformer, MetaFormer, MLP, State Space Model.',
+            ),
+            (
+                'model_version',
+                'Refinement for multi-generation families: v2, v3, SE, NF, CSP, ...',
+            ),
+            (
+                'size',
+                'Human-readable size label, Tiny to Giant, or B0 to B8 for EfficientNet.',
+            ),
+            (
+                'depth_code',
+                'Depth for depth-scaled families, e.g., 50, 101 (ResNet), f0 to f6 (NFNet).',
+            ),
+            (
+                'width_code',
+                'Channel or group-width multiplier, e.g., 32x4d (ResNeXt), w44 (HRNet), 075 (MobileNet).',
+            ),
+            ('patch_size', 'ViT patch size in pixels; null for CNNs.'),
+            (
+                'input_resolution',
+                'Native architectural input resolution, distinct from the pretraining and fine-tuning resolutions.',
+            ),
+            (
+                'window_size',
+                'Local-attention window of Swin, MaxViT and CoAtNet; null for global attention.',
+            ),
+            (
+                'stride_code',
+                'Stage/stride code of families such as CaiT, ConvFormer and ShViT.',
+            ),
+        ],
+    ),
+    (
+        'Head and attention',
+        [
+            (
+                'head_type',
+                'Pooling before the classifier: GAP (global average), CLS (class token) or CLS+GAP (hybrid).',
+            ),
+            (
+                'num_registers',
+                'Number of DINOv2-style register tokens, typically 1 or 4.',
+            ),
+            (
+                'positional_encoding',
+                'Non-default scheme: RoPE, RelPos, SinCos, APE; null is the default learned absolute encoding.',
+            ),
+            (
+                'activation',
+                'Non-default activation, notably QuickGELU for OpenAI-style CLIP models; null is standard GELU or ReLU.',
+            ),
+            (
+                'pe_scope',
+                'Scope tag of the ViT-PE (Perception Encoder) family: Lang, Core, Spatial.',
+            ),
+        ],
+    ),
+    (
+        'Variant flags (booleans)',
+        [
+            ('is_distilled', 'Distilled model (e.g., DeiT with a RegNet teacher).'),
+            ('is_pruned', 'Structurally pruned model.'),
+            ('is_legacy', 'Older model under the `legacy_` prefix.'),
+            ('is_gap', 'Shorthand for `head_type == "GAP"`.'),
+            ('uses_quickgelu', 'Shorthand for `activation == "QuickGELU"`.'),
+            ('uses_rmlp', 'MaxViT/CoAtNet with MLP Log-CPB relative position bias.'),
+            (
+                'uses_rw',
+                '`timm` re-implementation tuned for PyTorch eager-mode efficiency.',
+            ),
+            ('uses_cr', 'SwinV2 cross-resolution variant.'),
+            ('uses_ns', 'SwinV2-CR with LayerNorm at every stage (norm per stage).'),
+            ('uses_abswin', 'Hiera with absolute window position embeddings.'),
+            ('uses_ts', 'BYOBNet with a tiered three-layer convolutional stem.'),
+            ('uses_aa', 'Anti-aliased downsampling.'),
+        ],
+    ),
+    (
+        'Pretraining',
+        [
+            (
+                'pretrain_config',
+                'Raw configuration string (the part after the dot), kept for reference and debugging.',
+            ),
+            (
+                'pretrain_org',
+                'Training organization: Meta, Apple, OpenAI, Google, `timm SBB recipe`, ...',
+            ),
+            (
+                'pretrain_dataset',
+                'Corpus: ImageNet-1K/21K/22K, LAION-2B, WebLI, LVD-142M, ...',
+            ),
+            ('pretrain_dataset_size', 'Corpus size when ambiguous: 400M, s39b, 2.1T.'),
+            (
+                'pretrain_method',
+                'Objective keyword parsed from the identifier: CLIP, MAE, DINO, DINOv2, MIM, FCMAE, AugReg, ...; null for standard supervised training and for several other models.',
+            ),
+            (
+                'pretrain_tasks',
+                'List of tasks used to train the model, main objective first (see below).',
+            ),
+            (
+                'paradigm',
+                'Learning signal of the main objective: supervised, contrastive, self_supervised, multimodal_generative or unknown (see below).',
+            ),
+            (
+                'pretrain_ft',
+                'Subsequent fine-tuning, typically ImageNet-1K, occasionally ImageNet-22K or ImageNet-12K.',
+            ),
+            ('pretrain_resolution', 'Input resolution at pretraining.'),
+            ('pretrain_ft_resolution', 'Input resolution at fine-tuning.'),
+            ('pretrain_epochs', 'Compute budget in epochs, e.g., e200 -> 200.'),
+            (
+                'pretrain_tokens',
+                'Token budget for token-based recipes such as SAM2, e.g., 2pt1 -> 2.1T tokens.',
+            ),
+            (
+                'pretrain_aug',
+                'Augmentation: AugReg, AdvProp, NoisyStudent, AutoAugment, RandAugment.',
+            ),
+            (
+                'pretrain_i18n',
+                'Flags SigLIP models pretrained on multilingual WebLI (109 languages).',
+            ),
+        ],
+    ),
+    (
+        'Capacity (derived by instantiating the model)',
+        [
+            (
+                'num_parameters',
+                'Total trainable parameters, obtained by instantiating the model in `timm` (without downloading weights, when feasible).',
+            ),
+            (
+                'latent_dim',
+                'Length of the `embedding` vector in the SEMASIA datasets, i.e., the output size of the `timm` model created with `num_classes=0` (`head_hidden_size` when present, else `num_features`).',
+            ),
+        ],
+    ),
+]
+
+_MODEL_REGISTRY_TASKS: list[tuple[str, str]] = [
+    (
+        'image_classification',
+        'Supervised class labels (also weakly or semi-supervised, and distilled models).',
+    ),
+    (
+        'image_text_contrastive',
+        'Image-text contrastive or sigmoid loss: CLIP, SigLIP, MobileCLIP, Perception Encoder.',
+    ),
+    (
+        'masked_image_modeling',
+        'Reconstruction of masked image content (pixels, tokens or features): MAE, FCMAE, BEiT, EVA, I-JEPA.',
+    ),
+    (
+        'joint_embedding',
+        'DINO-style self-distillation and clustering (SwAV, used by SEER).',
+    ),
+    (
+        'vision_language_generative',
+        'Captioning, autoregressive or next-token objective with a language decoder: AIMv2, PaliGemma towers, InternViT.',
+    ),
+    (
+        'masked_vision_language_modeling',
+        'Masked modeling of images and text together: BEiT-3.',
+    ),
+    ('promptable_segmentation', 'Segmentation from prompts: SAM, SAM 2.'),
+    ('vision_language_multitask', 'Several vision-language tasks at once: Florence-2.'),
+]
+
+
 def generate_model_registry_readme(
     repo_dir: Path,
     repo_id: str,
@@ -620,11 +817,30 @@ def generate_model_registry_readme(
     }
     yaml_text = '---\n' + yaml.safe_dump(yaml_top, sort_keys=False) + '---\n'
 
-    md_body = textwrap.dedent(f"""
+    fields_md = '\n\n'.join(
+        '\n'.join(
+            [
+                f'### {group}',
+                '',
+                '| Field | Description |',
+                '|-------|-------------|',
+            ]
+            + [f'| `{field}` | {desc} |' for field, desc in rows]
+        )
+        for group, rows in _MODEL_REGISTRY_FIELDS
+    )
+    tasks_md = '\n'.join(
+        ['| Task | Meaning |', '|------|---------|']
+        + [f'| `{task}` | {desc} |' for task, desc in _MODEL_REGISTRY_TASKS]
+    )
+
+    md_head = textwrap.dedent("""
     # Timm Model Metadata Registry
 
     This dataset contains a lookup table of metadata for all pretrained
-    models available in the timm library.
+    models available in the timm library. It is the companion of the SEMASIA
+    latent-space datasets: the column `model_name` is the join key with the
+    `model_name` column of every SEMASIA dataset.
 
     ## Usage
 
@@ -636,39 +852,73 @@ def generate_model_registry_readme(
     df = ds["train"].to_polars()
 
     # Query by model name
-    model = df.filter(pl.col("model_name") == "vit_base_patch16_224")
+    model = df.filter(pl.col("model_name") == "vit_base_patch16_224.augreg_in21k")
 
     # Filter by family
     vit_models = df.filter(pl.col("family") == "ViT")
 
     # Filter by parameter count
     small_models = df.filter(pl.col("num_parameters") < 50_000_000)
+
+    # Filter by training paradigm or task (pretrain_tasks is a list column)
+    self_supervised = df.filter(pl.col("paradigm") == "self_supervised")
+    contrastive = df.filter(pl.col("pretrain_tasks").list.contains("image_text_contrastive"))
     ```
 
     ## Fields
 
-    | Field | Description |
-    |-------|-------------|
-    | model_name | Full timm model identifier |
-    | family | Architecture family (e.g., ViT, ConvNeXt, ResNet) |
-    | model_version | Architecture generation (e.g., v2, v3) |
-    | size | Human-readable size label (e.g., Base, Large) |
-    | num_parameters | Total trainable parameters |
-    | latent_dim | Output embedding dimension |
-    | patch_size | ViT patch size in pixels (if applicable) |
-    | input_resolution | Native input resolution |
-    | pretrain_org | Organisation responsible for training |
-    | pretrain_dataset | Pretraining dataset |
-    | pretrain_method | Training objective (e.g., CLIP, MAE, DINO) |
-    | pretrain_ft | Fine-tuning dataset (if applicable) |
+    The identifier of a model is `{architecture}.{pretrain_config}`: everything
+    before the dot encodes the architecture, everything after it encodes how
+    and where the checkpoint was pretrained. The columns are grouped
+    accordingly. Fields that do not apply to a model are null.
+
+    """)
+
+    md_tail = (
+        textwrap.dedent("""
+
+    ## Training tasks and paradigm
+
+    `pretrain_tasks` is a list. The first element is the main objective of the
+    pretraining that produced the weights; the other elements are objectives
+    of the same recipe, of the initialization, or of a later supervised
+    fine-tuning. `paradigm` is the learning signal of the first element.
+
+    @@TASKS@@
+
+    | Paradigm | Tasks it is derived from |
+    |----------|--------------------------|
+    | `supervised` | `image_classification`, `promptable_segmentation` |
+    | `contrastive` | `image_text_contrastive` |
+    | `self_supervised` | `masked_image_modeling`, `joint_embedding` |
+    | `multimodal_generative` | `vision_language_generative`, `masked_vision_language_modeling`, `vision_language_multitask` |
+    | `unknown` | nothing could be inferred |
+
+    Examples:
+
+    - `convnext_base.clip_laion2b_augreg_ft_in1k`: `["image_text_contrastive", "image_classification"]`, paradigm `contrastive`.
+    - `convnextv2_base.fcmae_ft_in1k`: `["masked_image_modeling", "image_classification"]`, paradigm `self_supervised`.
+    - `vit_base_patch16_siglip_224.v2_webli` (SigLIP 2): `["image_text_contrastive", "vision_language_generative", "joint_embedding", "masked_image_modeling"]`, paradigm `contrastive`.
+
+    These columns are derived from the model name and `pretrain_method` with
+    the rules of `infer_pretrain_tasks` (`src/utils/timm_metadata.py`), which
+    cites the papers behind the non-obvious cases; they are not read from the
+    model cards. `pretrain_method` is an objective keyword parsed from the
+    identifier and is null for several models (e.g., most SigLIP models), so
+    use `pretrain_tasks` or `paradigm` to select models by objective.
 
     ## Notes
 
     - Metadata is extracted using the `get_model_metadata` function from the
       [semantic-datasets](https://github.com/spaicom-lab/semantic-datasets) library.
     - Some fields may be ``None`` if they cannot be inferred from the model name.
-    - Total number of models: **{num_models}**
+    - Total number of models: **@@N@@**
     """)
+        .replace('@@TASKS@@', tasks_md)
+        .replace('@@N@@', str(num_models))
+    )
+
+    md_body = md_head + fields_md + md_tail
 
     out_path = repo_dir / 'README.md'
     out_path.write_text(yaml_text + md_body, encoding='utf-8')

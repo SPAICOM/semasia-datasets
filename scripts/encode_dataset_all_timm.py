@@ -30,6 +30,7 @@ from timm.data.transforms_factory import create_transform
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 
+from src.models.timm import check_embedding
 from src import (
     LatentExtractor,
     collect_local_models_by_split,
@@ -87,7 +88,21 @@ def main(cfg: DictConfig) -> None:
 
     seed_everything(cfg.seed)
 
-    dataset = load_dataset(cfg.dataset.name)
+    # Download and load only the splits that are encoded: `data_files` restricts the
+    # parquet files to the requested splits (`split=` alone still fetches all of them);
+    # the recorded-splits check is skipped since the other splits are not downloaded.
+    splits = list(cfg.dataset.split)
+    dataset = dict(
+        zip(
+            splits,
+            load_dataset(
+                cfg.dataset.name,
+                data_files={s: f'**/{s}-*.parquet' for s in splits},
+                split=splits,
+                verification_mode='no_checks',
+            ),
+        )
+    )
 
     dataset_export_root = export_root / dataset_name
     for split in cfg.dataset.split:
@@ -134,6 +149,19 @@ def main(cfg: DictConfig) -> None:
     all_models = [m for m in all_models if m not in processed_models]
 
     trainer = Trainer(**cfg.trainer)
+
+    # Expected embedding length per model (registry latent_dim) for the sanity check.
+    registry_path = Path(
+        cfg.get(
+            'registry', 'data/semasia-model-registry/semasia_model_registry.parquet'
+        )
+    )
+    expected_latent_dims: dict[str, int] = {}
+    if registry_path.exists():
+        reg = pl.read_parquet(registry_path).select('model_name', 'latent_dim')
+        expected_latent_dims = dict(zip(reg['model_name'], reg['latent_dim']))
+    else:
+        print(f'[WARN] registry {registry_path} not found: only checking length > 0')
 
     for model_name in tqdm(all_models, desc=f'TIMM {len(all_models)} Models'):
         print(f'\n\n[INFO] Checking {model_name} parameters...', end='\t')
@@ -183,6 +211,16 @@ def main(cfg: DictConfig) -> None:
                     continue
 
                 latents = torch.cat(latents, dim=0).contiguous()
+
+                # Sanity check before anything is written: non-empty embedding whose
+                # length equals the registry latent_dim.
+                try:
+                    check_embedding(
+                        latents, model_name, expected_latent_dims.get(model_name)
+                    )
+                except ValueError as e:
+                    print(f'[ERROR][{model_name}] {split=}: {e}; nothing written')
+                    continue
 
                 temp = data[split].copy()
                 temp['model_name'] = model_name

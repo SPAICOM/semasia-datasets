@@ -368,6 +368,16 @@ pretrain_dataset_size : str | None
       "6M"    → NextViT SSLD distilled on 6M unlabelled images
     None when no scale qualifier is present.
 
+pretrain_tasks : list[str]
+    Tasks used to train the model (see ``TASKS`` and ``infer_pretrain_tasks``):
+    main pretraining objective first, then other objectives of the recipe,
+    of the initialisation, or a later supervised fine-tuning.
+
+paradigm : str
+    Learning signal of the main pretraining objective (first element of
+    ``pretrain_tasks``). One of: "supervised", "contrastive", "self_supervised",
+    "multimodal_generative", "unknown".
+
 pretrain_method : str | None
     The training objective / self-supervised method used for pretraining.
     Parsed by scanning all config tokens for method keywords.
@@ -511,11 +521,12 @@ num_parameters : int | None
     None when timm is not installed or the model name is not recognised.
 
 latent_dim : int | None
-    Dimensionality of the output embedding — the feature vector produced by
-    ``model.forward_features()`` (before the classification head), which is
-    what you store in embedding datasets or pass to downstream tasks.
-    Read from ``model.num_features`` (the timm standard), falling back
-    through ``model.embed_dim``, ``model.hidden_size``, ``model.d_model``.
+    Length of the embedding vector stored in the SEMASIA datasets: the output
+    of the timm model created with ``num_classes=0`` (see :func:`get_latent_dim`).
+    Read from ``model.head_hidden_size`` when present, else ``model.num_features``,
+    else from one forward pass on a dummy input.  For most backbones this is the
+    feature size before the head (``num_features``); for models whose head has a
+    hidden layer (MobileNetV3, VGG, EfficientViT, ...) it is the size after it.
     Common values by ViT size:
       - ViT-Tiny:      192
       - ViT-Small:     384
@@ -1574,31 +1585,104 @@ def _parse_pretrain_config(pretrain_config: str) -> dict:
 # ===========================================================================
 
 
+def _positive_int(value) -> int | None:
+    return int(value) if isinstance(value, int) and value > 0 else None
+
+
+def get_latent_dim(model_name: str) -> int | None:
+    """
+    Length of the embedding that the encoding pipeline saves for a timm model.
+
+    The encoder is created exactly as in ``src.models.timm.load_model``
+    (``num_classes=0``) and its output is what ends up in the ``embedding``
+    column.  The size is read from the model attributes and checked with one
+    forward pass on a dummy input (``output.shape[-1]``):
+
+    1. attributes: ``head_hidden_size`` when present (timm convention for the
+       pre-logits size), else ``num_features``;
+    2. forward pass: authoritative when it gives a positive length.  It differs
+       from the attributes for pruned ResNets (``num_features`` is not updated
+       when the layers are pruned) and for SAM-ViT (the neck outputs 256);
+    3. the attribute value is used when the forward pass fails or returns length 0
+       (InceptionNeXt: ``num_classes=0`` leaves a ``Linear(hidden, 0)`` head, so
+       ``model(x)`` is empty while ``forward_head(..., pre_logits=True)`` has
+       ``head_hidden_size`` entries).
+
+    The models are built on the ``meta`` device (no weight memory), falling back
+    to a real instance if that fails.  Returns None when timm cannot instantiate
+    the model.
+    """
+    try:
+        import timm
+        import torch
+
+        def build(meta: bool):
+            if meta:
+                with torch.device('meta'):
+                    return timm.create_model(
+                        model_name, pretrained=False, num_classes=0
+                    )
+            return timm.create_model(model_name, pretrained=False, num_classes=0)
+
+        try:
+            model, on_meta = build(True), True
+        except Exception:
+            model, on_meta = build(False), False
+
+        attr_dim = None
+        for attr in ('head_hidden_size', 'num_features'):
+            try:
+                attr_dim = _positive_int(getattr(model, attr, None))
+            except Exception:
+                attr_dim = None
+            if attr_dim is not None:
+                break
+
+        size = getattr(model, 'pretrained_cfg', {}).get('input_size', (3, 224, 224))
+
+        def forward_dim(m, device) -> int | None:
+            with torch.no_grad():
+                out = m.eval()(torch.zeros(1, *size, device=device))
+            return _positive_int(int(out.shape[-1]))
+
+        fwd_dim = None
+        try:
+            fwd_dim = forward_dim(model, 'meta' if on_meta else 'cpu')
+        except Exception:
+            if on_meta:  # some models need real tensors for the forward pass
+                try:
+                    fwd_dim = forward_dim(build(False), 'cpu')
+                except Exception:
+                    fwd_dim = None
+        return fwd_dim if fwd_dim is not None else attr_dim
+    except Exception as exc:
+        logger.warning("timm could not instantiate '%s': %s", model_name, exc)
+        return None
+
+
 def _get_timm_info(model_name: str) -> tuple[int | None, int | None]:
     """
     Instantiate the model (weights=False) via timm to get:
-    - num_parameters: total trainable parameter count
-    - latent_dim: dimensionality of the penultimate feature vector fed to the
-      classifier head. Equivalent to model.num_features in timm convention,
-      which is what you get from forward_features() before the head.
+    - num_parameters: total trainable parameter count (model with its original
+      classification head)
+    - latent_dim: length of the saved embedding (see :func:`get_latent_dim`)
 
     Requires timm to be installed. Returns (None, None) if timm is not
     available or the model name is not recognised.
     """
     try:
         import timm
+        import torch
 
-        model = timm.create_model(model_name, pretrained=False)
+        # Meta device: parameters are counted without allocating the weights
+        # (a 7B-parameter model would not fit in RAM).
+        try:
+            with torch.device('meta'):
+                model = timm.create_model(model_name, pretrained=False)
+        except Exception:
+            model = timm.create_model(model_name, pretrained=False)
         num_params = sum(p.numel() for p in model.parameters())
-        # timm standard: num_features is the pre-head feature dim.
-        # Fall back through a chain of common attribute names.
-        latent_dim = (
-            getattr(model, 'num_features', None)
-            or getattr(model, 'embed_dim', None)
-            or getattr(model, 'hidden_size', None)
-            or getattr(model, 'd_model', None)
-        )
-        return num_params, latent_dim
+        return num_params, get_latent_dim(model_name)
     except Exception as exc:
         logger.warning("timm could not instantiate '%s': %s", model_name, exc)
         return None, None
@@ -1607,6 +1691,196 @@ def _get_timm_info(model_name: str) -> tuple[int | None, int | None]:
 # ===========================================================================
 # PUBLIC API
 # ===========================================================================
+
+
+# ===========================================================================
+# Pretraining tasks and training paradigm.
+# ===========================================================================
+
+# What the model is trained to do (``pretrain_tasks`` is a list of these).
+TASKS = (
+    'image_classification',  # supervised class labels (also weak / semi-supervised, distilled)
+    'image_text_contrastive',  # CLIP, SigLIP, MobileCLIP, Perception Encoder
+    'masked_image_modeling',  # MAE, FCMAE, BEiT, EVA, I-JEPA (pixels, tokens or features)
+    'joint_embedding',  # DINO-style self-distillation, SwAV (SEER)
+    'vision_language_generative',  # captioning / autoregressive / next-token with a language decoder
+    'masked_vision_language_modeling',  # BEiT-3
+    'promptable_segmentation',  # SAM, SAM 2
+    'vision_language_multitask',  # Florence-2 (captioning, detection, grounding, segmentation)
+)
+
+# Coarse learning signal, derived from the *first* task of ``pretrain_tasks``.
+PARADIGMS = (
+    'supervised',
+    'contrastive',
+    'self_supervised',
+    'multimodal_generative',
+    'unknown',
+)
+
+_PARADIGM_OF_TASK = {
+    'image_classification': 'supervised',
+    'promptable_segmentation': 'supervised',  # trained on mask annotations
+    'image_text_contrastive': 'contrastive',
+    'masked_image_modeling': 'self_supervised',
+    'joint_embedding': 'self_supervised',
+    'vision_language_generative': 'multimodal_generative',
+    'masked_vision_language_modeling': 'multimodal_generative',
+    'vision_language_multitask': 'multimodal_generative',
+}
+
+_CONTRASTIVE_METHODS = frozenset({'CLIP', 'mCLIP', 'SigLIP'})
+_JOINT_EMBEDDING_METHODS = frozenset({'DINO', 'DINOv2', 'DINOv3', 'SEER'})
+_MASKED_METHODS = frozenset({'MAE', 'MIM', 'FCMAE', 'I-JEPA'})
+_SUPERVISED_METHODS = frozenset(
+    {'SSL', 'Distillation', 'AugReg', 'SWAG', 'SWSL', 'WSL', 'NadAMuon'}
+)
+
+
+def infer_pretrain_tasks(
+    model_name: str,
+    family: str | None,
+    pretrain_method: str | None,
+    pretrain_dataset: str | None = None,
+    pretrain_ft: str | None = None,
+) -> list[str]:
+    """
+    Tasks used to train a model, as a list of values of ``TASKS``.
+
+    The first element is the main objective of the pretraining that produced
+    the released weights; the following ones are other objectives of the same
+    recipe (e.g. an auxiliary decoder), of the initialisation the weights come
+    from (e.g. the MAE initialisation of SAM) or of a later fine-tuning on a
+    labelled dataset (``image_classification``). The list is empty only when
+    nothing can be inferred. ``pretrain_method`` alone is not enough (it is
+    empty for most SigLIP models and ``SSL`` means semi-supervised label
+    distillation, not self-supervised), so the model name is used too.
+
+    Sources behind the non-obvious assignments:
+    - Perception Encoder (Bolya et al., 2025, arXiv:2504.13181): PE-core is
+      contrastive; PE-lang and PE-spatial add a language-decoder / spatial
+      (self-distillation + SAM 2 mask loss) alignment tuning on top of PE-core.
+    - SigLIP 2 (Tschannen et al., 2025, arXiv:2502.14786): sigmoid loss plus
+      LocCa captioning decoder, self-distillation and masked prediction.
+    - PaliGemma / PaliGemma 2 vision towers (arXiv:2412.03555): SigLIP-So400m
+      (contrastive), then trained jointly with a Gemma decoder (not frozen).
+    - EVA / EVA-02 (arXiv:2211.07636, 2303.11331): masked image modelling that
+      reconstructs CLIP features. BEiT v2 (arXiv:2208.06366): masked prediction
+      of tokens from a tokenizer distilled from a CLIP teacher. BEiT: dVAE tokens.
+    - AIMv2 (arXiv:2411.14402): multimodal autoregressive (patches and text).
+    - InternViT-300M V2.5 (arXiv:2412.05271): distilled from InternViT-6B, then
+      trained with next-token prediction inside InternVL 2.5.
+    - Florence-2 (arXiv:2311.06242): unified multi-task sequence-to-sequence.
+    - MobileNetV5 (Gemma 3n image encoder): the training recipe is not public;
+      assigned to ``vision_language_generative`` as a vision tower of a
+      multimodal LLM (low confidence).
+    - SAM / SAM 2: promptable segmentation on SA-1B, with an MAE-pretrained
+      image encoder.
+    """
+    variant = model_name.split('.', 1)[0].lower()
+    config = model_name.split('.', 1)[1].lower() if '.' in model_name else ''
+    method = pretrain_method or ''
+    fam = family or ''
+    tasks: list[str] = []
+
+    if 'pe_core' in variant:
+        tasks = ['image_text_contrastive']
+    elif 'pe_lang' in variant:
+        tasks = ['image_text_contrastive', 'vision_language_generative']
+    elif 'pe_spatial' in variant:
+        tasks = ['image_text_contrastive', 'joint_embedding']
+    elif 'siglip' in variant and config.startswith('v2_'):
+        tasks = [
+            'image_text_contrastive',
+            'vision_language_generative',
+            'joint_embedding',
+            'masked_image_modeling',
+        ]
+    elif 'siglip' in variant and 'pali' in config:
+        tasks = ['image_text_contrastive', 'vision_language_generative']
+    elif method in _CONTRASTIVE_METHODS or 'siglip' in variant or 'clip' in variant:
+        tasks = ['image_text_contrastive']
+    elif 'beit3' in variant:
+        tasks = ['masked_vision_language_modeling']
+    elif method == 'Autoregressive' or fam == 'AIMv2':
+        tasks = ['vision_language_generative']
+    elif 'intern300m' in variant:
+        tasks = ['vision_language_generative']
+    elif fam.startswith('SAM'):
+        tasks = ['promptable_segmentation', 'masked_image_modeling']
+    elif 'florence2' in config:
+        tasks = ['vision_language_multitask']
+    elif variant.startswith('mobilenetv5'):
+        tasks = ['vision_language_generative']
+    elif method in {'DINOv2', 'DINOv3'}:
+        tasks = ['joint_embedding', 'masked_image_modeling']  # DINO + iBOT losses
+    elif method in _JOINT_EMBEDDING_METHODS:
+        tasks = ['joint_embedding']
+    elif (
+        method in _MASKED_METHODS
+        or 'm30m' in config
+        or fam == 'BEiT'  # BEiT / BEiT-v2 (BEiT-3 is caught above)
+        or variant.startswith('eva_')  # EVA (clip variants are caught above)
+    ):
+        tasks = ['masked_image_modeling']
+    elif method in _SUPERVISED_METHODS or (method == '' and pretrain_dataset):
+        tasks = ['image_classification']
+
+    # Later fine-tuning on a labelled dataset.
+    finetuned = bool(pretrain_ft) or bool(re.search(r'_ft_|_ft$', model_name.lower()))
+    if tasks and finetuned and 'image_classification' not in tasks:
+        tasks.append('image_classification')
+    return tasks
+
+
+def infer_paradigm(
+    model_name: str,
+    family: str | None,
+    pretrain_method: str | None,
+    pretrain_dataset: str | None = None,
+    pretrain_ft: str | None = None,
+) -> str:
+    """Learning signal of the main pretraining objective: one of ``PARADIGMS``.
+
+    It is the paradigm of the first element of ``infer_pretrain_tasks``, so a
+    fine-tuned checkpoint keeps the paradigm of its pretraining.
+    """
+    tasks = infer_pretrain_tasks(
+        model_name, family, pretrain_method, pretrain_dataset, pretrain_ft
+    )
+    return _PARADIGM_OF_TASK[tasks[0]] if tasks else 'unknown'
+
+
+def add_derived_columns(df):
+    """
+    Return a Polars DataFrame of the registry with ``pretrain_tasks`` and
+    ``paradigm`` (re)computed from its other columns, appended at the end.
+
+    Used by ``scripts/push_model_registry.py`` so that models already stored
+    in the local Parquet get the derived columns without being re-extracted
+    with timm. It needs ``model_name``, ``family``, ``pretrain_method``,
+    ``pretrain_dataset`` and ``pretrain_ft``.
+    """
+    import polars as pl
+
+    df = df.drop([c for c in ('pretrain_tasks', 'paradigm') if c in df.columns])
+    rows = list(
+        df.select(
+            'model_name',
+            'family',
+            'pretrain_method',
+            'pretrain_dataset',
+            'pretrain_ft',
+        ).iter_rows()
+    )
+    return df.with_columns(
+        pl.Series(
+            'pretrain_tasks',
+            [infer_pretrain_tasks(*r) for r in rows],
+            dtype=pl.List(pl.String),
+        ),
+        pl.Series('paradigm', [infer_paradigm(*r) for r in rows], dtype=pl.String),
+    )
 
 
 def get_model_metadata(model_name: str, use_timm: bool = True) -> dict:
@@ -1716,6 +1990,20 @@ def get_model_metadata(model_name: str, use_timm: bool = True) -> dict:
         'num_parameters': num_parameters,
         'latent_dim': latent_dim,
         **pretrain_fields,
+        'pretrain_tasks': infer_pretrain_tasks(
+            model_name,
+            variant_fields['family'],
+            pretrain_fields['pretrain_method'],
+            pretrain_fields['pretrain_dataset'],
+            pretrain_fields['pretrain_ft'],
+        ),
+        'paradigm': infer_paradigm(
+            model_name,
+            variant_fields['family'],
+            pretrain_fields['pretrain_method'],
+            pretrain_fields['pretrain_dataset'],
+            pretrain_fields['pretrain_ft'],
+        ),
     }
 
 

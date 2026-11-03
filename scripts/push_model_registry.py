@@ -8,10 +8,15 @@ This script:
 4. Pushes to HuggingFace dataset spaicom-lab/model-registry
 5. Generates and pushes README
 
+``latent_dim`` is the length of the saved embedding, computed by ``get_latent_dim``
+inside ``get_model_metadata``.
+
 Usage:
-    uv run scripts/push_model_registry.py
+    uv run scripts/push_model_registry.py            # build and push
+    uv run scripts/push_model_registry.py --no-push  # build locally only
 """
 
+import argparse
 import json
 import shutil
 import sys
@@ -27,13 +32,14 @@ from huggingface_hub.utils import get_token
 from tqdm.auto import tqdm
 
 from src.utils.huggingface import generate_model_registry_readme, push_folder_to_hub
-from src.utils.timm_metadata import get_model_metadata
+from src.utils.timm_metadata import add_derived_columns, get_model_metadata
 
 BATCH_SIZE = 100
 
 METADATA_SCHEMA: dict[str, pl.DataType] = {
     'model_name': pl.String,
     'family': pl.String,
+    'macro_family': pl.String,
     'model_version': pl.String,
     'size': pl.String,
     'depth_code': pl.String,
@@ -73,6 +79,8 @@ METADATA_SCHEMA: dict[str, pl.DataType] = {
     'pretrain_i18n': pl.Boolean,
     'num_parameters': pl.Int64,
     'latent_dim': pl.Int64,
+    'pretrain_tasks': pl.List(pl.String),
+    'paradigm': pl.String,
 }
 
 
@@ -100,7 +108,13 @@ def load_existing_models(path: Path) -> set[str]:
 
 
 def main() -> None:
-    """Extract timm model metadata and push to HuggingFace."""
+    """Extract timm model metadata and (optionally) push to HuggingFace."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '--no-push', action='store_true', help='update the local registry only'
+    )
+    args = parser.parse_args()
+
     repo_id = 'spaicom-lab/semasia-model-registry'
     local_path = Path('data/semasia-model-registry')
     temp_dir = local_path / 'temp'
@@ -182,8 +196,17 @@ def main() -> None:
         else:
             df = pl.DataFrame(schema=METADATA_SCHEMA)
 
+    # Derived columns (pretrain_tasks, paradigm) are recomputed for every model,
+    # also for those already stored in the local parquet.
+    df = add_derived_columns(df)
+    df.write_parquet(parquet_path)
+
     print(f'DataFrame shape: {df.shape}')
     print(f'Columns: {df.columns}')
+
+    if args.no_push:
+        print('--no-push: local registry written, nothing pushed.')
+        return
 
     api = HfApi(token=get_token())
     api.create_repo(repo_id=repo_id, repo_type='dataset', exist_ok=True)
