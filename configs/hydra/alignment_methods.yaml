@@ -9,7 +9,7 @@ datasets:
 train_split: train
 test_split: test
 
-model_b: vit_large_patch16_224.augreg_in21k  
+model_b: vit_large_patch16_224.augreg_in21k
 
 models_a:
   - vit_base_patch16_224.augreg_in21k
@@ -17,9 +17,11 @@ models_a:
   - vit_small_patch16_224.augreg_in1k
   - aimv2_1b_patch14_224.apple_pt
 
-seed: 42
+# proto (KMeans) is the only stochastic method: it is run once per seed.
+# cca and linear are deterministic and are run once (seed = null in the results).
+seeds: [42, 43, 44, 45, 46]
 
-# k is used as n_prototypes for proto and n_components for CCA
+# k is used as n_prototypes for proto and n_components for CCA / rank for linear
 k_values:
   - 2
   - 4
@@ -35,9 +37,26 @@ methods:
   - cca
   - linear
 
-# Toggle metrics on/off
+# Toggle metrics on/off (mse also writes mse_per_sample, nmse and d_b)
 metrics:
   accuracy: true
   mse: true
 
+# Decoder used for "accuracy after communication" (linear probe, no intercept,
+# fit on the receiver's raw TRAIN embeddings and one-hot TRAIN labels).
+#   ridge : W = (X^T X + lam I)^-1 X^T Y, float64 on CPU, lam = lam_rel * trace(X^T X) / d
+#           (independent of the device)
+#   lstsq : legacy bare torch.linalg.lstsq in float32 on `lstsq_device`
+#           (depends on the device: CPU truncates the rank, CUDA solves exactly)
+decoder: ridge
+lam_rel: 1.0e-3
+lstsq_device: cpu # cpu | cuda, only used when decoder=lstsq
+
+# Extra lam_rel values evaluated on the same transmissions (ridge only).
+# Accuracy per lam_rel is written to lambda_dir; the main results use lam_rel.
+lam_sweep: [1.0e-5, 1.0e-4, 1.0e-3, 1.0e-2, 1.0e-1]
+
+results_dir: results/alignment
+lambda_dir: results/alignment_lambda
+overwrite: false
 save_results: true

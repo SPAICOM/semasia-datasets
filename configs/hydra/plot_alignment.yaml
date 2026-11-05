@@ -1,15 +1,44 @@
 results_dir: results/alignment
-plots_dir: results/alignment/plots
+out_pdf: figures_out/alignment.pdf
+plots_dir: results/alignment/plots # a copy of the PDF is saved here as alignment.pdf
+figure_data: results/alignment/figure_data.csv
 
-log_x: true # set to true for log2 scale on the k axis
+# Metric columns of the result files used for the two rows of the figure
+accuracy_col: accuracy
+mse_col: mse # mse | mse_per_sample | nmse
 
-# Methods to plot (proto | cca | linear)
+# Bands: t interval of the mean across pairs (pairs share the same receiver)
+confidence: 0.95
+
+# Methods to plot (proto | cca | linear), in legend order
 methods:
   - proto
   - cca
   - linear
 
-# Metrics to plot (must exist as columns in the parquet files)
-metrics:
-  - accuracy
-  - mse
+labels:
+  proto: PPFE
+  cca: CCA
+  linear: Linear
+  no_mismatch: No Mismatch
+
+titles:
+  cifar10: CIFAR-10
+  mnist: MNIST
+  fashion_mnist: Fashion-MNIST
+
+# SPAICOM logo palette
+colors:
+  linear: "#477BFF"
+  cca: "#E13D66"
+  proto: "#70D7D0"
+  no_mismatch: "#4D4D4D"
+
+font_candidates: [Times New Roman, Tinos, Liberation Serif, STIXGeneral, DejaVu Serif]
+
+mean_linewidth: 1.8
+pair_linewidth: 0.9
+pair_alpha: 0.35
+band_alpha: 0.18
+figsize: [12.0, 6.0]
+xlabel: Compression (K)

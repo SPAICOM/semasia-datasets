@@ -1,7 +1,7 @@
 """Semantic alignment evaluation over pairs of models.
 
 Transmits model A's test embeddings into model B's raw embedding space via
-two methods and evaluates the quality of the transmission on the test set.
+several methods and evaluates the quality of the transmission on the test set.
 
 Methods
 -------
@@ -9,15 +9,26 @@ proto  : prewhitening + KMeans + Parseval frame (injected strategy).
 cca    : Canonical Correlation Analysis on raw embeddings.
 linear : prewhitening + rank-k truncated linear map  M_k = U S_k Vt.
 
+Accuracy after communication is measured with a linear probe fit on the
+receiver's raw TRAIN embeddings (``decoder: ridge`` in float64 on CPU, or the
+legacy ``decoder: lstsq``). Only proto (KMeans) is stochastic and is run for every
+seed in ``seeds``; cca and linear are deterministic and run once.
+
 Run with:
     uv run python scripts/alignment.py
+    uv run python scripts/alignment.py decoder=lstsq results_dir=<dir>
 """
 
 from __future__ import annotations
 
+import json
 import logging
+import os
+import platform
+import subprocess
 import sys
-from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from importlib import metadata
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -29,24 +40,18 @@ import polars as pl
 import torch
 import torch.nn.functional as torch_F
 from datasets import load_dataset
+from omegaconf import OmegaConf
 from sklearn.cluster import KMeans
 from tqdm.auto import tqdm
 
 from src.objects import LatentSpace
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from omegaconf import DictConfig
 
 logging.getLogger('httpx').setLevel(logging.WARNING)
-
-
-@dataclass
-class AlignmentResult:
-    model_a: str
-    model_b: str
-    method: str  # 'proto' | 'cca' | 'linear'
-    k: int
-    metrics: dict[str, float] = field(default_factory=dict)
 
 
 def _load_split(
@@ -60,37 +65,106 @@ def _load_split(
     return embeddings, labels
 
 
-def _lstsq_predict(
-    X_train: np.ndarray,
-    y_train: np.ndarray,
-    X_test: np.ndarray,
-    device: torch.device,
-) -> np.ndarray:
+def _one_hot(y: np.ndarray, n_classes: int, dtype: type) -> np.ndarray:
+    out = np.zeros((len(y), n_classes), dtype=dtype)
+    out[np.arange(len(y)), y] = 1
+    return out
+
+
+def _lstsq_probe(
+    X_train: np.ndarray, y_train: np.ndarray, device: torch.device
+) -> Callable[[np.ndarray], np.ndarray]:
+    """Legacy decoder: bare ``torch.linalg.lstsq`` in float32 (device dependent)."""
     X_tr = torch.tensor(X_train, dtype=torch.float32, device=device)
     y_tr = torch.tensor(y_train, dtype=torch.long, device=device)
     n_classes = int(y_tr.max().item()) + 1
     Y_oh = torch_F.one_hot(y_tr, n_classes).float()
     W = torch.linalg.lstsq(X_tr, Y_oh).solution
-    X_te = torch.tensor(X_test, dtype=torch.float32, device=device)
-    return (X_te @ W).argmax(dim=1).cpu().numpy()
+
+    def predict(X: np.ndarray) -> np.ndarray:
+        X_te = torch.tensor(X, dtype=torch.float32, device=device)
+        return (X_te @ W).argmax(dim=1).cpu().numpy()
+
+    return predict
 
 
-def _compute_metrics(
+def _ridge_probes(
+    X_train: np.ndarray, y_train: np.ndarray, lam_rels: list[float]
+) -> dict[float, Callable[[np.ndarray], np.ndarray]]:
+    """Ridge probes W = (X^T X + lam I)^-1 X^T Y, float64 on CPU, no intercept.
+
+    lam = lam_rel * trace(X^T X) / d, one probe per entry of ``lam_rels``.
+    """
+    X = X_train.astype(np.float64)
+    n_classes = int(y_train.max()) + 1
+    Y = _one_hot(y_train, n_classes, np.float64)
+    gram = X.T @ X
+    xty = X.T @ Y
+    d = gram.shape[0]
+    scale = np.trace(gram) / d
+    eye = np.eye(d)
+
+    def make(lam_rel: float) -> Callable[[np.ndarray], np.ndarray]:
+        W = np.linalg.solve(gram + lam_rel * scale * eye, xty)
+
+        def predict(X_new: np.ndarray) -> np.ndarray:
+            return (X_new.astype(np.float64) @ W).argmax(axis=1)
+
+        return predict
+
+    return {lam: make(lam) for lam in lam_rels}
+
+
+def _make_probes(
+    decoder: str,
+    X_train: np.ndarray,
+    y_train: np.ndarray,
+    lam_rels: list[float],
+    lstsq_device: torch.device,
+) -> dict[float, Callable[[np.ndarray], np.ndarray]]:
+    """Decoders keyed by lam_rel (the lstsq decoder ignores lam and has one entry)."""
+    if decoder == 'ridge':
+        return _ridge_probes(X_train, y_train, lam_rels)
+    if decoder == 'lstsq':
+        return {lam_rels[0]: _lstsq_probe(X_train, y_train, lstsq_device)}
+    raise ValueError(f'unknown decoder {decoder!r} (expected ridge | lstsq)')
+
+
+def _error_metrics(b_hat: np.ndarray, b_test: np.ndarray) -> dict[str, float]:
+    """Reconstruction error in the raw receiver space.
+
+    mse            : mean over all entries (= per-sample squared norm / d_b)
+    mse_per_sample : mean over samples of the squared L2 norm of the error
+    nmse           : total squared error / total squared norm of the targets
+    """
+    b_hat64 = b_hat.astype(np.float64)
+    b_test64 = b_test.astype(np.float64)
+    sq = (b_hat64 - b_test64) ** 2
+    return {
+        'mse': float(sq.mean()),
+        'mse_per_sample': float(sq.sum(axis=1).mean()),
+        'nmse': float(sq.sum() / (b_test64**2).sum()),
+        'd_b': int(b_test.shape[1]),
+    }
+
+
+def _evaluate(
     selected: dict[str, bool],
     b_hat: np.ndarray,
     b_test: np.ndarray,
-    b_train: np.ndarray,
-    labels_train: np.ndarray,
+    probes: dict[float, Callable[[np.ndarray], np.ndarray]],
     labels_test: np.ndarray,
-    device: torch.device,
-) -> dict[str, float]:
+) -> tuple[dict[str, float], dict[float, float]]:
+    """Return (metrics, accuracy per lam_rel). The first probe is the main one."""
     out: dict[str, float] = {}
+    acc_by_lam: dict[float, float] = {}
     if selected.get('accuracy', False):
-        preds = _lstsq_predict(b_train, labels_train, b_hat, device)
-        out['accuracy'] = float(np.mean(preds == labels_test))
+        for lam, predict in probes.items():
+            acc_by_lam[lam] = float(np.mean(predict(b_hat) == labels_test))
+        out['accuracy'] = acc_by_lam[next(iter(probes))]
     if selected.get('mse', False):
-        out['mse'] = float(np.mean((b_hat - b_test) ** 2))
-    return out
+        out.update(_error_metrics(b_hat, b_test))
+    return out, acc_by_lam
 
 
 def _proto_transmit(
@@ -217,172 +291,259 @@ def _cca_transmit(
     return (a_test_c @ W_b_pinv + y_mean).astype(np.float32)
 
 
+def _git_info() -> dict[str, object]:
+    def run(*args: str) -> str:
+        return subprocess.run(
+            ['git', *args], capture_output=True, text=True, check=False
+        ).stdout.rstrip('\n')
+
+    dirty = [
+        line[3:]
+        for line in run('status', '--porcelain', '--untracked-files=no').splitlines()
+    ]
+    return {
+        'commit': run('rev-parse', 'HEAD').strip(),
+        'branch': run('rev-parse', '--abbrev-ref', 'HEAD').strip(),
+        'dirty_tracked_files': dirty,
+    }
+
+
+def _pkg_version(name: str) -> str:
+    try:
+        return metadata.version(name)
+    except metadata.PackageNotFoundError:
+        return 'n/a'
+
+
+def _write_manifest(
+    path: Path, cfg: DictConfig, info: dict[str, dict], lstsq_device: torch.device
+) -> None:
+    manifest = {
+        'date_utc': datetime.now(UTC).isoformat(timespec='seconds'),
+        'git': _git_info(),
+        'device': {
+            'cuda_available': torch.cuda.is_available(),
+            'cuda_visible_devices': os.environ.get('CUDA_VISIBLE_DEVICES'),
+            'lstsq_device': str(lstsq_device),
+            'ridge_decoder_device': 'cpu (float64)',
+            'transmission_methods_device': 'cpu (numpy / scikit-learn)',
+        },
+        'versions': {
+            'python': platform.python_version(),
+            'torch': torch.__version__,
+            'numpy': np.__version__,
+            'scikit-learn': _pkg_version('scikit-learn'),
+            'seaborn': _pkg_version('seaborn'),
+            'polars': pl.__version__,
+        },
+        'decoder': cfg.decoder,
+        'lam_rel': float(cfg.lam_rel),
+        'lam_sweep': list(cfg.get('lam_sweep', [])),
+        'seeds': list(cfg.seeds),
+        'config': OmegaConf.to_container(cfg, resolve=True),
+        **info,
+    }
+    path.write_text(json.dumps(manifest, indent=2, default=str))
+
+
 @hydra.main(
     config_path='../configs/hydra/',
     config_name='alignment_methods',
     version_base='1.3',
 )
 def main(cfg: DictConfig) -> None:
-    current = Path('.')
-    results_dir = current / 'results' / 'alignment'
+    results_dir = Path(cfg.results_dir)
     results_dir.mkdir(parents=True, exist_ok=True)
 
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    seed: int = cfg.seed
+    decoder: str = cfg.decoder
+    lam_rel = float(cfg.lam_rel)
+    lam_sweep = [float(x) for x in cfg.get('lam_sweep', [])]
+    lam_all = [lam_rel] + [lam for lam in lam_sweep if lam != lam_rel]
+    lambda_dir = Path(cfg.lambda_dir)
+    if decoder == 'ridge' and lam_sweep:
+        lambda_dir.mkdir(parents=True, exist_ok=True)
+
+    # Only the legacy lstsq decoder uses a device; ridge is always CPU float64.
+    lstsq_device = torch.device(cfg.lstsq_device)
+    if lstsq_device.type == 'cuda' and not torch.cuda.is_available():
+        raise RuntimeError('lstsq_device=cuda requested but CUDA is not available')
+
+    seeds: list[int] = list(cfg.seeds)
     k_values: list[int] = list(cfg.k_values)
     selected_metrics: dict[str, bool] = dict(cfg.metrics)
     selected_methods: list[str] = list(cfg.get('methods', ['proto', 'cca']))
     model_b: str = cfg.model_b
     models_a: list[str] = list(cfg.models_a)
     datasets: list[str] = list(cfg.datasets)
+    overwrite: bool = bool(cfg.get('overwrite', False))
 
     tqdm.write(f'[INFO] Datasets: {datasets}')
     tqdm.write(f'[INFO] Model B: {model_b}')
     tqdm.write(f'[INFO] Models A: {models_a}')
     tqdm.write(f'[INFO] Methods: {selected_methods}  |  k values: {k_values}')
-    tqdm.write(f'[INFO] Metrics: {[m for m, v in selected_metrics.items() if v]}')
+    tqdm.write(f'[INFO] Decoder: {decoder}  lam_rel={lam_rel}  sweep={lam_sweep}')
+    tqdm.write(f'[INFO] Seeds (proto): {seeds}  |  results_dir: {results_dir}')
+
+    manifest_path = results_dir / 'manifest.json'
+    info: dict[str, dict] = {'datasets': {}, 'models': {}, 'pairs': {}}
+    if manifest_path.exists():
+        old = json.loads(manifest_path.read_text())
+        info = {key: old.get(key, {}) for key in info}
 
     for dataset in tqdm(datasets, desc='Datasets', unit='dataset'):
         dataset_path = f'{cfg.repo_id}/{cfg.prefix}{dataset}'
         tqdm.write(f'\n[INFO] Dataset: {dataset_path}')
 
-        # Load model_b once per dataset (shared across all model_a iterations)
         tqdm.write(f'  Loading {model_b} train...')
         lb_train, labels_train = _load_split(dataset_path, model_b, cfg.train_split)
         tqdm.write(f'  Loading {model_b} test...')
         lb_test, labels_test = _load_split(dataset_path, model_b, cfg.test_split)
+        info['datasets'][dataset] = {
+            'n_train': int(lb_train.shape[0]),
+            'n_test': int(lb_test.shape[0]),
+            'n_classes': int(labels_train.max()) + 1,
+            'train_split': cfg.train_split,
+            'test_split': cfg.test_split,
+        }
+        info['models'][model_b] = {
+            'latent_dim': int(lb_train.shape[1]),
+            'role': 'receiver',
+        }
 
-        # No Mismatch baseline is the same for all model_a in this dataset
+        probes = _make_probes(decoder, lb_train, labels_train, lam_all, lstsq_device)
+
+        # No Mismatch baseline: probe applied to the receiver's own test embeddings
         nm_metrics: dict[str, float] = {}
+        nm_acc_by_lam: dict[float, float] = {}
         if selected_metrics.get('accuracy', False):
-            preds_nm = _lstsq_predict(lb_train, labels_train, lb_test, device)
-            nm_metrics['accuracy'] = float(np.mean(preds_nm == labels_test))
+            nm_metrics, nm_acc_by_lam = _evaluate(
+                {'accuracy': True}, lb_test, lb_test, probes, labels_test
+            )
         if selected_metrics.get('mse', False):
-            nm_metrics['mse'] = 0.0
+            nm_metrics.update(
+                {
+                    'mse': 0.0,
+                    'mse_per_sample': 0.0,
+                    'nmse': 0.0,
+                    'd_b': int(lb_test.shape[1]),
+                }
+            )
         tqdm.write(f'  no_mismatch: {nm_metrics}')
 
         for model_a in tqdm(models_a, desc='Models A', unit='model'):
             out_path = results_dir / f'{model_a}__{model_b}__{dataset}.parquet'
-
-            # Skip if already complete
-            if out_path.exists():
-                _existing = pl.read_parquet(out_path)
-                if _existing['method'].is_in(['no_mismatch']).any():
-                    tqdm.write(f'[SKIP] {model_a} → {model_b} ({out_path.name})')
-                    continue
+            if out_path.exists() and not overwrite:
+                tqdm.write(f'[SKIP] {model_a} -> {model_b} ({out_path.name})')
+                continue
 
             tqdm.write(f'\n{"=" * 60}')
-            tqdm.write(f'[PAIR] {model_a}  →  {model_b}')
+            tqdm.write(f'[PAIR] {model_a}  ->  {model_b}')
 
-            if cfg.get('save_results', True):
-                nm_row = pl.DataFrame(
-                    [
-                        {
-                            'model_a': model_a,
-                            'model_b': model_b,
-                            'method': 'no_mismatch',
-                            'k': 0,
-                            **nm_metrics,
-                        }
-                    ]
-                )
-                if out_path.exists():
-                    df = pl.concat([pl.read_parquet(out_path), nm_row], how='diagonal')
-                    df.write_parquet(out_path)
-                    tqdm.write(f'  [PATCHED] {out_path.name}')
-                    continue
-
-            # ── Full alignment (only for brand-new parquets) ───────────────────
             tqdm.write(f'  Loading {model_a} train...')
             la_train, _ = _load_split(dataset_path, model_a, cfg.train_split)
             tqdm.write(f'  Loading {model_a} test...')
             la_test, _ = _load_split(dataset_path, model_a, cfg.test_split)
-
+            info['models'][model_a] = {
+                'latent_dim': int(la_train.shape[1]),
+                'role': 'transmitter',
+            }
+            info['pairs'][f'{model_a}__{dataset}'] = {
+                'd_a': int(la_train.shape[1]),
+                'd_b': int(lb_train.shape[1]),
+                'n_train': int(la_train.shape[0]),
+                'n_test': int(la_test.shape[0]),
+            }
             tqdm.write(
                 f'  Train A={la_train.shape}  B={lb_train.shape}'
                 f'  |  Test A={la_test.shape}  B={lb_test.shape}'
             )
 
-            results: list[AlignmentResult] = []
-            results.append(
-                AlignmentResult(model_a, model_b, 'no_mismatch', 0, nm_metrics)
-            )
+            base = {'model_a': model_a, 'model_b': model_b, 'dataset': dataset}
+            rows: list[dict] = []
+            sweep_rows: list[dict] = []
+
+            def add(
+                method: str,
+                k: int,
+                seed: int | None,
+                metrics: dict[str, float],
+                acc_by_lam: dict[float, float],
+                base: dict = base,
+                rows: list[dict] = rows,
+                sweep_rows: list[dict] = sweep_rows,
+            ) -> None:
+                rows.append(
+                    {
+                        **base,
+                        'method': method,
+                        'k': k,
+                        'seed': seed,
+                        'decoder': decoder,
+                        'lam_rel': lam_rel if decoder == 'ridge' else None,
+                        **metrics,
+                    }
+                )
+                if decoder == 'ridge' and lam_sweep:
+                    sweep_rows.extend(
+                        {
+                            **base,
+                            'method': method,
+                            'k': k,
+                            'seed': seed,
+                            'lam_rel': lam,
+                            'accuracy': acc,
+                        }
+                        for lam, acc in acc_by_lam.items()
+                    )
+
+            add('no_mismatch', 0, None, nm_metrics, nm_acc_by_lam)
 
             linear_svd = None
             if 'linear' in selected_methods:
                 tqdm.write('  linear: fitting SVD of linear map...')
-                linear_svd = _fit_linear(la_train, lb_train, seed)
+                linear_svd = _fit_linear(la_train, lb_train, seeds[0])
 
             for k in tqdm(k_values, desc='  k values', unit='k', leave=False):
                 tqdm.write(f'\n  [k={k}]')
 
                 if 'proto' in selected_methods:
-                    tqdm.write('    proto: transmitting...')
-                    b_hat_proto = _proto_transmit(la_train, lb_train, la_test, k, seed)
-                    m_proto = _compute_metrics(
-                        selected_metrics,
-                        b_hat_proto,
-                        lb_test,
-                        lb_train,
-                        labels_train,
-                        labels_test,
-                        device,
-                    )
-                    tqdm.write(f'    proto: {m_proto}')
-                    results.append(
-                        AlignmentResult(model_a, model_b, 'proto', k, m_proto)
-                    )
+                    for seed in seeds:
+                        b_hat = _proto_transmit(la_train, lb_train, la_test, k, seed)
+                        m, acc = _evaluate(
+                            selected_metrics, b_hat, lb_test, probes, labels_test
+                        )
+                        tqdm.write(f'    proto (seed {seed}): {m}')
+                        add('proto', k, seed, m, acc)
 
                 if 'cca' in selected_methods:
-                    tqdm.write('    cca:   transmitting...')
-                    b_hat_cca = _cca_transmit(la_train, lb_train, la_test, k)
-                    m_cca = _compute_metrics(
-                        selected_metrics,
-                        b_hat_cca,
-                        lb_test,
-                        lb_train,
-                        labels_train,
-                        labels_test,
-                        device,
+                    b_hat = _cca_transmit(la_train, lb_train, la_test, k)
+                    m, acc = _evaluate(
+                        selected_metrics, b_hat, lb_test, probes, labels_test
                     )
-                    tqdm.write(f'    cca:   {m_cca}')
-                    results.append(AlignmentResult(model_a, model_b, 'cca', k, m_cca))
+                    tqdm.write(f'    cca:    {m}')
+                    add('cca', k, None, m, acc)
 
                 if linear_svd is not None:
                     U, s, Vt, ls_a_lin, ls_b_lin = linear_svd
-                    b_hat_lin = _linear_transmit(
-                        la_test, U, s, Vt, ls_a_lin, ls_b_lin, k
+                    b_hat = _linear_transmit(la_test, U, s, Vt, ls_a_lin, ls_b_lin, k)
+                    m, acc = _evaluate(
+                        selected_metrics, b_hat, lb_test, probes, labels_test
                     )
-                    m_lin = _compute_metrics(
-                        selected_metrics,
-                        b_hat_lin,
-                        lb_test,
-                        lb_train,
-                        labels_train,
-                        labels_test,
-                        device,
-                    )
-                    tqdm.write(f'    linear: {m_lin}')
-                    results.append(
-                        AlignmentResult(model_a, model_b, 'linear', k, m_lin)
-                    )
+                    tqdm.write(f'    linear: {m}')
+                    add('linear', k, None, m, acc)
 
-            # ── Save parquet ───────────────────────────────────────────────────
             if cfg.get('save_results', True):
-                rows = []
-                for r in results:
-                    row = {
-                        'model_a': r.model_a,
-                        'model_b': r.model_b,
-                        'method': r.method,
-                        'k': r.k,
-                    }
-                    row.update(r.metrics)
-                    rows.append(row)
-                df = pl.DataFrame(rows)
+                df = pl.DataFrame(rows, infer_schema_length=None)
                 df.write_parquet(out_path)
+                if sweep_rows:
+                    pl.DataFrame(sweep_rows, infer_schema_length=None).write_parquet(
+                        lambda_dir / out_path.name
+                    )
                 tqdm.write(f'\n  [SAVED] {out_path}')
-                tqdm.write(str(df))
+                _write_manifest(manifest_path, cfg, info, lstsq_device)
+
+    _write_manifest(manifest_path, cfg, info, lstsq_device)
+    tqdm.write(f'[DONE] manifest: {manifest_path}')
 
 
 if __name__ == '__main__':
