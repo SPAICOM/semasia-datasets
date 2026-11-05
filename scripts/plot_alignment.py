@@ -121,9 +121,7 @@ def _draw_figure(
             ax.set_xticklabels([str(k) for k in ks])
             ax.xaxis.set_minor_locator(NullLocator())
             ax.set_xlim(ks[0], ks[-1])
-            ax.set_ylabel(
-                f'{fig_cfg.ylabel}\n(receiver: {rx["label"]})' if j == 0 else ''
-            )
+            ax.set_ylabel(fig_cfg.ylabel if j == 0 else '')
             ax.set_xlabel(cfg.xlabel if i == n_rows - 1 else '')
             if i == 0:
                 ax.set_title(cfg.titles[dataset])
@@ -145,16 +143,25 @@ def _draw_figure(
         frameon=True,
         bbox_to_anchor=(0.5, 1.0),
     )
-    fig.tight_layout(rect=(0, 0, 1, 0.94 if n_rows > 1 else 0.92))
+    fig.tight_layout(rect=(cfg.row_title_margin, 0, 1, 0.94 if n_rows > 1 else 0.92))
+    # row titles: the receiver name, to the left of the y labels
+    for i, rx in enumerate(receivers):
+        box = axes[i, 0].get_position()
+        fig.text(
+            cfg.row_title_x,
+            (box.y0 + box.y1) / 2,
+            rx['label'],
+            rotation=90,
+            ha='center',
+            va='center',
+            fontweight='bold',
+        )
 
     out_pdf = Path(fig_cfg.out_pdf)
     out_pdf.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out_pdf)
-    plots_dir = Path(cfg.plots_dir)
-    plots_dir.mkdir(parents=True, exist_ok=True)
-    fig.savefig(plots_dir / out_pdf.name)
     plt.close(fig)
-    print(f'[SAVED] {out_pdf}  and  {plots_dir / out_pdf.name}')
+    print(f'[SAVED] {out_pdf}')
 
 
 @hydra.main(

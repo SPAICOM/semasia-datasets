@@ -3,23 +3,22 @@ results_dirs:
   - results/alignment
   - results/alignment_extended_vitl
   - results/alignment_extended_convnext
-plots_dir: results/alignment/plots # a copy of each PDF is saved here
-figure_data: results/alignment/figure_data.csv
+figure_data: results/figures/alignment_figure_data.csv
 
 # One PDF per entry. rows = receivers, columns = datasets.
 #   metric_col: column of the result files (mse | mse_per_sample | nmse | accuracy)
 #   no_mismatch: draw the No Mismatch line (accuracy only)
 figures:
-  - out_pdf: figures_out/alignment.pdf
+  - out_pdf: results/figures/alignment.pdf
     metric_col: accuracy
     ylabel: Accuracy
     no_mismatch: true
-  - out_pdf: figures_out/alignment_mse.pdf
+  - out_pdf: results/figures/alignment_mse.pdf
     metric_col: mse
     ylabel: MSE
     no_mismatch: false
 
-# Receivers in row order; `label` is written next to the y label
+# Receivers in row order; `label` is the row title (rotated, left of the y label)
 receivers:
   - model: vit_large_patch16_224.augreg_in21k
     label: ViT-L/16
@@ -61,3 +60,5 @@ pair_alpha: 0.35
 band_alpha: 0.18
 figsize: [12.0, 6.0]
 xlabel: Compression (K)
+row_title_x: 0.016 # figure coordinates of the row titles
+row_title_margin: 0.04 # left margin (figure fraction) kept free for the row titles
