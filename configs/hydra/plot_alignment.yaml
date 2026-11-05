@@ -25,7 +25,8 @@ receivers:
   - model: convnext_base.fb_in22k
     label: ConvNeXt-B
 
-# Bands: t interval of the mean across the pairs of each receiver
+# Bands: t interval of the mean across the pairs of each receiver (band: false hides them)
+band: true
 confidence: 0.95
 
 # Methods to plot (proto | cca | linear), in legend order

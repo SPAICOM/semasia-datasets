@@ -86,15 +86,16 @@ def _draw_figure(
                         linewidth=cfg.pair_linewidth,
                         zorder=2,
                     )
-                ax.fill_between(
-                    sel['k'],
-                    sel['ci_low'],
-                    sel['ci_high'],
-                    color=color,
-                    alpha=cfg.band_alpha,
-                    linewidth=0,
-                    zorder=1,
-                )
+                if cfg.band:
+                    ax.fill_between(
+                        sel['k'],
+                        sel['ci_low'],
+                        sel['ci_high'],
+                        color=color,
+                        alpha=cfg.band_alpha,
+                        linewidth=0,
+                        zorder=1,
+                    )
                 ax.plot(
                     sel['k'],
                     sel['mean'],
