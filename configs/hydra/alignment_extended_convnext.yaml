@@ -1,0 +1,19 @@
+# Second receiver (ConvNeXt-B, ImageNet-22k): its own No Mismatch bound per dataset.
+# Run: uv run scripts/alignment.py --config-name=alignment_extended_convnext
+defaults:
+  - alignment_methods
+  - _self_
+
+model_b: convnext_base.fb_in22k
+
+models_a:
+  - vit_base_patch16_224.augreg_in21k
+  - vit_base_patch14_reg4_dinov2.lvd142m
+  - vit_base_patch16_clip_224.laion2b_ft_in12k
+  - swin_base_patch4_window7_224.ms_in22k
+  - resnet50.a1_in1k
+  - aimv2_1b_patch14_224.apple_pt
+
+seeds: [42, 43, 44]
+lam_sweep: []
+results_dir: results/alignment_extended_convnext

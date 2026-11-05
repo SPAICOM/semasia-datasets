@@ -1,0 +1,21 @@
+# Extra transmitters for the ViT-L receiver (same receiver as the main 4 pairs).
+# Run: uv run scripts/alignment.py --config-name=alignment_extended_vitl
+defaults:
+  - alignment_methods
+  - _self_
+
+model_b: vit_large_patch16_224.augreg_in21k
+
+models_a:
+  - convnext_base.fb_in22k
+  - swin_base_patch4_window7_224.ms_in22k
+  - maxxvitv2_rmlp_base_rw_224.sw_in12k_ft_in1k
+  - vit_base_patch16_clip_224.laion2b_ft_in12k
+  - vit_base_patch14_reg4_dinov2.lvd142m
+  - mixer_b16_224.goog_in21k
+  - resnet50.a1_in1k
+  - resnet18.a1_in1k
+
+seeds: [42, 43, 44]
+lam_sweep: []
+results_dir: results/alignment_extended_vitl

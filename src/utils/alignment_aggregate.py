@@ -12,14 +12,16 @@ import numpy as np
 import polars as pl
 from scipy import stats
 
-GROUP = ['dataset', 'model_a', 'method', 'k']
+GROUP = ['dataset', 'model_b', 'model_a', 'method', 'k']
 
 
-def load_results(results_dir: str | Path) -> pl.DataFrame:
-    """Concatenate all per-pair parquet files of a results directory."""
-    files = sorted(Path(results_dir).glob('*.parquet'))
+def load_results(results_dirs: str | Path | list[str | Path]) -> pl.DataFrame:
+    """Concatenate all per-pair parquet files of one or more results directories."""
+    if isinstance(results_dirs, (str, Path)):
+        results_dirs = [results_dirs]
+    files = [f for d in results_dirs for f in sorted(Path(d).glob('*.parquet'))]
     if not files:
-        raise FileNotFoundError(f'no parquet files in {results_dir}')
+        raise FileNotFoundError(f'no parquet files in {results_dirs}')
     return pl.concat([pl.read_parquet(f) for f in files], how='diagonal')
 
 
@@ -37,12 +39,15 @@ def aggregate_pairs(
 ) -> pl.DataFrame:
     """Mean, SD (ddof=1), SE and t-interval of the mean across pairs.
 
-    Long format: dataset, method, k, metric, mean, sd, se, ci_low, ci_high, n_pairs.
+    Pairs are aggregated separately for each receiver (model_b), because the raw
+    metrics (and the No Mismatch bound) are not comparable across receivers.
+    Long format: dataset, model_b, method, k, metric, mean, sd, se, ci_low, ci_high,
+    n_pairs.
     The interval is mean +/- t(1-(1-confidence)/2, n-1) * SD / sqrt(n).
     """
     rows = []
-    for (dataset, method, k), g in pairs.group_by(
-        ['dataset', 'method', 'k'], maintain_order=True
+    for (dataset, model_b, method, k), g in pairs.group_by(
+        ['dataset', 'model_b', 'method', 'k'], maintain_order=True
     ):
         for metric in metrics:
             vals = g[metric].drop_nulls().to_numpy().astype(np.float64)
@@ -60,6 +65,7 @@ def aggregate_pairs(
             rows.append(
                 {
                     'dataset': dataset,
+                    'model_b': model_b,
                     'method': method,
                     'k': int(k),
                     'metric': metric,
@@ -71,4 +77,4 @@ def aggregate_pairs(
                     'n_pairs': n,
                 }
             )
-    return pl.DataFrame(rows).sort(['dataset', 'metric', 'method', 'k'])
+    return pl.DataFrame(rows).sort(['dataset', 'model_b', 'metric', 'method', 'k'])
