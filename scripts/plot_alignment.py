@@ -74,18 +74,19 @@ def _draw_figure(
                 sel = agg.filter(
                     where & (pl.col('metric') == col) & (pl.col('method') == method)
                 ).sort('k')
-                for _, g in pairs.filter(where & (pl.col('method') == method)).group_by(
-                    'model_a'
-                ):
-                    g = g.sort('k')
-                    ax.plot(
-                        g['k'],
-                        g[col],
-                        color=color,
-                        alpha=cfg.pair_alpha,
-                        linewidth=cfg.pair_linewidth,
-                        zorder=2,
-                    )
+                if cfg.pair_lines:
+                    for _, g in pairs.filter(
+                        where & (pl.col('method') == method)
+                    ).group_by('model_a'):
+                        g = g.sort('k')
+                        ax.plot(
+                            g['k'],
+                            g[col],
+                            color=color,
+                            alpha=cfg.pair_alpha,
+                            linewidth=cfg.pair_linewidth,
+                            zorder=2,
+                        )
                 if cfg.band:
                     ax.fill_between(
                         sel['k'],

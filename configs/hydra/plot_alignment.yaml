@@ -3,7 +3,7 @@ results_dirs:
   - results/alignment
   - results/alignment_extended_vitl
   - results/alignment_extended_convnext
-figure_data: results/figures/alignment_figure_data.csv
+figure_data: results/figure_data/alignment_figure_data.csv
 
 # One PDF per entry. rows = receivers, columns = datasets.
 #   metric_col: column of the result files (mse | mse_per_sample | nmse | accuracy)
@@ -27,6 +27,7 @@ receivers:
 
 # Bands: t interval of the mean across the pairs of each receiver (band: false hides them)
 band: true
+pair_lines: true # thin lines of the individual pairs
 confidence: 0.95
 
 # Methods to plot (proto | cca | linear), in legend order
