@@ -62,5 +62,5 @@ pair_alpha: 0.35
 band_alpha: 0.18
 figsize: [12.0, 6.0]
 xlabel: Compression (K)
-row_title_x: 0.016 # figure coordinates of the row titles
-row_title_margin: 0.04 # left margin (figure fraction) kept free for the row titles
+row_title_x: 0.021 # figure coordinates of the row titles
+row_title_margin: 0.03 # left margin (figure fraction) kept free for the row titles
