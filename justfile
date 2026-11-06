@@ -159,6 +159,16 @@ alignment:
 alignment-plot:
     uv run scripts/plot_alignment.py
 
+# Datasets and analyses are chosen in configs/hydra/scalability.yaml; extra args are Hydra overrides, e.g.
+#   just scalability 'datasets=[cifar10,mnist]' output_dir=results/scalability_small 'analyses=[hub,footers,tables]'
+# Scalability study (sizes, FLOPs, GPU-hours, traces) -> results/scalability/report.md
+scalability *ARGS:
+    uv run scripts/scalability.py {{ARGS}}
+
+# One scalability analysis: hub | footers | columns | flops | throughput | dataloader | traces | tables | report
+scalability-step STEP *ARGS:
+    uv run scripts/scalability.py 'analyses=[{{STEP}}]' {{ARGS}}
+
 # Plot PC correlation heatmap between two models on a dataset
 plot-heatmap MODEL_A MODEL_B DATASET:
     uv run scripts/plot_correlation_heatmap.py {{MODEL_A}} {{MODEL_B}} {{DATASET}}

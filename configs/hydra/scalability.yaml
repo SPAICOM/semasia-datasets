@@ -1,0 +1,76 @@
+# Scalability study of SEMASIA (Hub sizes, FLOPs, GPU-hour estimate, traces of the extraction run).
+# Script: scripts/scalability.py.  Run everything with `just scalability`, one step with e.g.
+# `just scalability-step flops`, or override anything: `uv run scripts/scalability.py 'datasets=[cifar10,mnist]' 'analyses=[hub,footers]'`.
+
+# Benchmarks to include.  Every analysis that depends on the benchmarks (hub, footers, columns, dataloader,
+# traces, tables) only looks at the ones listed here.  Names must be keys of `benchmarks` below.
+datasets:
+    - cifar10
+    - cifar100
+    - tiny-imagenet
+    - imagenet-1k
+    - mnist
+    - fashion_mnist
+    - celeba
+    - oxford-flowers
+
+# Analyses to run, always executed in this canonical order whatever the order written here:
+#   hub         file list and sizes of every Hub repo (HfApi.dataset_info, no download)            -> hub_files, hub_repo_meta
+#   footers     parquet footers (rows, schema) of a random sample of files, HTTP range reads only  -> hub_footers
+#   columns     compressed / uncompressed bytes per column, size of the registry repo              -> column_bytes_sample, hub_registry_files
+#   flops       forward FLOPs and parameters of every registry model (pretrained=False)            -> model_flops
+#   throughput  GPU images/s of a few models on dummy inputs (needs a CUDA GPU)                    -> throughput
+#   dataloader  data-loading rate per dataset from the local offline HF cache                      -> dataloader_rate_by_dataset
+#   traces      Hub commit history, local embedding files, per-pass times from the Hydra logs      -> hub_commits, local_embedding_files, log_passes
+#   tables      derived tables, throughput fits, GPU-hour estimates, cross-check                   -> table_*, cost_*, gpu_hours_*, key_numbers
+#   report      write report.md from the parquet files (needs ALL 8 benchmarks)
+analyses: [hub, footers, columns, flops, throughput, dataloader, traces, tables, report]
+
+# Folder of the parquet files and of report.md.  Use another folder for partial runs (e.g. a subset of datasets), so
+# that they do not overwrite the tables of the full study.
+output_dir: results/scalability
+
+repo_id: spaicom-lab # Hub organisation
+prefix: semasia- # repo of a dataset = <repo_id>/<prefix><dataset>; the registry is <prefix>model-registry
+registry: data/semasia-model-registry/semasia_model_registry.parquet
+local_embeddings: "data/*/*/*/part-*.parquet" # layout <dataset>/<split>/<model>/part-*.parquet
+hydra_logs: "outputs/*/*/" # Hydra run folders of encode_dataset_all_timm.py
+
+# Per benchmark: splits that were encoded (configs/hydra/dataset/) and the source used to measure the loading rate.
+benchmarks:
+    cifar10: {splits: [train, test], hf: uoft-cs/cifar10, hf_config: null, hf_split: test, image_column: img}
+    cifar100: {splits: [train, test], hf: uoft-cs/cifar100, hf_config: null, hf_split: test, image_column: img}
+    tiny-imagenet: {splits: [train, valid], hf: zh-plus/tiny-imagenet, hf_config: null, hf_split: valid, image_column: image}
+    imagenet-1k: {splits: [validation, test], hf: ILSVRC/imagenet-1k, hf_config: default, hf_split: validation, image_column: image}
+    mnist: {splits: [train, test], hf: ylecun/mnist, hf_config: null, hf_split: test, image_column: image}
+    fashion_mnist: {splits: [train, test], hf: zalando-datasets/fashion_mnist, hf_config: null, hf_split: test, image_column: image}
+    celeba: {splits: [train, valid, test], hf: flwrlabs/celeba, hf_config: img_align+identity+attr, hf_split: test, image_column: image}
+    oxford-flowers: {splits: [train, test], hf: nkirschi/oxford-flowers, hf_config: null, hf_split: test, image_column: image}
+
+footers:
+    per_shard: 40 # footers read per (dataset, split, shard); null = all files (about 30,000 requests, hits the Hub rate limit)
+    seed: 0
+    workers: 4
+    retries: 6 # exponential backoff 5 s * 2^k on errors such as HTTP 429
+
+columns:
+    models: [resnet50.a1_in1k, vit_large_patch16_224.augreg_in21k, tinynet_e.in1k] # different latent_dim
+
+flops:
+    limit: null # only the first N registry models (smoke test); a limited run writes model_flops_partial.parquet
+    threads: 8
+
+throughput:
+    n_models: 15
+    required_models: [resnet18.a1_in1k, resnet50.a1_in1k, vit_base_patch16_224.augreg_in21k, vit_large_patch16_224.augreg_in21k, aimv2_1b_patch14_224.apple_pt]
+    target_gflops: [0.2, 0.7, 2.0, 6.0, 60.0, 250.0, 1500.0, 3000.0] # the cheapest, median and dearest models are always included; these fill the gaps
+    batch_sizes: [16, 128] # 16 = committed default of encode_timm.yaml, 128 = used in the Nov-2026 re-encode runs
+    oom_retry_batch_sizes: [8, 4, 2, 1] # tried in order for the models that ran out of memory
+    warmup: 10
+    iters: 50
+
+dataloader:
+    batch_size: 16
+    workers: [1, 8]
+    max_images: 2000
+    proxy: {imagenet-1k: oxford-flowers} # benchmark not available offline -> rate of this one (large JPEGs)
