@@ -90,6 +90,20 @@ class Ctx:
     def repo(self, name: str) -> str:
         return f'{self.cfg.repo_id}/{self.cfg.prefix}{name}'
 
+    def registry(self) -> pl.DataFrame:
+        """Model registry; if the local copy is missing it is downloaded (47 KB) from the registry repo on the Hub."""
+        path = Path(self.cfg.registry)
+        if not path.exists():
+            from huggingface_hub import hf_hub_download
+
+            hf_hub_download(
+                self.repo('model-registry'),
+                path.name,
+                repo_type='dataset',
+                local_dir=path.parent,
+            )
+        return pl.read_parquet(path)
+
     def pq_files(self) -> pl.DataFrame:
         """Embedding parquet files (``<split>/<model>/<shard>``) of the selected datasets, from hub_files."""
         f = pl.read_parquet(self.R + 'hub_files.parquet')
@@ -272,7 +286,7 @@ def step_flops(c: Ctx) -> None:
 
     torch.set_num_threads(c.cfg.flops.threads)
     set_fused_attn(False)  # explicit matmuls so that attention FLOPs are counted
-    reg = pl.read_parquet(c.cfg.registry).select(
+    reg = c.registry().select(
         'model_name', 'family', 'macro_family', 'latent_dim', 'num_parameters'
     )
     rows = reg.rows(named=True)[: c.cfg.flops.limit]
@@ -679,7 +693,7 @@ def step_tables(c: Ctx) -> None:
         pl.col('dataset').is_in(ds_sel)
     )
     fl = pl.read_parquet(R + 'model_flops.parquet')
-    reg = pl.read_parquet(c.cfg.registry).select('model_name', 'latent_dim')
+    reg = c.registry().select('model_name', 'latent_dim')
     out = {}
 
     # ---- rows per (dataset, split) from the footers (shard = file name inside the model folder)
@@ -813,7 +827,9 @@ def step_tables(c: Ctx) -> None:
     out['N_total'] = int(N_d['N'].sum())
     out['top10_share'] = float(cost_model.head(10)['share'].sum())
     inet = cost_ds.filter(pl.col('dataset') == 'imagenet-1k')
-    out['imagenet_share'] = float(inet['flops'][0] / tot) if inet.height else None  # None: ImageNet-1k not selected
+    out['imagenet_share'] = (
+        float(inet['flops'][0] / tot) if inet.height else None
+    )  # None: ImageNet-1k not selected
     out['n_forward_passes'] = int(cd.select(pl.col('N').sum())[0, 0])
 
     # ---- throughput fit (batch 16; when a model needed a smaller batch the largest measured one is used)
@@ -1670,7 +1686,9 @@ def main(cfg: DictConfig) -> None:
     bad = [a for a in wanted if a not in STEPS]
     if bad:
         raise ValueError(f'unknown analyses {bad}; choose among {STEPS}')
-    logging.getLogger('httpx').setLevel(logging.WARNING)  # one INFO line per HTTP range request otherwise
+    logging.getLogger('httpx').setLevel(
+        logging.WARNING
+    )  # one INFO line per HTTP range request otherwise
     c = Ctx(cfg)
     for name in STEPS:  # canonical order, whatever the order in the config
         if name in wanted:
