@@ -707,7 +707,7 @@ _MODEL_REGISTRY_FIELDS: list[tuple[str, list[tuple[str, str]]]] = [
             ),
             (
                 'pretrain_ft',
-                'Subsequent fine-tuning, typically ImageNet-1K, occasionally ImageNet-22K or ImageNet-12K.',
+                'Ordered list of the datasets of the subsequent fine-tuning stages (last = final stage), e.g. [ImageNet-1K] or [ImageNet-22K, ImageNet-1K]; null = no fine-tuning.',
             ),
             ('pretrain_resolution', 'Input resolution at pretraining.'),
             ('pretrain_ft_resolution', 'Input resolution at fine-tuning.'),

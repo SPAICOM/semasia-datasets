@@ -1,0 +1,703 @@
+model_name,pretrain_org,source
+beit3_base_patch16_224.in22k_ft_in1k,Microsoft,BEiT / BEiT-v2 / BEiT-3 papers: Microsoft Research
+beit3_base_patch16_224.indomain_in22k_ft_in1k,Microsoft,BEiT / BEiT-v2 / BEiT-3 papers: Microsoft Research
+beit3_base_patch16_224.indomain_pt,Microsoft,BEiT / BEiT-v2 / BEiT-3 papers: Microsoft Research
+beit3_base_patch16_224.pt,Microsoft,BEiT / BEiT-v2 / BEiT-3 papers: Microsoft Research
+beit3_large_patch16_224.in22k_ft_in1k,Microsoft,BEiT / BEiT-v2 / BEiT-3 papers: Microsoft Research
+beit3_large_patch16_224.indomain_in22k_ft_in1k,Microsoft,BEiT / BEiT-v2 / BEiT-3 papers: Microsoft Research
+beit3_large_patch16_224.indomain_pt,Microsoft,BEiT / BEiT-v2 / BEiT-3 papers: Microsoft Research
+beit3_large_patch16_224.pt,Microsoft,BEiT / BEiT-v2 / BEiT-3 papers: Microsoft Research
+beit_base_patch16_224.in22k_ft_in22k,Microsoft,BEiT / BEiT-v2 / BEiT-3 papers: Microsoft Research
+beit_base_patch16_224.in22k_ft_in22k_in1k,Microsoft,BEiT / BEiT-v2 / BEiT-3 papers: Microsoft Research
+beit_base_patch16_384.in22k_ft_in22k_in1k,Microsoft,BEiT / BEiT-v2 / BEiT-3 papers: Microsoft Research
+beit_large_patch16_224.in22k_ft_in22k,Microsoft,BEiT / BEiT-v2 / BEiT-3 papers: Microsoft Research
+beit_large_patch16_224.in22k_ft_in22k_in1k,Microsoft,BEiT / BEiT-v2 / BEiT-3 papers: Microsoft Research
+beit_large_patch16_384.in22k_ft_in22k_in1k,Microsoft,BEiT / BEiT-v2 / BEiT-3 papers: Microsoft Research
+beit_large_patch16_512.in22k_ft_in22k_in1k,Microsoft,BEiT / BEiT-v2 / BEiT-3 papers: Microsoft Research
+beitv2_base_patch16_224.in1k_ft_in1k,Microsoft,BEiT / BEiT-v2 / BEiT-3 papers: Microsoft Research
+beitv2_base_patch16_224.in1k_ft_in22k,Microsoft,BEiT / BEiT-v2 / BEiT-3 papers: Microsoft Research
+beitv2_base_patch16_224.in1k_ft_in22k_in1k,Microsoft,BEiT / BEiT-v2 / BEiT-3 papers: Microsoft Research
+beitv2_large_patch16_224.in1k_ft_in1k,Microsoft,BEiT / BEiT-v2 / BEiT-3 papers: Microsoft Research
+beitv2_large_patch16_224.in1k_ft_in22k,Microsoft,BEiT / BEiT-v2 / BEiT-3 papers: Microsoft Research
+beitv2_large_patch16_224.in1k_ft_in22k_in1k,Microsoft,BEiT / BEiT-v2 / BEiT-3 papers: Microsoft Research
+coat_lite_medium.in1k,Academic,CoaT paper: UC San Diego
+coat_lite_medium_384.in1k,Academic,CoaT paper: UC San Diego
+coat_lite_mini.in1k,Academic,CoaT paper: UC San Diego
+coat_lite_small.in1k,Academic,CoaT paper: UC San Diego
+coat_lite_tiny.in1k,Academic,CoaT paper: UC San Diego
+coat_mini.in1k,Academic,CoaT paper: UC San Diego
+coat_small.in1k,Academic,CoaT paper: UC San Diego
+coat_tiny.in1k,Academic,CoaT paper: UC San Diego
+convmixer_1024_20_ks9_p14.in1k,Academic,ConvMixer paper: CMU
+convmixer_1536_20.in1k,Academic,ConvMixer paper: CMU
+convmixer_768_32.in1k,Academic,ConvMixer paper: CMU
+convnext_base.clip_laion2b,LAION,card: OpenCLIP / laion weights
+convnext_base.clip_laion2b_augreg,LAION,card: OpenCLIP / laion weights
+convnext_base.clip_laion2b_augreg_ft_in12k,LAION,card: OpenCLIP / laion weights
+convnext_base.clip_laion2b_augreg_ft_in12k_in1k,LAION,card: OpenCLIP / laion weights
+convnext_base.clip_laion2b_augreg_ft_in12k_in1k_384,LAION,card: OpenCLIP / laion weights
+convnext_base.clip_laion2b_augreg_ft_in1k,LAION,card: OpenCLIP / laion weights
+convnext_base.clip_laiona,LAION,card: OpenCLIP / laion weights
+convnext_base.clip_laiona_320,LAION,card: OpenCLIP / laion weights
+convnext_base.clip_laiona_augreg_320,LAION,card: OpenCLIP / laion weights
+convnext_base.clip_laiona_augreg_ft_in1k_384,LAION,card: OpenCLIP / laion weights
+convnext_large_mlp.clip_laion2b_augreg,LAION,card: OpenCLIP / laion weights
+convnext_large_mlp.clip_laion2b_augreg_ft_in12k_384,LAION,card: OpenCLIP / laion weights
+convnext_large_mlp.clip_laion2b_augreg_ft_in1k,LAION,card: OpenCLIP / laion weights
+convnext_large_mlp.clip_laion2b_augreg_ft_in1k_384,LAION,card: OpenCLIP / laion weights
+convnext_large_mlp.clip_laion2b_ft_320,LAION,card: OpenCLIP / laion weights
+convnext_large_mlp.clip_laion2b_ft_soup_320,LAION,card: OpenCLIP / laion weights
+convnext_large_mlp.clip_laion2b_soup_ft_in12k_320,LAION,card: OpenCLIP / laion weights
+convnext_large_mlp.clip_laion2b_soup_ft_in12k_384,LAION,card: OpenCLIP / laion weights
+convnext_large_mlp.clip_laion2b_soup_ft_in12k_in1k_320,LAION,card: OpenCLIP / laion weights
+convnext_large_mlp.clip_laion2b_soup_ft_in12k_in1k_384,LAION,card: OpenCLIP / laion weights
+convnext_nano.in12k,Ross Wightman,card: trained by Ross Wightman
+convnext_nano.in12k_ft_in1k,Ross Wightman,card: trained by Ross Wightman
+convnext_nano.r384_ad_in12k,Ross Wightman,card: trained by Ross Wightman
+convnext_nano.r384_in12k,Ross Wightman,card: trained by Ross Wightman
+convnext_nano.r384_in12k_ft_in1k,Ross Wightman,card: trained by Ross Wightman
+convnext_small.in12k,Ross Wightman,card: trained by Ross Wightman
+convnext_small.in12k_ft_in1k,Ross Wightman,card: trained by Ross Wightman
+convnext_small.in12k_ft_in1k_384,Ross Wightman,card: trained by Ross Wightman
+convnext_tiny.in12k,Ross Wightman,card: trained by Ross Wightman
+convnext_tiny.in12k_ft_in1k,Ross Wightman,card: trained by Ross Wightman
+convnext_tiny.in12k_ft_in1k_384,Ross Wightman,card: trained by Ross Wightman
+convnext_xxlarge.clip_laion2b_rewind,LAION,card: OpenCLIP / laion weights
+convnext_xxlarge.clip_laion2b_soup,LAION,card: OpenCLIP / laion weights
+convnext_xxlarge.clip_laion2b_soup_ft_in12k,LAION,card: OpenCLIP / laion weights
+convnext_xxlarge.clip_laion2b_soup_ft_in1k,LAION,card: OpenCLIP / laion weights
+convnextv2_atto.fcmae,Meta,ConvNeXt-V2 paper: KAIST + Meta FAIR + NYU; weights: Meta (exception to the first-author rule)
+convnextv2_atto.fcmae_ft_in1k,Meta,ConvNeXt-V2 paper: KAIST + Meta FAIR + NYU; weights: Meta (exception to the first-author rule)
+convnextv2_base.fcmae,Meta,ConvNeXt-V2 paper: KAIST + Meta FAIR + NYU; weights: Meta (exception to the first-author rule)
+convnextv2_base.fcmae_ft_in1k,Meta,ConvNeXt-V2 paper: KAIST + Meta FAIR + NYU; weights: Meta (exception to the first-author rule)
+convnextv2_base.fcmae_ft_in22k_in1k,Meta,ConvNeXt-V2 paper: KAIST + Meta FAIR + NYU; weights: Meta (exception to the first-author rule)
+convnextv2_base.fcmae_ft_in22k_in1k_384,Meta,ConvNeXt-V2 paper: KAIST + Meta FAIR + NYU; weights: Meta (exception to the first-author rule)
+convnextv2_femto.fcmae,Meta,ConvNeXt-V2 paper: KAIST + Meta FAIR + NYU; weights: Meta (exception to the first-author rule)
+convnextv2_femto.fcmae_ft_in1k,Meta,ConvNeXt-V2 paper: KAIST + Meta FAIR + NYU; weights: Meta (exception to the first-author rule)
+convnextv2_huge.fcmae,Meta,ConvNeXt-V2 paper: KAIST + Meta FAIR + NYU; weights: Meta (exception to the first-author rule)
+convnextv2_huge.fcmae_ft_in1k,Meta,ConvNeXt-V2 paper: KAIST + Meta FAIR + NYU; weights: Meta (exception to the first-author rule)
+convnextv2_huge.fcmae_ft_in22k_in1k_384,Meta,ConvNeXt-V2 paper: KAIST + Meta FAIR + NYU; weights: Meta (exception to the first-author rule)
+convnextv2_huge.fcmae_ft_in22k_in1k_512,Meta,ConvNeXt-V2 paper: KAIST + Meta FAIR + NYU; weights: Meta (exception to the first-author rule)
+convnextv2_large.fcmae,Meta,ConvNeXt-V2 paper: KAIST + Meta FAIR + NYU; weights: Meta (exception to the first-author rule)
+convnextv2_large.fcmae_ft_in1k,Meta,ConvNeXt-V2 paper: KAIST + Meta FAIR + NYU; weights: Meta (exception to the first-author rule)
+convnextv2_large.fcmae_ft_in22k_in1k,Meta,ConvNeXt-V2 paper: KAIST + Meta FAIR + NYU; weights: Meta (exception to the first-author rule)
+convnextv2_large.fcmae_ft_in22k_in1k_384,Meta,ConvNeXt-V2 paper: KAIST + Meta FAIR + NYU; weights: Meta (exception to the first-author rule)
+convnextv2_nano.fcmae,Meta,ConvNeXt-V2 paper: KAIST + Meta FAIR + NYU; weights: Meta (exception to the first-author rule)
+convnextv2_nano.fcmae_ft_in1k,Meta,ConvNeXt-V2 paper: KAIST + Meta FAIR + NYU; weights: Meta (exception to the first-author rule)
+convnextv2_nano.fcmae_ft_in22k_in1k,Meta,ConvNeXt-V2 paper: KAIST + Meta FAIR + NYU; weights: Meta (exception to the first-author rule)
+convnextv2_nano.fcmae_ft_in22k_in1k_384,Meta,ConvNeXt-V2 paper: KAIST + Meta FAIR + NYU; weights: Meta (exception to the first-author rule)
+convnextv2_pico.fcmae,Meta,ConvNeXt-V2 paper: KAIST + Meta FAIR + NYU; weights: Meta (exception to the first-author rule)
+convnextv2_pico.fcmae_ft_in1k,Meta,ConvNeXt-V2 paper: KAIST + Meta FAIR + NYU; weights: Meta (exception to the first-author rule)
+convnextv2_tiny.fcmae,Meta,ConvNeXt-V2 paper: KAIST + Meta FAIR + NYU; weights: Meta (exception to the first-author rule)
+convnextv2_tiny.fcmae_ft_in1k,Meta,ConvNeXt-V2 paper: KAIST + Meta FAIR + NYU; weights: Meta (exception to the first-author rule)
+convnextv2_tiny.fcmae_ft_in22k_in1k,Meta,ConvNeXt-V2 paper: KAIST + Meta FAIR + NYU; weights: Meta (exception to the first-author rule)
+convnextv2_tiny.fcmae_ft_in22k_in1k_384,Meta,ConvNeXt-V2 paper: KAIST + Meta FAIR + NYU; weights: Meta (exception to the first-author rule)
+crossvit_15_240.in1k,MIT-IBM Watson AI Lab,CrossViT paper
+crossvit_15_dagger_240.in1k,MIT-IBM Watson AI Lab,CrossViT paper
+crossvit_15_dagger_408.in1k,MIT-IBM Watson AI Lab,CrossViT paper
+crossvit_18_240.in1k,MIT-IBM Watson AI Lab,CrossViT paper
+crossvit_18_dagger_240.in1k,MIT-IBM Watson AI Lab,CrossViT paper
+crossvit_18_dagger_408.in1k,MIT-IBM Watson AI Lab,CrossViT paper
+crossvit_9_240.in1k,MIT-IBM Watson AI Lab,CrossViT paper
+crossvit_9_dagger_240.in1k,MIT-IBM Watson AI Lab,CrossViT paper
+crossvit_base_240.in1k,MIT-IBM Watson AI Lab,CrossViT paper
+crossvit_small_240.in1k,MIT-IBM Watson AI Lab,CrossViT paper
+crossvit_tiny_240.in1k,MIT-IBM Watson AI Lab,CrossViT paper
+dla102.in1k,Academic,DLA paper: UC Berkeley
+dla102x.in1k,Academic,DLA paper: UC Berkeley
+dla102x2.in1k,Academic,DLA paper: UC Berkeley
+dla169.in1k,Academic,DLA paper: UC Berkeley
+dla34.in1k,Academic,DLA paper: UC Berkeley
+dla46_c.in1k,Academic,DLA paper: UC Berkeley
+dla46x_c.in1k,Academic,DLA paper: UC Berkeley
+dla60.in1k,Academic,DLA paper: UC Berkeley
+dla60_res2net.in1k,Academic,DLA paper: UC Berkeley
+dla60_res2next.in1k,Academic,DLA paper: UC Berkeley
+dla60x.in1k,Academic,DLA paper: UC Berkeley
+dla60x_c.in1k,Academic,DLA paper: UC Berkeley
+edgenext_base.in21k_ft_in1k,Academic,EdgeNeXt paper: MBZUAI
+edgenext_base.usi_in1k,Academic,EdgeNeXt paper: MBZUAI
+edgenext_small.usi_in1k,Academic,EdgeNeXt paper: MBZUAI
+edgenext_x_small.in1k,Academic,EdgeNeXt paper: MBZUAI
+edgenext_xx_small.in1k,Academic,EdgeNeXt paper: MBZUAI
+efficientnet_b1.ft_in1k,Google,EfficientNet papers: Google (TF weights ported)
+efficientvit_b0.r224_in1k,Academic,EfficientViT paper: MIT
+efficientvit_b1.r224_in1k,Academic,EfficientViT paper: MIT
+efficientvit_b1.r256_in1k,Academic,EfficientViT paper: MIT
+efficientvit_b1.r288_in1k,Academic,EfficientViT paper: MIT
+efficientvit_b2.r224_in1k,Academic,EfficientViT paper: MIT
+efficientvit_b2.r256_in1k,Academic,EfficientViT paper: MIT
+efficientvit_b2.r288_in1k,Academic,EfficientViT paper: MIT
+efficientvit_b3.r224_in1k,Academic,EfficientViT paper: MIT
+efficientvit_b3.r256_in1k,Academic,EfficientViT paper: MIT
+efficientvit_b3.r288_in1k,Academic,EfficientViT paper: MIT
+efficientvit_l1.r224_in1k,Academic,EfficientViT paper: MIT
+efficientvit_l2.r224_in1k,Academic,EfficientViT paper: MIT
+efficientvit_l2.r256_in1k,Academic,EfficientViT paper: MIT
+efficientvit_l2.r288_in1k,Academic,EfficientViT paper: MIT
+efficientvit_l2.r384_in1k,Academic,EfficientViT paper: MIT
+efficientvit_l3.r224_in1k,Academic,EfficientViT paper: MIT
+efficientvit_l3.r256_in1k,Academic,EfficientViT paper: MIT
+efficientvit_l3.r320_in1k,Academic,EfficientViT paper: MIT
+efficientvit_l3.r384_in1k,Academic,EfficientViT paper: MIT
+efficientvit_m0.r224_in1k,Academic,EfficientViT paper: MIT
+efficientvit_m1.r224_in1k,Academic,EfficientViT paper: MIT
+efficientvit_m2.r224_in1k,Academic,EfficientViT paper: MIT
+efficientvit_m3.r224_in1k,Academic,EfficientViT paper: MIT
+efficientvit_m4.r224_in1k,Academic,EfficientViT paper: MIT
+efficientvit_m5.r224_in1k,Academic,EfficientViT paper: MIT
+eva02_base_patch14_224.mim_in22k,BAAI,EVA-02 paper: BAAI
+eva02_base_patch14_448.mim_in22k_ft_in1k,BAAI,EVA-02 paper: BAAI
+eva02_base_patch14_448.mim_in22k_ft_in22k,BAAI,EVA-02 paper: BAAI
+eva02_base_patch14_448.mim_in22k_ft_in22k_in1k,BAAI,EVA-02 paper: BAAI
+eva02_base_patch16_clip_224.merged2b,LAION,card: OpenCLIP / laion weights
+eva02_enormous_patch14_clip_224.laion2b,LAION,card: OpenCLIP / laion weights
+eva02_enormous_patch14_clip_224.laion2b_plus,LAION,card: OpenCLIP / laion weights
+eva02_large_patch14_224.mim_in22k,BAAI,EVA-02 paper: BAAI
+eva02_large_patch14_224.mim_m38m,BAAI,EVA-02 paper: BAAI
+eva02_large_patch14_448.mim_in22k_ft_in1k,BAAI,EVA-02 paper: BAAI
+eva02_large_patch14_448.mim_in22k_ft_in22k,BAAI,EVA-02 paper: BAAI
+eva02_large_patch14_448.mim_in22k_ft_in22k_in1k,BAAI,EVA-02 paper: BAAI
+eva02_large_patch14_448.mim_m38m_ft_in1k,BAAI,EVA-02 paper: BAAI
+eva02_large_patch14_448.mim_m38m_ft_in22k,BAAI,EVA-02 paper: BAAI
+eva02_large_patch14_448.mim_m38m_ft_in22k_in1k,BAAI,EVA-02 paper: BAAI
+eva02_large_patch14_clip_224.merged2b,LAION,card: OpenCLIP / laion weights
+eva02_large_patch14_clip_336.merged2b,LAION,card: OpenCLIP / laion weights
+eva02_small_patch14_224.mim_in22k,BAAI,EVA-02 paper: BAAI
+eva02_small_patch14_336.mim_in22k_ft_in1k,BAAI,EVA-02 paper: BAAI
+eva02_tiny_patch14_224.mim_in22k,BAAI,EVA-02 paper: BAAI
+eva02_tiny_patch14_336.mim_in22k_ft_in1k,BAAI,EVA-02 paper: BAAI
+eva_giant_patch14_224.clip_ft_in1k,BAAI,EVA-02 paper: BAAI
+eva_giant_patch14_336.clip_ft_in1k,BAAI,EVA-02 paper: BAAI
+eva_giant_patch14_336.m30m_ft_in22k_in1k,BAAI,EVA-02 paper: BAAI
+eva_giant_patch14_560.m30m_ft_in22k_in1k,BAAI,EVA-02 paper: BAAI
+eva_giant_patch14_clip_224.laion400m,LAION,card: OpenCLIP / laion weights
+eva_giant_patch14_clip_224.merged2b,LAION,card: OpenCLIP / laion weights
+eva_large_patch14_196.in22k_ft_in1k,BAAI,EVA-02 paper: BAAI
+eva_large_patch14_196.in22k_ft_in22k_in1k,BAAI,EVA-02 paper: BAAI
+eva_large_patch14_336.in22k_ft_in1k,BAAI,EVA-02 paper: BAAI
+eva_large_patch14_336.in22k_ft_in22k_in1k,BAAI,EVA-02 paper: BAAI
+fasternet_l.in1k,Academic,FasterNet paper: HKUST
+fasternet_m.in1k,Academic,FasterNet paper: HKUST
+fasternet_s.in1k,Academic,FasterNet paper: HKUST
+fasternet_t0.in1k,Academic,FasterNet paper: HKUST
+fasternet_t1.in1k,Academic,FasterNet paper: HKUST
+fasternet_t2.in1k,Academic,FasterNet paper: HKUST
+flexivit_base.1000ep_in21k,Google,FlexiViT paper: Google
+flexivit_base.1200ep_in1k,Google,FlexiViT paper: Google
+flexivit_base.300ep_in1k,Google,FlexiViT paper: Google
+flexivit_base.300ep_in21k,Google,FlexiViT paper: Google
+flexivit_base.600ep_in1k,Google,FlexiViT paper: Google
+flexivit_base.patch16_in21k,Google,FlexiViT paper: Google
+flexivit_base.patch30_in21k,Google,FlexiViT paper: Google
+flexivit_large.1200ep_in1k,Google,FlexiViT paper: Google
+flexivit_large.300ep_in1k,Google,FlexiViT paper: Google
+flexivit_large.600ep_in1k,Google,FlexiViT paper: Google
+flexivit_small.1200ep_in1k,Google,FlexiViT paper: Google
+flexivit_small.300ep_in1k,Google,FlexiViT paper: Google
+flexivit_small.600ep_in1k,Google,FlexiViT paper: Google
+gcvit_base.in1k,NVIDIA,GCViT paper: NVIDIA
+gcvit_small.in1k,NVIDIA,GCViT paper: NVIDIA
+gcvit_tiny.in1k,NVIDIA,GCViT paper: NVIDIA
+gcvit_xtiny.in1k,NVIDIA,GCViT paper: NVIDIA
+gcvit_xxtiny.in1k,NVIDIA,GCViT paper: NVIDIA
+gernet_l.idstcv_in1k,Alibaba,GENet paper: Alibaba Group
+gernet_m.idstcv_in1k,Alibaba,GENet paper: Alibaba Group
+gernet_s.idstcv_in1k,Alibaba,GENet paper: Alibaba Group
+ghostnet_100.in1k,Huawei,GhostNet paper: Huawei Noah's Ark Lab
+ghostnetv2_100.in1k,Huawei,GhostNet paper: Huawei Noah's Ark Lab
+ghostnetv2_130.in1k,Huawei,GhostNet paper: Huawei Noah's Ark Lab
+ghostnetv2_160.in1k,Huawei,GhostNet paper: Huawei Noah's Ark Lab
+ghostnetv3_100.in1k,Huawei,GhostNet paper: Huawei Noah's Ark Lab
+hgnet_base.ssld_in1k,Baidu/PaddlePaddle,card: trained by model authors (PaddleClas)
+hgnet_small.ssld_in1k,Baidu/PaddlePaddle,card: trained by model authors (PaddleClas)
+hgnet_tiny.ssld_in1k,Baidu/PaddlePaddle,card: trained by model authors (PaddleClas)
+hgnetv2_b0.ssld_stage1_in22k_in1k,Baidu/PaddlePaddle,card: trained by model authors (PaddleClas)
+hgnetv2_b0.ssld_stage2_ft_in1k,Baidu/PaddlePaddle,card: trained by model authors (PaddleClas)
+hgnetv2_b1.ssld_stage1_in22k_in1k,Baidu/PaddlePaddle,card: trained by model authors (PaddleClas)
+hgnetv2_b1.ssld_stage2_ft_in1k,Baidu/PaddlePaddle,card: trained by model authors (PaddleClas)
+hgnetv2_b2.ssld_stage1_in22k_in1k,Baidu/PaddlePaddle,card: trained by model authors (PaddleClas)
+hgnetv2_b2.ssld_stage2_ft_in1k,Baidu/PaddlePaddle,card: trained by model authors (PaddleClas)
+hgnetv2_b3.ssld_stage1_in22k_in1k,Baidu/PaddlePaddle,card: trained by model authors (PaddleClas)
+hgnetv2_b3.ssld_stage2_ft_in1k,Baidu/PaddlePaddle,card: trained by model authors (PaddleClas)
+hgnetv2_b4.ssld_stage1_in22k_in1k,Baidu/PaddlePaddle,card: trained by model authors (PaddleClas)
+hgnetv2_b4.ssld_stage2_ft_in1k,Baidu/PaddlePaddle,card: trained by model authors (PaddleClas)
+hgnetv2_b5.ssld_stage1_in22k_in1k,Baidu/PaddlePaddle,card: trained by model authors (PaddleClas)
+hgnetv2_b5.ssld_stage2_ft_in1k,Baidu/PaddlePaddle,card: trained by model authors (PaddleClas)
+hgnetv2_b6.ssld_stage1_in22k_in1k,Baidu/PaddlePaddle,card: trained by model authors (PaddleClas)
+hgnetv2_b6.ssld_stage2_ft_in1k,Baidu/PaddlePaddle,card: trained by model authors (PaddleClas)
+hiera_base_224.mae,Meta,Hiera paper: Meta (FAIR)
+hiera_base_224.mae_in1k_ft_in1k,Meta,Hiera paper: Meta (FAIR)
+hiera_base_plus_224.mae,Meta,Hiera paper: Meta (FAIR)
+hiera_base_plus_224.mae_in1k_ft_in1k,Meta,Hiera paper: Meta (FAIR)
+hiera_huge_224.mae,Meta,Hiera paper: Meta (FAIR)
+hiera_huge_224.mae_in1k_ft_in1k,Meta,Hiera paper: Meta (FAIR)
+hiera_large_224.mae,Meta,Hiera paper: Meta (FAIR)
+hiera_large_224.mae_in1k_ft_in1k,Meta,Hiera paper: Meta (FAIR)
+hiera_small_224.mae,Meta,Hiera paper: Meta (FAIR)
+hiera_small_224.mae_in1k_ft_in1k,Meta,Hiera paper: Meta (FAIR)
+hiera_tiny_224.mae,Meta,Hiera paper: Meta (FAIR)
+hiera_tiny_224.mae_in1k_ft_in1k,Meta,Hiera paper: Meta (FAIR)
+mambaout_base.in1k,Academic,MambaOut paper: NUS
+mambaout_femto.in1k,Academic,MambaOut paper: NUS
+mambaout_kobe.in1k,Academic,MambaOut paper: NUS
+mambaout_small.in1k,Academic,MambaOut paper: NUS
+mambaout_tiny.in1k,Academic,MambaOut paper: NUS
+maxvit_base_tf_224.in1k,Google,MaxViT paper: Google Research
+maxvit_base_tf_224.in21k,Google,MaxViT paper: Google Research
+maxvit_base_tf_384.in1k,Google,MaxViT paper: Google Research
+maxvit_base_tf_384.in21k_ft_in1k,Google,MaxViT paper: Google Research
+maxvit_base_tf_512.in1k,Google,MaxViT paper: Google Research
+maxvit_base_tf_512.in21k_ft_in1k,Google,MaxViT paper: Google Research
+maxvit_large_tf_224.in1k,Google,MaxViT paper: Google Research
+maxvit_large_tf_224.in21k,Google,MaxViT paper: Google Research
+maxvit_large_tf_384.in1k,Google,MaxViT paper: Google Research
+maxvit_large_tf_384.in21k_ft_in1k,Google,MaxViT paper: Google Research
+maxvit_large_tf_512.in1k,Google,MaxViT paper: Google Research
+maxvit_large_tf_512.in21k_ft_in1k,Google,MaxViT paper: Google Research
+maxvit_small_tf_224.in1k,Google,MaxViT paper: Google Research
+maxvit_small_tf_384.in1k,Google,MaxViT paper: Google Research
+maxvit_small_tf_512.in1k,Google,MaxViT paper: Google Research
+maxvit_tiny_tf_224.in1k,Google,MaxViT paper: Google Research
+maxvit_tiny_tf_384.in1k,Google,MaxViT paper: Google Research
+maxvit_tiny_tf_512.in1k,Google,MaxViT paper: Google Research
+maxvit_xlarge_tf_224.in21k,Google,MaxViT paper: Google Research
+maxvit_xlarge_tf_384.in21k_ft_in1k,Google,MaxViT paper: Google Research
+maxvit_xlarge_tf_512.in21k_ft_in1k,Google,MaxViT paper: Google Research
+mixnet_l.ft_in1k,Google,MixConv paper: Google Brain
+mixnet_m.ft_in1k,Google,MixConv paper: Google Brain
+mixnet_s.ft_in1k,Google,MixConv paper: Google Brain
+mobilenetv4_conv_aa_large.e230_r384_in12k,Ross Wightman,card: trained by Ross Wightman
+mobilenetv4_conv_aa_large.e230_r384_in12k_ft_in1k,Ross Wightman,card: trained by Ross Wightman
+mobilenetv4_conv_aa_large.e230_r448_in12k_ft_in1k,Ross Wightman,card: trained by Ross Wightman
+mobilenetv4_conv_aa_large.e600_r384_in1k,Ross Wightman,card: trained by Ross Wightman
+mobilenetv4_conv_blur_medium.e500_r224_in1k,Ross Wightman,card: trained by Ross Wightman
+mobilenetv4_conv_large.e500_r256_in1k,Ross Wightman,card: trained by Ross Wightman
+mobilenetv4_conv_large.e600_r384_in1k,Ross Wightman,card: trained by Ross Wightman
+mobilenetv4_conv_medium.e180_ad_r384_in12k,Ross Wightman,card: trained by Ross Wightman
+mobilenetv4_conv_medium.e180_r384_in12k,Ross Wightman,card: trained by Ross Wightman
+mobilenetv4_conv_medium.e250_r384_in12k,Ross Wightman,card: trained by Ross Wightman
+mobilenetv4_conv_medium.e250_r384_in12k_ft_in1k,Ross Wightman,card: trained by Ross Wightman
+mobilenetv4_conv_medium.e500_r224_in1k,Ross Wightman,card: trained by Ross Wightman
+mobilenetv4_conv_medium.e500_r256_in1k,Ross Wightman,card: trained by Ross Wightman
+mobilenetv4_conv_small.e1200_r224_in1k,Ross Wightman,card: trained by Ross Wightman
+mobilenetv4_conv_small.e2400_r224_in1k,Ross Wightman,card: trained by Ross Wightman
+mobilenetv4_conv_small.e3600_r256_in1k,Ross Wightman,card: trained by Ross Wightman
+mobilenetv4_conv_small_050.e3000_r224_in1k,Ross Wightman,card: trained by Ross Wightman
+mobilenetv4_hybrid_large.e600_r384_in1k,Ross Wightman,card: trained by Ross Wightman
+mobilenetv4_hybrid_large.ix_e600_r384_in1k,Ross Wightman,card: trained by Ross Wightman
+mobilenetv4_hybrid_medium.e200_r256_in12k,Ross Wightman,card: trained by Ross Wightman
+mobilenetv4_hybrid_medium.e200_r256_in12k_ft_in1k,Ross Wightman,card: trained by Ross Wightman
+mobilenetv4_hybrid_medium.e500_r224_in1k,Ross Wightman,card: trained by Ross Wightman
+mobilenetv4_hybrid_medium.ix_e550_r256_in1k,Ross Wightman,card: trained by Ross Wightman
+mobilenetv4_hybrid_medium.ix_e550_r384_in1k,Ross Wightman,card: trained by Ross Wightman
+naflexvit_base_patch16_gap.e300_s576_in1k,Ross Wightman,card: trained by Ross Wightman
+naflexvit_base_patch16_par_gap.e300_s576_in1k,Ross Wightman,card: trained by Ross Wightman
+naflexvit_base_patch16_parfac_gap.e300_s576_in1k,Ross Wightman,card: trained by Ross Wightman
+naflexvit_base_patch16_siglip.v2_webli,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+naflexvit_so400m_patch16_siglip.v2_webli,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+pit_b_224.in1k,Naver AI Lab,PiT paper: NAVER AI Lab
+pit_b_distilled_224.in1k,Naver AI Lab,PiT paper: NAVER AI Lab
+pit_s_224.in1k,Naver AI Lab,PiT paper: NAVER AI Lab
+pit_s_distilled_224.in1k,Naver AI Lab,PiT paper: NAVER AI Lab
+pit_ti_224.in1k,Naver AI Lab,PiT paper: NAVER AI Lab
+pit_ti_distilled_224.in1k,Naver AI Lab,PiT paper: NAVER AI Lab
+pit_xs_224.in1k,Naver AI Lab,PiT paper: NAVER AI Lab
+pit_xs_distilled_224.in1k,Naver AI Lab,PiT paper: NAVER AI Lab
+pvt_v2_b0.in1k,Academic,PVT v2 paper: Nanjing University / Shanghai AI Lab
+pvt_v2_b1.in1k,Academic,PVT v2 paper: Nanjing University / Shanghai AI Lab
+pvt_v2_b2.in1k,Academic,PVT v2 paper: Nanjing University / Shanghai AI Lab
+pvt_v2_b2_li.in1k,Academic,PVT v2 paper: Nanjing University / Shanghai AI Lab
+pvt_v2_b3.in1k,Academic,PVT v2 paper: Nanjing University / Shanghai AI Lab
+pvt_v2_b4.in1k,Academic,PVT v2 paper: Nanjing University / Shanghai AI Lab
+pvt_v2_b5.in1k,Academic,PVT v2 paper: Nanjing University / Shanghai AI Lab
+regnety_1280.seer,Meta,SEER paper: Facebook AI Research
+regnety_1280.seer_ft_in1k,Meta,SEER paper: Facebook AI Research
+regnety_160.lion_in12k_ft_in1k,Ross Wightman,card: trained by Ross Wightman
+regnety_2560.seer_ft_in1k,Meta,SEER paper: Facebook AI Research
+regnety_320.seer,Meta,SEER paper: Facebook AI Research
+regnety_320.seer_ft_in1k,Meta,SEER paper: Facebook AI Research
+regnety_640.seer,Meta,SEER paper: Facebook AI Research
+regnety_640.seer_ft_in1k,Meta,SEER paper: Facebook AI Research
+repghostnet_050.in1k,Shopee,RepGhost paper: Shopee
+repghostnet_058.in1k,Shopee,RepGhost paper: Shopee
+repghostnet_080.in1k,Shopee,RepGhost paper: Shopee
+repghostnet_100.in1k,Shopee,RepGhost paper: Shopee
+repghostnet_111.in1k,Shopee,RepGhost paper: Shopee
+repghostnet_130.in1k,Shopee,RepGhost paper: Shopee
+repghostnet_150.in1k,Shopee,RepGhost paper: Shopee
+repghostnet_200.in1k,Shopee,RepGhost paper: Shopee
+repvgg_a0.rvgg_in1k,Academic,RepVGG paper: Tsinghua (first author)
+repvgg_a1.rvgg_in1k,Academic,RepVGG paper: Tsinghua (first author)
+repvgg_a2.rvgg_in1k,Academic,RepVGG paper: Tsinghua (first author)
+repvgg_b0.rvgg_in1k,Academic,RepVGG paper: Tsinghua (first author)
+repvgg_b1.rvgg_in1k,Academic,RepVGG paper: Tsinghua (first author)
+repvgg_b1g4.rvgg_in1k,Academic,RepVGG paper: Tsinghua (first author)
+repvgg_b2.rvgg_in1k,Academic,RepVGG paper: Tsinghua (first author)
+repvgg_b2g4.rvgg_in1k,Academic,RepVGG paper: Tsinghua (first author)
+repvgg_b3.rvgg_in1k,Academic,RepVGG paper: Tsinghua (first author)
+repvgg_b3g4.rvgg_in1k,Academic,RepVGG paper: Tsinghua (first author)
+repvgg_d2se.rvgg_in1k,Academic,RepVGG paper: Tsinghua (first author)
+res2net101_26w_4s.in1k,Academic,Res2Net paper: Nankai University
+res2net101d.in1k,Academic,Res2Net paper: Nankai University
+res2net50_14w_8s.in1k,Academic,Res2Net paper: Nankai University
+res2net50_26w_4s.in1k,Academic,Res2Net paper: Nankai University
+res2net50_26w_6s.in1k,Academic,Res2Net paper: Nankai University
+res2net50_26w_8s.in1k,Academic,Res2Net paper: Nankai University
+res2net50_48w_2s.in1k,Academic,Res2Net paper: Nankai University
+res2net50d.in1k,Academic,Res2Net paper: Nankai University
+res2next50.in1k,Academic,Res2Net paper: Nankai University
+resnest101e.in1k,Amazon,ResNeSt paper: Amazon (most authors)
+resnest200e.in1k,Amazon,ResNeSt paper: Amazon (most authors)
+resnest269e.in1k,Amazon,ResNeSt paper: Amazon (most authors)
+resnest50d.in1k,Amazon,ResNeSt paper: Amazon (most authors)
+resnest50d_1s4x24d.in1k,Amazon,ResNeSt paper: Amazon (most authors)
+resnest50d_4s2x40d.in1k,Amazon,ResNeSt paper: Amazon (most authors)
+resnet10t.c3_in1k,timm C3 recipe,card: timm recipe based on ResNet Strikes Back C recipes
+resnet14t.c3_in1k,timm C3 recipe,card: timm recipe based on ResNet Strikes Back C recipes
+resnet50.am_in1k,timm AM recipe,card: timm AugMix recipe
+samvit_base_patch16.sa1b,Meta,Segment Anything paper: Meta
+samvit_huge_patch16.sa1b,Meta,Segment Anything paper: Meta
+samvit_large_patch16.sa1b,Meta,Segment Anything paper: Meta
+selecsls42b.in1k,Academic,XNect paper: Max Planck Institute for Informatics
+selecsls60.in1k,Academic,XNect paper: Max Planck Institute for Informatics
+selecsls60b.in1k,Academic,XNect paper: Max Planck Institute for Informatics
+sequencer2d_l.in1k,Academic,Sequencer paper: Rikkyo University
+sequencer2d_m.in1k,Academic,Sequencer paper: Rikkyo University
+sequencer2d_s.in1k,Academic,Sequencer paper: Rikkyo University
+shvit_s1.in1k,Academic,SHViT paper: University of Seoul
+shvit_s2.in1k,Academic,SHViT paper: University of Seoul
+shvit_s3.in1k,Academic,SHViT paper: University of Seoul
+shvit_s4.in1k,Academic,SHViT paper: University of Seoul
+starnet_s1.in1k,Academic,StarNet paper: Northeastern University (first author)
+starnet_s2.in1k,Academic,StarNet paper: Northeastern University (first author)
+starnet_s3.in1k,Academic,StarNet paper: Northeastern University (first author)
+starnet_s4.in1k,Academic,StarNet paper: Northeastern University (first author)
+test_byobnet.r160_in1k,Ross Wightman,card: trained by Ross Wightman
+test_convnext.r160_in1k,Ross Wightman,card: trained by Ross Wightman
+test_convnext2.r160_in1k,Ross Wightman,card: trained by Ross Wightman
+test_convnext3.r160_in1k,Ross Wightman,card: trained by Ross Wightman
+test_efficientnet.r160_in1k,Ross Wightman,card: trained by Ross Wightman
+test_efficientnet_evos.r160_in1k,Ross Wightman,card: trained by Ross Wightman
+test_efficientnet_gn.r160_in1k,Ross Wightman,card: trained by Ross Wightman
+test_efficientnet_ln.r160_in1k,Ross Wightman,card: trained by Ross Wightman
+test_nfnet.r160_in1k,Ross Wightman,card: trained by Ross Wightman
+test_resnet.r160_in1k,Ross Wightman,card: trained by Ross Wightman
+test_vit.r160_in1k,Ross Wightman,card: trained by Ross Wightman
+test_vit2.r160_in1k,Ross Wightman,card: trained by Ross Wightman
+test_vit3.r160_in1k,Ross Wightman,card: trained by Ross Wightman
+tf_efficientnet_b0.aa_in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnet_b0.ap_in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnet_b0.in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnet_b0.ns_jft_in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnet_b1.aa_in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnet_b1.ap_in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnet_b1.in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnet_b1.ns_jft_in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnet_b2.aa_in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnet_b2.ap_in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnet_b2.in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnet_b2.ns_jft_in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnet_b3.aa_in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnet_b3.ap_in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnet_b3.in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnet_b3.ns_jft_in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnet_b4.aa_in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnet_b4.ap_in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnet_b4.in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnet_b4.ns_jft_in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnet_b5.aa_in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnet_b5.ap_in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnet_b5.in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnet_b5.ns_jft_in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnet_b6.aa_in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnet_b6.ap_in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnet_b6.ns_jft_in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnet_b7.aa_in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnet_b7.ap_in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnet_b7.ns_jft_in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnet_b8.ap_in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnet_cc_b0_4e.in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnet_cc_b0_8e.in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnet_cc_b1_8e.in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnet_el.in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnet_em.in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnet_es.in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnet_l2.ns_jft_in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnet_l2.ns_jft_in1k_475,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnet_lite0.in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnet_lite1.in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnet_lite2.in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnet_lite3.in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnet_lite4.in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnetv2_b0.in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnetv2_b1.in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnetv2_b2.in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnetv2_b3.in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnetv2_b3.in21k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnetv2_b3.in21k_ft_in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnetv2_l.in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnetv2_l.in21k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnetv2_l.in21k_ft_in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnetv2_m.in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnetv2_m.in21k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnetv2_m.in21k_ft_in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnetv2_s.in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnetv2_s.in21k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnetv2_s.in21k_ft_in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnetv2_xl.in21k,Google,EfficientNet papers: Google (TF weights ported)
+tf_efficientnetv2_xl.in21k_ft_in1k,Google,EfficientNet papers: Google (TF weights ported)
+tf_mixnet_l.in1k,Google,MixConv paper: Google Brain
+tf_mixnet_m.in1k,Google,MixConv paper: Google Brain
+tf_mixnet_s.in1k,Google,MixConv paper: Google Brain
+tf_mobilenetv3_large_075.in1k,Google,MobileNetV3 paper: Google
+tf_mobilenetv3_large_100.in1k,Google,MobileNetV3 paper: Google
+tf_mobilenetv3_large_minimal_100.in1k,Google,MobileNetV3 paper: Google
+tf_mobilenetv3_small_075.in1k,Google,MobileNetV3 paper: Google
+tf_mobilenetv3_small_100.in1k,Google,MobileNetV3 paper: Google
+tf_mobilenetv3_small_minimal_100.in1k,Google,MobileNetV3 paper: Google
+tiny_vit_11m_224.in1k,Microsoft,TinyViT paper: Microsoft Research
+tiny_vit_21m_224.in1k,Microsoft,TinyViT paper: Microsoft Research
+tiny_vit_5m_224.in1k,Microsoft,TinyViT paper: Microsoft Research
+tinynet_a.in1k,Huawei,TinyNet paper: Huawei Noah's Ark Lab
+tinynet_b.in1k,Huawei,TinyNet paper: Huawei Noah's Ark Lab
+tinynet_c.in1k,Huawei,TinyNet paper: Huawei Noah's Ark Lab
+tinynet_d.in1k,Huawei,TinyNet paper: Huawei Noah's Ark Lab
+tinynet_e.in1k,Huawei,TinyNet paper: Huawei Noah's Ark Lab
+tnt_b_patch16_224.in1k,Huawei,TNT paper: Huawei Noah's Ark Lab
+tnt_s_legacy_patch16_224.in1k,Huawei,TNT paper: Huawei Noah's Ark Lab
+tnt_s_patch16_224.in1k,Huawei,TNT paper: Huawei Noah's Ark Lab
+twins_pcpvt_base.in1k,Meituan,Twins paper: Meituan (first author)
+twins_pcpvt_large.in1k,Meituan,Twins paper: Meituan (first author)
+twins_pcpvt_small.in1k,Meituan,Twins paper: Meituan (first author)
+twins_svt_base.in1k,Meituan,Twins paper: Meituan (first author)
+twins_svt_large.in1k,Meituan,Twins paper: Meituan (first author)
+twins_svt_small.in1k,Meituan,Twins paper: Meituan (first author)
+visformer_small.in1k,Academic,Visformer paper: Beihang University
+visformer_tiny.in1k,Academic,Visformer paper: Beihang University
+vit_7b_patch16_dinov3.lvd1689m,Meta,DINOv2 / DINOv3
+vit_7b_patch16_dinov3.sat493m,Meta,DINOv2 / DINOv3
+vit_base_patch14_dinov2.lvd142m,Meta,DINOv2 / DINOv3
+vit_base_patch14_reg4_dinov2.lvd142m,Meta,DINOv2 / DINOv3
+vit_base_patch16_224.augreg2_in21k_ft_in1k,Google,ViT / AugReg papers: Google
+vit_base_patch16_224.augreg_in1k,Google,ViT / AugReg papers: Google
+vit_base_patch16_224.augreg_in21k,Google,ViT / AugReg papers: Google
+vit_base_patch16_224.augreg_in21k_ft_in1k,Google,ViT / AugReg papers: Google
+vit_base_patch16_224.mae,Meta,MAE
+vit_base_patch16_224.orig_in21k,Google,ViT / AugReg papers: Google
+vit_base_patch16_224.orig_in21k_ft_in1k,Google,ViT / AugReg papers: Google
+vit_base_patch16_224.sam_in1k,Google,SAM-optimizer paper: Google Research
+vit_base_patch16_224_miil.in21k,MIIL,card: by Alibaba MIIL (same organisation as the other MIIL checkpoints)
+vit_base_patch16_224_miil.in21k_ft_in1k,MIIL,card: by Alibaba MIIL (same organisation as the other MIIL checkpoints)
+vit_base_patch16_384.augreg_in1k,Google,ViT / AugReg papers: Google
+vit_base_patch16_384.augreg_in21k_ft_in1k,Google,ViT / AugReg papers: Google
+vit_base_patch16_384.orig_in21k_ft_in1k,Google,ViT / AugReg papers: Google
+vit_base_patch16_clip_224.laion2b,LAION,card: OpenCLIP / laion weights
+vit_base_patch16_clip_224.laion2b_ft_in12k,LAION,card: OpenCLIP / laion weights
+vit_base_patch16_clip_224.laion2b_ft_in12k_in1k,LAION,card: OpenCLIP / laion weights
+vit_base_patch16_clip_224.laion2b_ft_in1k,LAION,card: OpenCLIP / laion weights
+vit_base_patch16_clip_224.laion400m_e32,LAION,card: OpenCLIP / laion weights
+vit_base_patch16_clip_224.metaclip_2pt5b,Meta,"MetaCLIP papers: FAIR, Meta"
+vit_base_patch16_clip_224.metaclip_400m,Meta,"MetaCLIP papers: FAIR, Meta"
+vit_base_patch16_clip_384.laion2b_ft_in12k_in1k,LAION,card: OpenCLIP / laion weights
+vit_base_patch16_clip_384.laion2b_ft_in1k,LAION,card: OpenCLIP / laion weights
+vit_base_patch16_clip_quickgelu_224.metaclip_2pt5b,Meta,"MetaCLIP papers: FAIR, Meta"
+vit_base_patch16_clip_quickgelu_224.metaclip_400m,Meta,"MetaCLIP papers: FAIR, Meta"
+vit_base_patch16_dinov3.lvd1689m,Meta,DINOv2 / DINOv3
+vit_base_patch16_dinov3_qkvb.lvd1689m,Meta,DINOv2 / DINOv3
+vit_base_patch16_plus_clip_240.laion400m_e32,LAION,card: OpenCLIP / laion weights
+vit_base_patch16_siglip_224.v2_webli,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_base_patch16_siglip_224.webli,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_base_patch16_siglip_256.v2_webli,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_base_patch16_siglip_256.webli,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_base_patch16_siglip_256.webli_i18n,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_base_patch16_siglip_384.v2_webli,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_base_patch16_siglip_384.webli,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_base_patch16_siglip_512.v2_webli,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_base_patch16_siglip_512.webli,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_base_patch16_siglip_gap_224.v2_webli,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_base_patch16_siglip_gap_224.webli,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_base_patch16_siglip_gap_256.v2_webli,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_base_patch16_siglip_gap_256.webli,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_base_patch16_siglip_gap_256.webli_i18n,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_base_patch16_siglip_gap_384.v2_webli,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_base_patch16_siglip_gap_384.webli,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_base_patch16_siglip_gap_512.v2_webli,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_base_patch16_siglip_gap_512.webli,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_base_patch32_224.augreg_in1k,Google,ViT / AugReg papers: Google
+vit_base_patch32_224.augreg_in21k,Google,ViT / AugReg papers: Google
+vit_base_patch32_224.augreg_in21k_ft_in1k,Google,ViT / AugReg papers: Google
+vit_base_patch32_224.orig_in21k,Google,ViT / AugReg papers: Google
+vit_base_patch32_224.sam_in1k,Google,SAM-optimizer paper: Google Research
+vit_base_patch32_384.augreg_in1k,Google,ViT / AugReg papers: Google
+vit_base_patch32_384.augreg_in21k_ft_in1k,Google,ViT / AugReg papers: Google
+vit_base_patch32_clip_224.laion2b,LAION,card: OpenCLIP / laion weights
+vit_base_patch32_clip_224.laion2b_ft_in12k_in1k,LAION,card: OpenCLIP / laion weights
+vit_base_patch32_clip_224.laion2b_ft_in1k,LAION,card: OpenCLIP / laion weights
+vit_base_patch32_clip_224.laion400m_e32,LAION,card: OpenCLIP / laion weights
+vit_base_patch32_clip_224.metaclip_2pt5b,Meta,"MetaCLIP papers: FAIR, Meta"
+vit_base_patch32_clip_224.metaclip_400m,Meta,"MetaCLIP papers: FAIR, Meta"
+vit_base_patch32_clip_384.laion2b_ft_in12k_in1k,LAION,card: OpenCLIP / laion weights
+vit_base_patch32_clip_448.laion2b_ft_in12k_in1k,LAION,card: OpenCLIP / laion weights
+vit_base_patch32_clip_quickgelu_224.laion400m_e32,LAION,card: OpenCLIP / laion weights
+vit_base_patch32_clip_quickgelu_224.metaclip_2pt5b,Meta,"MetaCLIP papers: FAIR, Meta"
+vit_base_patch32_clip_quickgelu_224.metaclip_400m,Meta,"MetaCLIP papers: FAIR, Meta"
+vit_base_patch32_siglip_256.v2_webli,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_base_patch32_siglip_gap_256.v2_webli,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_base_patch8_224.augreg2_in21k_ft_in1k,Google,ViT / AugReg papers: Google
+vit_base_patch8_224.augreg_in21k,Google,ViT / AugReg papers: Google
+vit_base_patch8_224.augreg_in21k_ft_in1k,Google,ViT / AugReg papers: Google
+vit_base_r50_s16_224.orig_in21k,Google,ViT / AugReg papers: Google
+vit_base_r50_s16_384.orig_in21k_ft_in1k,Google,ViT / AugReg papers: Google
+vit_betwixt_patch32_clip_224.tinyclip_laion400m,Microsoft,TinyCLIP paper: Microsoft
+vit_giant_patch14_clip_224.laion2b,LAION,card: OpenCLIP / laion weights
+vit_giant_patch14_dinov2.lvd142m,Meta,DINOv2 / DINOv3
+vit_giant_patch14_reg4_dinov2.lvd142m,Meta,DINOv2 / DINOv3
+vit_giant_patch16_gap_224.in22k_ijepa,Meta,I-JEPA paper: Meta AI (FAIR)
+vit_giantopt_patch16_siglip_256.v2_webli,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_giantopt_patch16_siglip_384.v2_webli,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_giantopt_patch16_siglip_gap_256.v2_webli,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_giantopt_patch16_siglip_gap_384.v2_webli,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_gigantic_patch14_clip_224.laion2b,LAION,card: OpenCLIP / laion weights
+vit_gigantic_patch14_clip_224.metaclip2_worldwide,Meta,"MetaCLIP papers: FAIR, Meta"
+vit_gigantic_patch14_clip_224.metaclip_2pt5b,Meta,"MetaCLIP papers: FAIR, Meta"
+vit_gigantic_patch14_clip_378.metaclip2_worldwide,Meta,"MetaCLIP papers: FAIR, Meta"
+vit_gigantic_patch14_clip_quickgelu_224.metaclip_2pt5b,Meta,"MetaCLIP papers: FAIR, Meta"
+vit_huge_patch14_224.mae,Meta,MAE
+vit_huge_patch14_224.orig_in21k,Google,ViT / AugReg papers: Google
+vit_huge_patch14_clip_224.laion2b,LAION,card: OpenCLIP / laion weights
+vit_huge_patch14_clip_224.laion2b_ft_in12k,LAION,card: OpenCLIP / laion weights
+vit_huge_patch14_clip_224.laion2b_ft_in12k_in1k,LAION,card: OpenCLIP / laion weights
+vit_huge_patch14_clip_224.laion2b_ft_in1k,LAION,card: OpenCLIP / laion weights
+vit_huge_patch14_clip_224.metaclip2_worldwide,Meta,"MetaCLIP papers: FAIR, Meta"
+vit_huge_patch14_clip_224.metaclip_2pt5b,Meta,"MetaCLIP papers: FAIR, Meta"
+vit_huge_patch14_clip_224.metaclip_altogether,Meta,"MetaCLIP papers: FAIR, Meta"
+vit_huge_patch14_clip_336.laion2b_ft_in12k_in1k,LAION,card: OpenCLIP / laion weights
+vit_huge_patch14_clip_378.metaclip2_worldwide,Meta,"MetaCLIP papers: FAIR, Meta"
+vit_huge_patch14_clip_quickgelu_224.metaclip2_worldwide,LAION,card: OpenCLIP / laion weights
+vit_huge_patch14_clip_quickgelu_224.metaclip_2pt5b,Meta,"MetaCLIP papers: FAIR, Meta"
+vit_huge_patch14_gap_224.in1k_ijepa,Meta,I-JEPA paper: Meta AI (FAIR)
+vit_huge_patch14_gap_224.in22k_ijepa,Meta,I-JEPA paper: Meta AI (FAIR)
+vit_huge_patch16_gap_448.in1k_ijepa,Meta,I-JEPA paper: Meta AI (FAIR)
+vit_huge_plus_patch16_dinov3.lvd1689m,Meta,DINOv2 / DINOv3
+vit_huge_plus_patch16_dinov3_qkvb.lvd1689m,Meta,DINOv2 / DINOv3
+vit_large_patch14_clip_224.laion2b,LAION,card: OpenCLIP / laion weights
+vit_large_patch14_clip_224.laion2b_ft_in12k,LAION,card: OpenCLIP / laion weights
+vit_large_patch14_clip_224.laion2b_ft_in12k_in1k,LAION,card: OpenCLIP / laion weights
+vit_large_patch14_clip_224.laion2b_ft_in1k,LAION,card: OpenCLIP / laion weights
+vit_large_patch14_clip_224.laion400m_e32,LAION,card: OpenCLIP / laion weights
+vit_large_patch14_clip_224.metaclip_2pt5b,Meta,"MetaCLIP papers: FAIR, Meta"
+vit_large_patch14_clip_224.metaclip_400m,Meta,"MetaCLIP papers: FAIR, Meta"
+vit_large_patch14_clip_336.laion2b_ft_in12k_in1k,LAION,card: OpenCLIP / laion weights
+vit_large_patch14_clip_336.laion2b_ft_in1k,LAION,card: OpenCLIP / laion weights
+vit_large_patch14_clip_quickgelu_224.metaclip_2pt5b,Meta,"MetaCLIP papers: FAIR, Meta"
+vit_large_patch14_clip_quickgelu_224.metaclip_400m,Meta,"MetaCLIP papers: FAIR, Meta"
+vit_large_patch14_dinov2.lvd142m,Meta,DINOv2 / DINOv3
+vit_large_patch14_reg4_dinov2.lvd142m,Meta,DINOv2 / DINOv3
+vit_large_patch16_224.augreg_in21k,Google,ViT / AugReg papers: Google
+vit_large_patch16_224.augreg_in21k_ft_in1k,Google,ViT / AugReg papers: Google
+vit_large_patch16_224.mae,Meta,MAE
+vit_large_patch16_224.orig_in21k,Google,ViT / AugReg papers: Google
+vit_large_patch16_384.augreg_in21k_ft_in1k,Google,ViT / AugReg papers: Google
+vit_large_patch16_dinov3.lvd1689m,Meta,DINOv2 / DINOv3
+vit_large_patch16_dinov3.sat493m,Meta,DINOv2 / DINOv3
+vit_large_patch16_dinov3_qkvb.lvd1689m,Meta,DINOv2 / DINOv3
+vit_large_patch16_dinov3_qkvb.sat493m,Meta,DINOv2 / DINOv3
+vit_large_patch16_siglip_256.v2_webli,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_large_patch16_siglip_256.webli,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_large_patch16_siglip_384.v2_webli,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_large_patch16_siglip_384.webli,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_large_patch16_siglip_512.v2_webli,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_large_patch16_siglip_gap_256.v2_webli,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_large_patch16_siglip_gap_256.webli,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_large_patch16_siglip_gap_384.v2_webli,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_large_patch16_siglip_gap_384.webli,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_large_patch16_siglip_gap_512.v2_webli,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_large_patch32_224.orig_in21k,Google,ViT / AugReg papers: Google
+vit_large_patch32_384.orig_in21k_ft_in1k,Google,ViT / AugReg papers: Google
+vit_large_r50_s32_224.augreg_in21k,Google,ViT / AugReg papers: Google
+vit_large_r50_s32_224.augreg_in21k_ft_in1k,Google,ViT / AugReg papers: Google
+vit_large_r50_s32_384.augreg_in21k_ft_in1k,Google,ViT / AugReg papers: Google
+vit_medium_patch16_clip_224.tinyclip_yfcc15m,Microsoft,TinyCLIP paper: Microsoft
+vit_medium_patch32_clip_224.tinyclip_laion400m,Microsoft,TinyCLIP paper: Microsoft
+vit_small_patch14_dinov2.lvd142m,Meta,DINOv2 / DINOv3
+vit_small_patch14_reg4_dinov2.lvd142m,Meta,DINOv2 / DINOv3
+vit_small_patch16_224.augreg_in1k,Google,ViT / AugReg papers: Google
+vit_small_patch16_224.augreg_in21k,Google,ViT / AugReg papers: Google
+vit_small_patch16_224.augreg_in21k_ft_in1k,Google,ViT / AugReg papers: Google
+vit_small_patch16_384.augreg_in1k,Google,ViT / AugReg papers: Google
+vit_small_patch16_384.augreg_in21k_ft_in1k,Google,ViT / AugReg papers: Google
+vit_small_patch16_dinov3.lvd1689m,Meta,DINOv2 / DINOv3
+vit_small_patch16_dinov3_qkvb.lvd1689m,Meta,DINOv2 / DINOv3
+vit_small_patch32_224.augreg_in21k,Google,ViT / AugReg papers: Google
+vit_small_patch32_224.augreg_in21k_ft_in1k,Google,ViT / AugReg papers: Google
+vit_small_patch32_384.augreg_in21k_ft_in1k,Google,ViT / AugReg papers: Google
+vit_small_plus_patch16_dinov3.lvd1689m,Meta,DINOv2 / DINOv3
+vit_small_plus_patch16_dinov3_qkvb.lvd1689m,Meta,DINOv2 / DINOv3
+vit_small_r26_s32_224.augreg_in21k,Google,ViT / AugReg papers: Google
+vit_small_r26_s32_224.augreg_in21k_ft_in1k,Google,ViT / AugReg papers: Google
+vit_small_r26_s32_384.augreg_in21k_ft_in1k,Google,ViT / AugReg papers: Google
+vit_so400m_patch14_siglip_224.v2_webli,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_so400m_patch14_siglip_224.webli,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_so400m_patch14_siglip_378.v2_webli,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_so400m_patch14_siglip_378.webli,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_so400m_patch14_siglip_378.webli_ft_in1k,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_so400m_patch14_siglip_384.webli,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_so400m_patch14_siglip_gap_224.pali2_10b_pt,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_so400m_patch14_siglip_gap_224.pali2_3b_pt,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_so400m_patch14_siglip_gap_224.pali_mix,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_so400m_patch14_siglip_gap_224.pali_pt,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_so400m_patch14_siglip_gap_224.v2_webli,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_so400m_patch14_siglip_gap_224.webli,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_so400m_patch14_siglip_gap_378.v2_webli,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_so400m_patch14_siglip_gap_378.webli,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_so400m_patch14_siglip_gap_378.webli_ft_in1k,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_so400m_patch14_siglip_gap_384.webli,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_so400m_patch14_siglip_gap_448.pali2_10b_pt,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_so400m_patch14_siglip_gap_448.pali2_3b_pt,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_so400m_patch14_siglip_gap_448.pali_mix,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_so400m_patch14_siglip_gap_448.pali_ocrvqa,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_so400m_patch14_siglip_gap_448.pali_pt,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_so400m_patch14_siglip_gap_448.pali_refcoco_seg,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_so400m_patch14_siglip_gap_896.pali2_10b_pt,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_so400m_patch14_siglip_gap_896.pali2_3b_pt,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_so400m_patch14_siglip_gap_896.pali_ocrvqa,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_so400m_patch14_siglip_gap_896.pali_pt,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_so400m_patch14_siglip_gap_896.pali_refcoco_seg,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_so400m_patch16_siglip_256.v2_webli,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_so400m_patch16_siglip_256.webli_i18n,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_so400m_patch16_siglip_384.v2_webli,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_so400m_patch16_siglip_512.v2_webli,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_so400m_patch16_siglip_gap_256.v2_webli,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_so400m_patch16_siglip_gap_256.webli_i18n,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_so400m_patch16_siglip_gap_384.v2_webli,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_so400m_patch16_siglip_gap_512.v2_webli,Google,"SigLIP / PaliGemma cards (google/ repos, SigLIP papers: Google DeepMind)"
+vit_tiny_patch16_224.augreg_in21k,Google,ViT / AugReg papers: Google
+vit_tiny_patch16_224.augreg_in21k_ft_in1k,Google,ViT / AugReg papers: Google
+vit_tiny_patch16_384.augreg_in21k_ft_in1k,Google,ViT / AugReg papers: Google
+vit_tiny_r_s16_p8_224.augreg_in21k,Google,ViT / AugReg papers: Google
+vit_tiny_r_s16_p8_224.augreg_in21k_ft_in1k,Google,ViT / AugReg papers: Google
+vit_tiny_r_s16_p8_384.augreg_in21k_ft_in1k,Google,ViT / AugReg papers: Google
+vit_xsmall_patch16_clip_224.tinyclip_yfcc15m,Microsoft,TinyCLIP paper: Microsoft
+mobilenetv5_300m.gemma3n,Google,card: weights for the Gemma 3n series (google collection)
+efficientnet_b1_pruned.in1k,Alibaba,"timm docstring: pruning obtained with Knapsack Pruning with Inner Distillation (arXiv 2002.08258, Alibaba Damo Academy)"
+efficientnet_b2_pruned.in1k,Alibaba,"timm docstring: pruning obtained with Knapsack Pruning with Inner Distillation (arXiv 2002.08258, Alibaba Damo Academy)"
+efficientnet_b3_pruned.in1k,Alibaba,"timm docstring: pruning obtained with Knapsack Pruning with Inner Distillation (arXiv 2002.08258, Alibaba Damo Academy)"
+efficientnet_el_pruned.in1k,DeGirum,timm docstring: github.com/DeGirum/pruned-models
+efficientnet_es_pruned.in1k,DeGirum,timm docstring: github.com/DeGirum/pruned-models
+resnet101_clip.yfcc15m,OpenCLIP (mlfoundations),card: open_clip weights; trained with the mlfoundations/open_clip repository
+resnet101_clip_gap.yfcc15m,OpenCLIP (mlfoundations),card: open_clip weights; trained with the mlfoundations/open_clip repository
+resnet50_clip.cc12m,OpenCLIP (mlfoundations),card: open_clip weights; trained with the mlfoundations/open_clip repository
+resnet50_clip.yfcc15m,OpenCLIP (mlfoundations),card: open_clip weights; trained with the mlfoundations/open_clip repository
+resnet50_clip_gap.cc12m,OpenCLIP (mlfoundations),card: open_clip weights; trained with the mlfoundations/open_clip repository
+resnet50_clip_gap.yfcc15m,OpenCLIP (mlfoundations),card: open_clip weights; trained with the mlfoundations/open_clip repository
+legacy_senet154.in1k,Academic,"SENet paper: Jie Hu (Institute of Software, Chinese Academy of Sciences; also Momenta); weights converted from the original SENet via Cadene"
+legacy_seresnet101.in1k,Academic,"SENet paper: Jie Hu (Institute of Software, Chinese Academy of Sciences; also Momenta); weights converted from the original SENet via Cadene"
+legacy_seresnet152.in1k,Academic,"SENet paper: Jie Hu (Institute of Software, Chinese Academy of Sciences; also Momenta); weights converted from the original SENet via Cadene"
+legacy_seresnet18.in1k,Academic,"SENet paper: Jie Hu (Institute of Software, Chinese Academy of Sciences; also Momenta); weights converted from the original SENet via Cadene"
+legacy_seresnet34.in1k,Academic,"SENet paper: Jie Hu (Institute of Software, Chinese Academy of Sciences; also Momenta); weights converted from the original SENet via Cadene"
+legacy_seresnet50.in1k,Academic,"SENet paper: Jie Hu (Institute of Software, Chinese Academy of Sciences; also Momenta); weights converted from the original SENet via Cadene"
+legacy_seresnext101_32x4d.in1k,Academic,"SENet paper: Jie Hu (Institute of Software, Chinese Academy of Sciences; also Momenta); weights converted from the original SENet via Cadene"
+legacy_seresnext26_32x4d.in1k,Academic,"SENet paper: Jie Hu (Institute of Software, Chinese Academy of Sciences; also Momenta); weights converted from the original SENet via Cadene"
+legacy_seresnext50_32x4d.in1k,Academic,"SENet paper: Jie Hu (Institute of Software, Chinese Academy of Sciences; also Momenta); weights converted from the original SENet via Cadene"
+csatv2.r512_in1k,Academic,"card: paper in MDPI Bioengineering 2023 (10(11):1279) by individual authors; weights uploaded by user Hyunil; no organisation named (set to Academic by the user)"

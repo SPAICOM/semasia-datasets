@@ -318,17 +318,17 @@ pretrain_org : str | None
     Parsed by matching tokens against a priority-ordered lookup (longest
     keys first to prevent "ra" shadowing "ra4").
     Organisations: "Meta" (fb), "Apple", "OpenAI", "Microsoft" (ms/msft),
-      "Google" / "Google/TF" (goog/tf), "NVIDIA" (nv), "Baidu" (bd),
-      "DeepMind" (dm), "Naver", "SAIL", "MIIL", "Snap", "CVNets/Apple".
+      "Google" (goog/tf), "NVIDIA" (nv), "ByteDance" (bd; Next-ViT),
+      "DeepMind" (dm), "Naver AI Lab" (naver/nav), "SAIL", "MIIL", "Snap", "Apple" (apple/cvnets).
     Community / recipe authors: "Ross Wightman" (sw), "Chris Ha" (ch),
       "pycls" (Facebook Research pycls team), "MXNet community" (mx),
-      "NaverAI" (nav), "Baidu/PaddlePaddle" (paddle).
+      "Baidu/PaddlePaddle" (paddle).
     timm training recipes: "timm A1H recipe" (a1h), "timm A1 recipe" (a1),
       "timm A2/A3 recipe", "timm RA / RA2 / RA3 / RA4 recipe",
       "timm SBB / SBB-v2 recipe", "timm C1 / C2 / C2-NS recipe",
       "timm AH / D recipe", "timm B1K / B2K recipe",
-      "Bag-of-Tricks recipe" (bt), "torchvision / torchvision-v2" (tv/tv2),
-      "AGC recipe", "LAMB recipe", "RMSProp recipe".
+      "timm Bag-of-Tricks recipe" (bt), "torchvision / torchvision-v2" (tv/tv2),
+      "timm AGC recipe", "timm LAMB recipe", "timm RMSProp recipe".
     None when no matching token is found.
 
 pretrain_dataset : str | None
@@ -406,8 +406,11 @@ pretrain_method : str | None
     None for standard supervised training on ImageNet (the default, not
     explicitly encoded in the config).
 
-pretrain_ft : str | None
-    Dataset used for supervised fine-tuning after pretraining.
+pretrain_ft : list[str] | None
+    ORDERED list of the datasets of the fine-tuning stages after pretraining (one element per stage,
+    in order; the last one is the final stage), e.g. ["ImageNet-1K"] or ["ImageNet-22K", "ImageNet-1K"]
+    for ``in1k_ft_in22k_in1k``. None = no fine-tuning. Test membership with ``'ImageNet-1K' in pretrain_ft``.
+    Each stage is a dataset token after ``_ft_``.
     Detected by searching for a ``_ft_`` marker in the config and
     identifying the dataset token that follows it. Also catches implicit
     two-stage patterns like ``in22k_in1k`` (pretrain on IN-22K, evaluate
@@ -1318,24 +1321,24 @@ _ORG_MAP: dict[str, str] = {
     'msft': 'Microsoft',
     'ms': 'Microsoft',
     'goog': 'Google',
-    'tf': 'Google/TF',
-    'naver': 'Naver',
+    'tf': 'Google',
+    'naver': 'Naver AI Lab',
     'paddle': 'Baidu/PaddlePaddle',
     'sail': 'SAIL',
     'miil': 'MIIL',
     'snap': 'Snap',
     'nv': 'NVIDIA',
-    'bd': 'Baidu',
+    'bd': 'ByteDance',
     'fb': 'Meta',
     'ch': 'Chris Ha',
     'dm': 'DeepMind',
     'mx': 'MXNet community',
     'gluon': 'GluonCV/MXNet',  # Apache MXNet GluonCV authors
-    'nav': 'NaverAI',
+    'nav': 'Naver AI Lab',
     'pycls': 'pycls',
-    'cvnets': 'CVNets/Apple',
-    'rmsp': 'RMSProp recipe',
-    'lamb': 'LAMB recipe',
+    'cvnets': 'Apple',
+    'rmsp': 'timm RMSProp recipe',
+    'lamb': 'timm LAMB recipe',
     'sbb2': 'timm SBB-v2 recipe',
     'sbb': 'timm SBB recipe',
     'ra4': 'timm RA4 recipe',
@@ -1348,7 +1351,7 @@ _ORG_MAP: dict[str, str] = {
     'a3': 'timm A3 recipe',
     'b1k': 'timm B1K recipe',
     'b2k': 'timm B2K recipe',
-    'bt': 'Bag-of-Tricks recipe',
+    'bt': 'timm Bag-of-Tricks recipe',
     'tv2': 'torchvision-v2',
     'tv': 'torchvision',
     'sw': 'Ross Wightman',
@@ -1356,8 +1359,36 @@ _ORG_MAP: dict[str, str] = {
     'c2': 'timm C2 recipe',
     'c1': 'timm C1 recipe',
     'ah': 'timm AH recipe',
-    'agc': 'AGC recipe',
+    'agc': 'timm AGC recipe',
     'd': 'timm D recipe',
+    # tags of the same timm recipes that carry a suffix (checked on the model cards of
+    # timm/resnet50.ram_in1k, timm/convnext_tiny_hnf.a2h_in1k, timm/convnext_femto.d1_in1k).
+    # `racm` is the same RA family; its model card was not checked.
+    'ram': 'timm RA recipe',
+    'racm': 'timm RA recipe',
+    'a2h': 'timm A2 recipe',
+    'd1': 'timm D recipe',
+    'd1h': 'timm D recipe',
+    'd2': 'timm D recipe',
+    # Weights whose tag names the method or dataset, not the organisation. Organisation read on the model cards /
+    # pretrained cfg (origin_url, hf_hub_id) of the timm weights:
+    'dino': 'Meta',  # github.com/facebookresearch/dino
+    'dinov3': 'Meta',  # github.com/facebookresearch/dinov3
+    'deit': 'Meta',  # regnety_160.deit_in1k: "by DeiT authors", github.com/facebookresearch/deit
+    'swag': 'Meta',  # github.com/facebookresearch/SWAG
+    'dfn2b': 'Apple',  # apple/DFN2B-CLIP-*, also the dfn2b_s39b variant
+    'dfn5b': 'Apple',  # apple/DFN5B-CLIP-ViT-H-14
+    'docci': 'Google',  # google/paligemma2-*-ft-docci-448-jax
+    'datacompxl': 'LAION',  # laion/CLIP-ViT-*-DataComp.XL-s13B-b90K (DataComp is the dataset)
+    'datacomp1b': 'ViTamin (JHU/ByteDance)',  # jienengchen/ViTamin-*, trained on DataComp-1B
+    'ogvl': 'OpenGVLab',  # github.com/OpenGVLab/InternVL
+}
+
+# "dist" is the method (distillation), not an organisation: the weights come from the authors of the architecture.
+_ORG_BY_ARCH_FOR_DIST: dict[str, str] = {
+    'repvit': 'RepViT (THU-MIG)',  # github.com/THU-MIG/RepViT
+    'tiny_vit': 'Microsoft',  # github.com/microsoft/Cream/tree/main/TinyViT
+    'swiftformer': 'SwiftFormer authors',  # github.com/Amshaker/SwiftFormer
 }
 _ORG_KEYS = sorted(_ORG_MAP, key=len, reverse=True)
 
@@ -1432,6 +1463,43 @@ _VALID_PRETRAIN_RES = frozenset(
 )
 
 
+# Pretraining dataset of configs whose tag does not name it, taken from the model cards / papers
+# (applied only when the tag gives no dataset; the fine-tuning target still comes from the tag).
+_DATASET_BY_CONFIG: dict[str, str] = {
+    'mae': 'ImageNet-1K',  # timm cards (Hiera, ViT MAE): Pretrain Dataset ImageNet-1k
+    'fcmae': 'ImageNet-1K',  # ConvNeXt-V2 card
+    'fcmae_ft_in1k': 'ImageNet-1K',  # FCMAE on IN-1K, then fine-tuned on IN-1K
+    'dino': 'ImageNet-1K',  # DINO ViT card
+    'fb_dino': 'ImageNet-1K',  # ResMLP DINO card
+    'ssld_stage2_ft_in1k': 'ImageNet-22K',  # HGNetV2 card: SSLD distillation on mined IN-22k + IN-1k
+    'clip_ft_in1k': 'LAION-400M',  # EVA-CLIP card
+    'apple_pt': 'DFN-2B + COYO + HQITP',  # AIMv2 paper, Table 2 (HQITP is private)
+    'apple_pt_dist': 'DFN-2B + COYO + HQITP',
+    'msft_florence2': 'FLD-5B',  # Florence-2 card
+    'apple_mclip': 'DataCompDR-1B',  # MobileCLIP paper / README: DataComp-1B with reinforced captions and teacher embeddings
+    'apple_mclip_lt': 'DataCompDR-1B',  # "(LT)": same data, longer schedule
+    'pt': 'BEiT-3 mixture',  # BEiT-3 card: ImageNet-22k + web image-text pairs + text documents
+    'indomain_pt': 'BEiT-3 mixture',  # + continued training on COCO / Visual Genome
+    'fb': 'MetaCLIP-curated 5.4B',  # Perception Encoder paper: 5.4B alt-text pairs curated with MetaCLIP
+    'fb_tiling': 'MetaCLIP-curated 5.4B',
+    'gemma3n': 'Undocumented',  # MobileNetV5 (Gemma 3n encoder): the card names no data
+}
+
+
+def _ft_stages(cfg: str) -> list[str]:
+    """Datasets of the consecutive tokens after ``_ft_`` in a lower-case config, in order."""
+    i = cfg.find('_ft_')
+    if i == -1:
+        return []
+    out: list[str] = []
+    for tok in cfg[i + 4 :].split('_'):
+        if tok in _DATASET_MAP:
+            out.append(_DATASET_MAP[tok])
+        elif out:
+            break
+    return out
+
+
 def _parse_pretrain_config(pretrain_config: str) -> dict:
     cfg = pretrain_config.lower()
     tokens = re.split(r'[_]', cfg)
@@ -1450,9 +1518,14 @@ def _parse_pretrain_config(pretrain_config: str) -> dict:
             org = _ORG_MAP[key]
             break
     if org is None:
+        # Variant of a recipe tag: the key followed by a number and/or an 'h' ("a1h", "a2h", "d1h").
+        # A plain prefix test is wrong: "d" would match "dist", "dino", "dfn2b", "datacomp1b", ...
+        # and "sw" would match "swag", assigning those weights to a timm recipe or to Ross Wightman.
         for tok in tokens:
             for key in _ORG_KEYS:
-                if tok.startswith(key) and len(tok) > len(key):
+                if _ORG_MAP[key].startswith('timm ') and re.fullmatch(
+                    re.escape(key) + r'\d*h?', tok
+                ):
                     org = _ORG_MAP[key]
                     break
             if org:
@@ -1498,13 +1571,18 @@ def _parse_pretrain_config(pretrain_config: str) -> dict:
     if dataset is None and re.match(r'fb_r\d+', cfg):
         dataset = 'SA-1B'
 
+    if dataset is None:
+        dataset = _DATASET_BY_CONFIG.get(cfg)
+
     # Fallback: FCMAE/MAE/MIM configs where the pretrain dataset is implicit.
     # Only applies when ft_target is an *intermediate* dataset (not the final IN-1K),
     # i.e. the pattern is "method_ft_in22k_in1k" meaning pretrain→ft-22k→ft-1k.
     # When ft_target IS IN-1K already (e.g. fcmae_ft_in1k), there's no implicit
     # pretrain dataset we can infer reliably, so we leave dataset=None.
     if dataset is None and ft_target is not None and ft_target != 'ImageNet-1K':
-        dataset = ft_target
+        # the recipe may name its pretraining data (e.g. fcmae -> ImageNet-1K); the intermediate
+        # fine-tuning stage is kept in the ``pretrain_ft`` chain
+        dataset = _DATASET_BY_CONFIG.get(pre_ft_cfg) or ft_target
         ft_target = 'ImageNet-1K'  # the real ft target is always IN-1K in these cases
 
     # --- dataset size qualifier ---
@@ -1564,13 +1642,18 @@ def _parse_pretrain_config(pretrain_config: str) -> dict:
     # --- i18n / multilingual flag (WebLI-i18n) ---
     pretrain_i18n = 'i18n' in tokens
 
+    # fine-tuning chain: every dataset named after '_ft_' (two stages for in1k_ft_in22k_in1k, ...);
+    # otherwise the single target found above
+    stages = _ft_stages(cfg)
+    ft_list: list[str] | None = stages if len(stages) >= 2 else ([ft_target] if ft_target else None)
+
     return {
         'pretrain_config': pretrain_config,
         'pretrain_org': org,
         'pretrain_dataset': dataset,
         'pretrain_dataset_size': ds_size,
         'pretrain_method': method,
-        'pretrain_ft': ft_target,
+        'pretrain_ft': ft_list,
         'pretrain_resolution': pretrain_resolution,
         'pretrain_ft_resolution': pretrain_ft_resolution,
         'pretrain_epochs': pretrain_epochs,
@@ -1583,6 +1666,17 @@ def _parse_pretrain_config(pretrain_config: str) -> dict:
 # ===========================================================================
 # TIMM FIELDS
 # ===========================================================================
+
+
+def _org_for_model(model_variant: str, pretrain_config: str) -> str | None:
+    """Organisation of a weight: from the tag (``_parse_pretrain_config``), or, for the ``dist`` tag,
+    from the architecture."""
+    org = _parse_pretrain_config(pretrain_config)['pretrain_org']
+    if org is None and 'dist' in pretrain_config.lower().split('_'):
+        for prefix, name in _ORG_BY_ARCH_FOR_DIST.items():
+            if model_variant.startswith(prefix):
+                return name
+    return org
 
 
 def _positive_int(value) -> int | None:
@@ -1851,6 +1945,78 @@ def infer_paradigm(
     return _PARADIGM_OF_TASK[tasks[0]] if tasks else 'unknown'
 
 
+def _load_org_overrides() -> dict[str, str]:
+    """``model_name -> pretrain_org`` for models whose config tag names no organisation.
+
+    Read from ``pretrain_org_overrides.csv`` (next to this file); every row carries the source it was
+    taken from (model card or paper). It is used only where the tag-based parser finds no organisation.
+    """
+    import csv
+    from pathlib import Path
+
+    with open(Path(__file__).with_name('pretrain_org_overrides.csv'), newline='', encoding='utf-8') as f:
+        return {r['model_name']: r['pretrain_org'] for r in csv.DictReader(f)}
+
+
+def refresh_pretrain_org(df):
+    """
+    Return the registry with ``pretrain_org`` recomputed from ``model_name`` and ``pretrain_config``
+    (and, where the tag names no organisation, from ``pretrain_org_overrides.csv``).
+
+    Used by ``scripts/push_model_registry.py`` so that models already stored in the local
+    Parquet pick up a corrected ``_ORG_MAP`` / ``_parse_pretrain_config`` without being
+    re-extracted with timm. Only ``pretrain_org`` is touched (the other parsed columns are
+    post-processed in ``get_model_metadata`` and are not recomputed here).
+    """
+    import polars as pl
+
+    overrides = _load_org_overrides()
+    orgs = [
+        (_org_for_model(m.split('.', 1)[0], c) if c else None) or overrides.get(m)
+        for m, c in zip(df['model_name'].to_list(), df['pretrain_config'].to_list())
+    ]
+    return df.with_columns(pl.Series('pretrain_org', orgs, dtype=pl.String))
+
+
+def refresh_pretrain_dataset(df):
+    """
+    Return the registry with the missing ``pretrain_dataset`` filled from ``_DATASET_BY_CONFIG``
+    (values already present are never changed), so that models stored in the local Parquet pick it up
+    without being re-extracted with timm.
+    """
+    import polars as pl
+
+    filled = [
+        d if d is not None else _DATASET_BY_CONFIG.get(c.lower() if c else '')
+        for d, c in zip(df['pretrain_dataset'].to_list(), df['pretrain_config'].to_list())
+    ]
+    return df.with_columns(pl.Series('pretrain_dataset', filled, dtype=pl.String))
+
+
+def refresh_pretrain_ft(df):
+    """
+    Return the registry with ``pretrain_ft`` as an ordered list of fine-tuning datasets, recomputed from
+    ``pretrain_config`` (a String column of the previous schema is accepted and replaced).
+    ``pretrain_dataset`` is recomputed only for models whose tag has two or more fine-tuning stages
+    (the old parser moved the pretraining dataset of ``fcmae_ft_in22k_in1k`` to the intermediate stage);
+    all other columns are untouched.
+    """
+    import polars as pl
+
+    ft, ds = [], []
+    for c, d, f_old in zip(
+        df['pretrain_config'].to_list(), df['pretrain_dataset'].to_list(), df['pretrain_ft'].to_list()
+    ):
+        parsed = _parse_pretrain_config(c) if c else None
+        chain = parsed['pretrain_ft'] if parsed else None
+        ft.append(chain)
+        ds.append(parsed['pretrain_dataset'] if chain and len(chain) >= 2 else d)
+    return df.with_columns(
+        pl.Series('pretrain_ft', ft, dtype=pl.List(pl.String)),
+        pl.Series('pretrain_dataset', ds, dtype=pl.String),
+    )
+
+
 def add_derived_columns(df):
     """
     Return a Polars DataFrame of the registry with ``pretrain_tasks`` and
@@ -1909,6 +2075,7 @@ def get_model_metadata(model_name: str, use_timm: bool = True) -> dict:
 
     variant_fields = _parse_variant(model_variant)
     pretrain_fields = _parse_pretrain_config(pretrain_config)
+    pretrain_fields['pretrain_org'] = _org_for_model(model_variant, pretrain_config) or _load_org_overrides().get(model_name)
 
     # Cross-field inference:
     # 0. Config-side distillation token — CaiT, RepViT, SwiftFormer encode

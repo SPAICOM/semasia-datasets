@@ -31,8 +31,14 @@ from huggingface_hub import HfApi
 from huggingface_hub.utils import get_token
 from tqdm.auto import tqdm
 
-from src.utils.huggingface import generate_model_registry_readme, push_folder_to_hub
-from src.utils.timm_metadata import add_derived_columns, get_model_metadata
+from src.utils.huggingface import generate_model_registry_readme
+from src.utils.timm_metadata import (
+    add_derived_columns,
+    get_model_metadata,
+    refresh_pretrain_dataset,
+    refresh_pretrain_ft,
+    refresh_pretrain_org,
+)
 
 BATCH_SIZE = 100
 
@@ -70,7 +76,7 @@ METADATA_SCHEMA: dict[str, pl.DataType] = {
     'pretrain_dataset': pl.String,
     'pretrain_dataset_size': pl.String,
     'pretrain_method': pl.String,
-    'pretrain_ft': pl.String,
+    'pretrain_ft': pl.List(pl.String),  # ordered fine-tuning chain, None = no fine-tuning
     'pretrain_resolution': pl.Int64,
     'pretrain_ft_resolution': pl.Int64,
     'pretrain_epochs': pl.Int64,
@@ -196,6 +202,18 @@ def main() -> None:
         else:
             df = pl.DataFrame(schema=METADATA_SCHEMA)
 
+    # pretrain_org is recomputed from pretrain_config for every model, also for those already
+    # stored in the local parquet, so that a fix of the organisation parser needs no re-extraction.
+    old_org = df['pretrain_org']
+    df = refresh_pretrain_org(df)
+    n_ds = df['pretrain_dataset'].null_count()
+    df = refresh_pretrain_dataset(df)
+    # pretrain_ft as an ordered list of fine-tuning datasets, recomputed from pretrain_config for every model
+    df = refresh_pretrain_ft(df)
+    print(f'pretrain_dataset filled for {n_ds - df["pretrain_dataset"].null_count()} models')
+    n_changed = int((df['pretrain_org'].fill_null('') != old_org.fill_null('')).sum())
+    print(f'pretrain_org changed for {n_changed} models')
+
     # Derived columns (pretrain_tasks, paradigm) are recomputed for every model,
     # also for those already stored in the local parquet.
     df = add_derived_columns(df)
@@ -211,11 +229,12 @@ def main() -> None:
     api = HfApi(token=get_token())
     api.create_repo(repo_id=repo_id, repo_type='dataset', exist_ok=True)
 
-    push_folder_to_hub(
-        local_folder=local_path,
-        path_in_repo='/',
+    # Only the registry parquet is uploaded (not the whole folder: no backups, temp batches or other copies).
+    api.upload_file(
         repo_id=repo_id,
-        private=False,
+        repo_type='dataset',
+        path_or_fileobj=str(parquet_path),
+        path_in_repo=parquet_path.name,
         commit_message='Add/update model metadata registry',
     )
 
