@@ -42,6 +42,18 @@ from src.utils.timm_metadata import (
 
 BATCH_SIZE = 100
 
+
+def pretrain_dataset_to_text(df: pl.DataFrame) -> pl.DataFrame:
+    """pretrain_dataset as text ('A + B') for the refresh_* helpers, which work on strings. A String column is returned unchanged."""
+    if df.schema['pretrain_dataset'] == pl.String:
+        return df
+    return df.with_columns(pl.col('pretrain_dataset').list.join(' + '))
+
+
+def pretrain_dataset_to_list(df: pl.DataFrame) -> pl.DataFrame:
+    """pretrain_dataset as an ordered list of corpora: 'A + B + C' -> ['A', 'B', 'C'] (a single corpus gives a list of one element)."""
+    return df.with_columns(pl.col('pretrain_dataset').str.split('+').list.eval(pl.element().str.strip_chars()))
+
 METADATA_SCHEMA: dict[str, pl.DataType] = {
     'model_name': pl.String,
     'family': pl.String,
@@ -192,7 +204,11 @@ def main() -> None:
         batch_files = sorted(temp_dir.glob('batch_*.parquet'))
         if batch_files:
             dfs = [pl.read_parquet(f) for f in batch_files]
-            df = pl.concat(dfs)
+            # the models already stored in the local parquet are kept: only the new ones come from the batches
+            # (without this the parquet was overwritten with the new models only)
+            if parquet_path.exists():
+                dfs.insert(0, pretrain_dataset_to_text(pl.read_parquet(parquet_path)))
+            df = pl.concat(dfs, how='diagonal_relaxed')
             df = df.unique(subset='model_name', keep='first')
             df = df.sort('model_name')
             df.write_parquet(parquet_path)
@@ -204,6 +220,7 @@ def main() -> None:
 
     # pretrain_org is recomputed from pretrain_config for every model, also for those already
     # stored in the local parquet, so that a fix of the organisation parser needs no re-extraction.
+    df = pretrain_dataset_to_text(df)  # a registry already stored with lists is converted back for the refresh_* helpers below
     old_org = df['pretrain_org']
     df = refresh_pretrain_org(df)
     n_ds = df['pretrain_dataset'].null_count()
@@ -217,6 +234,7 @@ def main() -> None:
     # Derived columns (pretrain_tasks, paradigm) are recomputed for every model,
     # also for those already stored in the local parquet.
     df = add_derived_columns(df)
+    df = pretrain_dataset_to_list(df)  # the published registry stores pretrain_dataset as list<string>
     df.write_parquet(parquet_path)
 
     print(f'DataFrame shape: {df.shape}')

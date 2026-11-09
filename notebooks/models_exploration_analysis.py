@@ -385,7 +385,8 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(df, pl, px):
     heat_df = (
-        df.group_by(['pretrain_method', 'pretrain_dataset'])
+        df.explode('pretrain_dataset')  # a model with several corpora counts once for each of them
+        .group_by(['pretrain_method', 'pretrain_dataset'])
         .len()
         .filter(pl.col('len') > 1)
         .pivot(on='pretrain_dataset', index='pretrain_method', values='len')
@@ -1488,7 +1489,7 @@ def _(OUT, df, pl):
         )
         # Column "pretrain_org" holds the middle-level key (the stage): the pretraining dataset alone, or "dataset → fine-tuning dataset".
         tree_pd = (
-            df.filter(pl.col('pretrain_dataset').is_not_null())
+            df.filter(pl.col('pretrain_dataset').is_not_null()).with_columns(pretrain_dataset=pl.col('pretrain_dataset').list.join(' + '))  # run-time key: one unit per checkpoint (pretrain_dataset is a list)
             .with_columns(
                 pretrain_org=pl.when(pl.col('pretrain_ft').is_not_null())
                 .then(pl.col('pretrain_dataset') + ' → ' + pl.col('pretrain_ft').list.join(' → '))
@@ -1720,7 +1721,7 @@ def _(OUT, df, pl):
 
         SMALL = 10  # datasets with fewer checkpoints are merged into "Other"
         d = (
-            df.filter(pl.col('pretrain_dataset').is_not_null())
+            df.filter(pl.col('pretrain_dataset').is_not_null()).with_columns(pretrain_dataset=pl.col('pretrain_dataset').list.join(' + '))  # run-time key: one unit per checkpoint (pretrain_dataset is a list)
             .with_columns(
                 ft=pl.when(pl.col('pretrain_ft').is_not_null()).then(pl.lit('→ ') + pl.col('pretrain_ft').list.join(' → ')).otherwise(pl.lit('no fine-tuning')),
                 paradigm=pl.col('paradigm').str.replace_all('_', ' '),
@@ -1795,7 +1796,7 @@ def _(OUT, df, pl):
         SMALL = 10  # datasets with fewer checkpoints are merged into "Other"
         W, H = 10.0, 4.8
         d = (
-            df.filter(pl.col('pretrain_dataset').is_not_null())
+            df.filter(pl.col('pretrain_dataset').is_not_null()).with_columns(pretrain_dataset=pl.col('pretrain_dataset').list.join(' + '))  # run-time key: one unit per checkpoint (pretrain_dataset is a list)
             .with_columns(ft=pl.when(pl.col('pretrain_ft').is_not_null()).then(pl.lit('→ ') + pl.col('pretrain_ft').list.join(' → ')).otherwise(pl.lit('no fine-tuning')))
         )
         small = d.group_by('pretrain_dataset').len().filter(pl.col('len') < SMALL)['pretrain_dataset'].to_list()
@@ -1917,7 +1918,7 @@ def _(OUT, df, pl):
         plt.rcParams.update({'font.family': 'serif', 'font.serif': ['Times New Roman', 'DejaVu Serif'], 'pdf.fonttype': 42, 'ps.fonttype': 42})
         W = 11.5
         d = (
-            df.filter(pl.col('pretrain_dataset').is_not_null())
+            df.filter(pl.col('pretrain_dataset').is_not_null()).with_columns(pretrain_dataset=pl.col('pretrain_dataset').list.join(' + '))  # run-time key: one unit per checkpoint (pretrain_dataset is a list)
             .with_columns(ft=pl.when(pl.col('pretrain_ft').is_not_null()).then(pl.lit('→ ') + pl.col('pretrain_ft').list.join(' → ')).otherwise(pl.lit('Single-Stage Training')))
         )
         d = d.with_columns(ds=pl.col('pretrain_dataset'))
@@ -2119,7 +2120,7 @@ def _(OUT, df, pl):
         }
         SMALL = 20  # datasets with fewer checkpoints are merged into "Other"
         d = (
-            df.filter(pl.col('pretrain_dataset').is_not_null())
+            df.filter(pl.col('pretrain_dataset').is_not_null()).with_columns(pretrain_dataset=pl.col('pretrain_dataset').list.join(' + '))  # run-time key: one unit per checkpoint (pretrain_dataset is a list)
             .with_columns(
                 ft=pl.when(pl.col('pretrain_ft').is_not_null()).then(pl.lit('→ ') + pl.col('pretrain_ft').list.join(' → ')).otherwise(pl.lit('no fine-tuning')),
                 paradigm=pl.col('pretrain_tasks').list.eval(pl.element().replace(TASKS)).list.join(' + '),  # last column: pretraining tasks
@@ -3385,7 +3386,8 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(df, px):
     _pretrain_counts = (
-        df.group_by('pretrain_dataset')
+        df.explode('pretrain_dataset')  # a model with several corpora counts once for each of them
+        .group_by('pretrain_dataset')
         .len()
         .sort('len', descending=True)
         .rename({'len': 'count'})
