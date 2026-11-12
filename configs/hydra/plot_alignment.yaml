@@ -1,8 +1,8 @@
 # Result directories (all pairs of all receivers; rows of the figure are receivers)
 results_dirs:
-  - results/alignment
-  - results/alignment_extended_vitl
-  - results/alignment_extended_convnext
+  - results/alignment/main
+  - results/alignment/extended_vitl
+  - results/alignment/extended_convnext
 figure_data: results/figure_data/alignment_figure_data.csv
 
 # One PDF per entry. rows = receivers, columns = datasets.

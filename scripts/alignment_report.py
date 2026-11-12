@@ -2,7 +2,7 @@
 """Tables and claim checks for the semantic-alignment benchmark.
 
 Reads the result directories produced by ``scripts/alignment.py`` and writes CSVs
-plus ``tables.md`` to ``results/alignment_report/``. Everything printed in the
+plus ``tables.md`` to ``results/alignment/report/``. Everything printed in the
 report comes from here.
 
 Usage:
@@ -21,13 +21,13 @@ from scipy import stats
 
 from src.utils.alignment_aggregate import aggregate_pairs, load_results, per_pair
 
-MAIN = Path('results/alignment')
-EXT_VITL = Path('results/alignment_extended_vitl')
-EXT_CNX = Path('results/alignment_extended_convnext')
-LAMBDA = Path('results/alignment_lambda')
-LSTSQ_CPU = Path('results/alignment_lstsq_cpu')
-LSTSQ_GPU = Path('results/alignment_lstsq_gpu')
-OUT = Path('results/alignment_report')
+MAIN = Path('results/alignment/main')
+EXT_VITL = Path('results/alignment/extended_vitl')
+EXT_CNX = Path('results/alignment/extended_convnext')
+LAMBDA = Path('results/alignment/lambda_sweep')
+LSTSQ_CPU = Path('results/alignment/decoder_checks/lstsq_cpu')
+LSTSQ_GPU = Path('results/alignment/decoder_checks/lstsq_gpu')
+OUT = Path('results/alignment/report')
 
 METHODS = ['linear', 'cca', 'proto']
 NAME = {'linear': 'Linear', 'cca': 'CCA', 'proto': 'PPFE', 'no_mismatch': 'No Mismatch'}

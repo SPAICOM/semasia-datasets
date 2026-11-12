@@ -16,4 +16,4 @@ models_a:
 
 seeds: [42, 43, 44, 45, 46]
 lam_sweep: []
-results_dir: results/alignment_extended_convnext
+results_dir: results/alignment/extended_convnext

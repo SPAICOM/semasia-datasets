@@ -5,8 +5,8 @@ compare : two result directories agree to a tolerance (e.g. ridge on CPU vs GPU)
 
 Usage:
     uv run scripts/check_alignment_invariance.py seeds
-    uv run scripts/check_alignment_invariance.py compare results/alignment \
-        results/alignment_ridge_gpu_check --seed 42
+    uv run scripts/check_alignment_invariance.py compare results/alignment/main \
+        results/alignment/decoder_checks/ridge_gpu_check --seed 42
 """
 
 from __future__ import annotations

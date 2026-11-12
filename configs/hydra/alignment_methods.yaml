@@ -56,7 +56,7 @@ lstsq_device: cpu # cpu | cuda, only used when decoder=lstsq
 # Accuracy per lam_rel is written to lambda_dir; the main results use lam_rel.
 lam_sweep: [1.0e-5, 1.0e-4, 1.0e-3, 1.0e-2, 1.0e-1]
 
-results_dir: results/alignment
-lambda_dir: results/alignment_lambda
+results_dir: results/alignment/main
+lambda_dir: results/alignment/lambda_sweep
 overwrite: false
 save_results: true
