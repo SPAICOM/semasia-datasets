@@ -2,6 +2,11 @@
 
 Usage:
     python scripts/compute_metrics.py dataset_name=cifar10
+    python scripts/compute_metrics.py dataset_name=cifar10 latent_loader=datasets
+
+Optional config keys (pass with +key=value):
+    registry_path : parquet file of the model registry (default: the Hub)
+    results_dir   : where the metric parquet files are read from / written to (default: results/compute_metrics)
 """
 
 import logging
@@ -102,6 +107,7 @@ DATASET_SPLITS = {
     'tiny-imagenet': {'train'},
     'celeba': {'train', 'test'},
     'svhn': {'train', 'test'},
+    'oxford-flowers': {'train', 'test'},
 }
 
 
@@ -112,11 +118,17 @@ DATASET_SPLITS = {
 )
 def main(cfg: DictConfig) -> None:
     current: Path = Path('.')
-    results_dir: Path = current / 'results/compute_metrics'
+    results_dir: Path = current / cfg.get('results_dir', 'results/compute_metrics')
 
     results_dir.mkdir(parents=True, exist_ok=True)
 
     dataset: str = f'{cfg.repo_id}/{cfg.prefix}{cfg.dataset_name}'
+
+    latent_loader = cfg.get('latent_loader', 'polars')
+    if latent_loader not in LATENT_LOADERS:
+        raise ValueError(
+            f'latent_loader must be one of {LATENT_LOADERS}, got {latent_loader!r}.'
+        )
 
     split = cfg.split
     valid_splits = DATASET_SPLITS.get(cfg.dataset_name, {'train'})
@@ -125,7 +137,10 @@ def main(cfg: DictConfig) -> None:
 
     print('\n[INFO] Loading model registry...')
     model_df = pl.read_parquet(
-        'hf://datasets/spaicom-lab/semasia-model-registry/**/*.parquet'
+        cfg.get(
+            'registry_path',
+            'hf://datasets/spaicom-lab/semasia-model-registry/**/*.parquet',
+        )
     )
     model_df = model_df.with_columns(
         pl.col('model_name').str.split('.').list.first().alias('arch_key')
@@ -287,9 +302,22 @@ def main(cfg: DictConfig) -> None:
 
     if download_only:
         print('\n[PHASE 1] Downloading all model latents (no computation)...')
-        for model_name in tqdm(sorted(all_models), desc='Downloading latents'):
+        if latent_loader == 'polars':
+            print(
+                '  [NOTE] latent_loader=polars does not cache to disk: this only '
+                'checks that every model can be read. Use latent_loader=datasets '
+                'to cache.'
+            )
+        to_download = sorted(all_models)
+        if latent_loader == 'datasets':
+            to_download = [m for m in to_download if not _is_cached(dataset, m, split)]
+            print(
+                f'  Already in the HF cache: {len(all_models) - len(to_download)}, '
+                f'to download: {len(to_download)}'
+            )
+        for model_name in tqdm(to_download, desc='Downloading latents'):
             try:
-                load_latent(dataset, model_name, split)
+                load_latent(dataset, model_name, split, latent_loader)
             except Exception as e:
                 print(f'Error downloading {model_name}: {e}')
                 continue
@@ -426,15 +454,48 @@ def main(cfg: DictConfig) -> None:
         print(f'[COMPLETE] Probing results saved to {output_path_probing}')
 
 
-def _read_latent_df(dataset: str, model: str, split: str) -> pl.DataFrame:
-    """Read one model/split directly from the Hugging Face Hub (no local cache)."""
-    return pl.read_parquet(f'hf://datasets/{dataset}/{split}/{model}/*.parquet')
+LATENT_LOADERS = ('polars', 'datasets')
 
 
-def load_latent(dataset: str, model: str, split: str) -> np.ndarray:
-    """Load latent embeddings straight from the Hub with polars."""
-    df = _read_latent_df(dataset, model, split)
-    return df['embedding'].to_numpy().astype(np.float32, copy=False)
+def _is_cached(dataset: str, model: str, split: str) -> bool:
+    """True if ``load_dataset`` already built the Arrow file of this split on disk."""
+    from datasets import config
+
+    root = Path(config.HF_DATASETS_CACHE) / dataset.replace('/', '___') / model
+    return any(root.glob(f'*/*/*-{split}*.arrow'))
+
+
+def _load_columns(
+    dataset: str,
+    model: str,
+    split: str,
+    columns: list[str],
+    loader: str = 'polars',
+) -> dict[str, np.ndarray]:
+    """Read columns of one model/split from the Hugging Face Hub.
+
+    loader='polars'   : stream the parquet files with polars (``hf://``), nothing is
+                        written to disk.
+    loader='datasets' : ``datasets.load_dataset``; files are downloaded and cached
+                        on disk (HF cache) and reused by later runs.
+    """
+    if loader == 'polars':
+        df = pl.read_parquet(f'hf://datasets/{dataset}/{split}/{model}/*.parquet')
+        return {c: df[c].to_numpy() for c in columns}
+    if loader == 'datasets':
+        from datasets import load_dataset
+
+        data = load_dataset(dataset, model, split=split).with_format('numpy')
+        return {c: np.asarray(data[c]) for c in columns}
+    raise ValueError(f'Unknown latent_loader {loader!r}; choose from {LATENT_LOADERS}.')
+
+
+def load_latent(
+    dataset: str, model: str, split: str, loader: str = 'polars'
+) -> np.ndarray:
+    """Load latent embeddings (see :func:`_load_columns` for the loader choice)."""
+    emb = _load_columns(dataset, model, split, ['embedding'], loader)['embedding']
+    return emb.astype(np.float32, copy=False)
 
 
 def load_latent_with_labels(
@@ -442,11 +503,11 @@ def load_latent_with_labels(
     model: str,
     split: str,
     label_col: str,
+    loader: str = 'polars',
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Load latent embeddings and labels straight from the Hub with polars."""
-    df = _read_latent_df(dataset, model, split)
-    latent = df['embedding'].to_numpy().astype(np.float32, copy=False)
-    return latent, df[label_col].to_numpy()
+    """Load latent embeddings and labels (loader: see :func:`_load_columns`)."""
+    cols = _load_columns(dataset, model, split, ['embedding', label_col], loader)
+    return cols['embedding'].astype(np.float32, copy=False), cols[label_col]
 
 
 def _compute_probing_metrics(
@@ -607,7 +668,7 @@ def process_model(
     stat_cases = cfg.get('stat_cases', ['raw', 'proto_no_prewhiten', 'proto_prewhiten'])
     tda_cases = cfg.get('tda_cases', ['absolute', 'proto_no_prewhiten'])
 
-    latent = load_latent(dataset, model_name, split)
+    latent = load_latent(dataset, model_name, split, cfg.get('latent_loader', 'polars'))
 
     n_clusters = cfg.n_prototypes
     n_samples = cfg.get('n_samples', 10)
@@ -741,11 +802,12 @@ def process_model(
                 probe_test_split = 'validation'
             else:
                 probe_test_split = list(valid_splits)[0]
+        latent_loader = cfg.get('latent_loader', 'polars')
         X_train, y_train = load_latent_with_labels(
-            dataset, model_name, 'train', label_col
+            dataset, model_name, 'train', label_col, latent_loader
         )
         X_test, y_test = load_latent_with_labels(
-            dataset, model_name, probe_test_split, label_col
+            dataset, model_name, probe_test_split, label_col, latent_loader
         )
         probe_result = _compute_probing_metrics(
             X_train,

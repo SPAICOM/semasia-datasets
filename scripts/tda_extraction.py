@@ -125,63 +125,7 @@ def main(cfg: DictConfig) -> None:
                 remove_matching('~/.cache/huggingface/hub/', hub_pattern)
 
             except Exception as e:
-<<<<<<< HEAD
-                print(
-                    f"Error loading dataset for model '{model}', split '{split}': {e}"
-                )
-                continue
-
-            latent: torch.Tensor = torch.vstack(list(data['embedding']))
-
-            extras = None
-            if hasattr(cfg.dataset, 'extras') and cfg.dataset.extras:
-                extra_names = list(cfg.dataset.extras)
-                extras = {
-                    name: np.array(data[name])
-                    for name in extra_names
-                    if name in data.columns
-                }
-
-            ls = LatentSpace(latent, extras=extras, seed=cfg.seed)
-
-            if cfg.tda.max_points > 0 and ls.n_points > cfg.tda.max_points:
-                ls = ls.subsample(
-                    n_points=cfg.preprocess.max_points,
-                    compute_prototypes=cfg.preprocess.prototypes.enable,
-                    seed=cfg.seed,
-                )
-
-            if cfg.tda.normalize is not None:
-                latent_processed = ls.normalize(cfg.preprocess.normalize)
-            else:
-                latent_processed = ls.latent
-
-            if cfg.tda.dim_reduction is not None:
-                latent_processed = ls.reduce_dimensions(
-                    cfg.preprocess.dim_reduction,
-                    cfg.preprocess.dim_reduction_components,
-                    seed=cfg.seed,
-                )
-
-            output_tda = compute_tda_features(
-                latent_processed,
-                max_dim=cfg.tda.max_dim,
-                simplicial_filter=cfg.tda.simplicial_filter,
-                n_bins=cfg.tda.n_bins,
-                sigma=cfg.tda.sigma,
-                metric=cfg.tda.metric,
-            )
-
-            pl.DataFrame(temp | output_tda).write_parquet(
-                RESULTS
-                / f'{cfg.repo_id}__{cfg.prefix}{cfg.dataset}__{split}__{model}.parquet'
-            )
-
-            remove_matching('~/.cache/huggingface/datasets/', f'{cache_pattern}*')
-            remove_matching('~/.cache/huggingface/hub/', hub_pattern)
-=======
                 print(f"Error processing model '{model}', split '{split}': {e}")
->>>>>>> engrima
 
 
 if __name__ == '__main__':
