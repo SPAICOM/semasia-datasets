@@ -24,6 +24,7 @@ dependencies = [
     "wigglystuff>=0.1.10",
     "kaleido>=1.2.0",
     "igraph>=1.0.0",
+    "circlify>=0.16.0",
 ]
 
 [tool.ruff.lint]

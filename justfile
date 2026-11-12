@@ -74,6 +74,14 @@ tda-graph-dataset DATASET:
 compute-download:
     uv run scripts/compute_metrics.py download_only=true
 
+# Phase 1 for one dataset: cache its latents on disk (HF cache) via load_dataset
+compute-download-dataset DATASET:
+    uv run scripts/compute_metrics.py dataset_name={{DATASET}} download_only=true force_recompute=true latent_loader=datasets
+
+# Phase 1 for every dataset used in the regression
+compute-download-all:
+    for d in cifar10 mnist fashion_mnist oxford-flowers; do just compute-download-dataset $d; done
+
 # Phase 2: Compute metrics (stat + TDA) from cached latents
 compute-compute:
     uv run scripts/compute_metrics.py download_only=false

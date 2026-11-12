@@ -339,6 +339,15 @@ wheels = [
 ]
 
 [[package]]
+name = "circlify"
+version = "0.16.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/10/3b/69f63094f8d81b0404e5b5ed65763c8478f3a9a90de97bf716d8dfa78aa8/circlify-0.16.0.tar.gz", hash = "sha256:42fd4bb3908502e027e55c47ac83405f3a7050834b39cbbaaf481430d257b31e", size = 12349, upload-time = "2026-10-31T21:59:28.279Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e7/0e/7fe21572ff168db356141ef3352fe317f2cc3bc11660c8c9ab7426a20e38/circlify-0.16.0-py3-none-any.whl", hash = "sha256:604b24b844d2523580f4afc1b8749cc2413d7bc3735b71c0ce2a4baad9e52a23", size = 11858, upload-time = "2026-10-31T21:59:27.061Z" },
+]
+
+[[package]]
 name = "click"
 version = "8.3.2"
 source = { registry = "https://pypi.org/simple" }
@@ -3068,6 +3077,7 @@ name = "semantic-dataset"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "circlify" },
     { name = "datasets" },
     { name = "hdbscan" },
     { name = "huggingface-hub" },
@@ -3098,6 +3108,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "circlify", specifier = ">=0.16.0" },
     { name = "datasets", specifier = ">=4.4.1" },
     { name = "hdbscan", specifier = ">=0.8.29" },
     { name = "huggingface-hub", specifier = ">=1.2.3" },
