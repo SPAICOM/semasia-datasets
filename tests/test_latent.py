@@ -358,15 +358,19 @@ class TestComputePrototypes:
         G = latent.synthesis_operator
         np.testing.assert_array_almost_equal(G, F.T)
 
-    def test_compute_prototypes_error_small_cluster(self):
+    def test_compute_prototypes_small_cluster_uses_all_points(self):
         from src.objects.latent import LatentSpace
 
         X = np.array([[0, 0], [1, 1], [2, 2]], dtype=np.float32)
         clusters = np.array([0, 0, 1])
 
         latent = LatentSpace(X, seed=42)
-        with pytest.raises(ValueError, match='Cluster 0 has 2 samples'):
-            latent.compute_prototypes(n_samples=5, clusters=clusters)
+        prototypes = latent.compute_prototypes(n_samples=5, clusters=clusters)
+
+        # n_samples is clamped to the cluster size: mean of all its points
+        assert prototypes.shape == (2, 2)
+        np.testing.assert_allclose(prototypes[0], [0.5, 0.5])
+        np.testing.assert_allclose(prototypes[1], [2.0, 2.0])
 
     def test_compute_prototypes_error_no_mode(self, simple_cloud):
         from src.objects.latent import LatentSpace

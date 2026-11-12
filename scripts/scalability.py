@@ -122,25 +122,25 @@ def step_hub(c: Ctx) -> None:
     for n in c.datasets:
         i = api.dataset_info(c.repo(n), files_metadata=True)
         meta.append(
-            dict(
-                dataset=n,
-                used_storage=getattr(i, 'used_storage', None),
-                n_siblings=len(i.siblings),
-                last_modified=str(i.last_modified),
-                sha=i.sha,
-            )
+            {
+                'dataset': n,
+                'used_storage': getattr(i, 'used_storage', None),
+                'n_siblings': len(i.siblings),
+                'last_modified': str(i.last_modified),
+                'sha': i.sha,
+            }
         )
         for s in i.siblings:
             p = s.rfilename.split('/')  # <split>/<model>/<shard>.parquet
             rows.append(
-                dict(
-                    dataset=n,
-                    path=s.rfilename,
-                    size=s.size,
-                    split=p[0] if len(p) == 3 else None,
-                    model=p[1] if len(p) == 3 else None,
-                    is_parquet=s.rfilename.endswith('.parquet'),
-                )
+                {
+                    'dataset': n,
+                    'path': s.rfilename,
+                    'size': s.size,
+                    'split': p[0] if len(p) == 3 else None,
+                    'model': p[1] if len(p) == 3 else None,
+                    'is_parquet': s.rfilename.endswith('.parquet'),
+                }
             )
         print(n, len(i.siblings), flush=True)
     pl.DataFrame(rows).write_parquet(c.R + 'hub_files.parquet')
@@ -200,31 +200,31 @@ def step_footers(c: Ctx) -> None:
                     fs.open(f'datasets/{c.repo(n)}/{path}', block_size=2**20)
                 )
                 m = pf.metadata
-                return dict(
-                    dataset=n,
-                    path=path,
-                    num_rows=m.num_rows,
-                    row_groups=m.num_row_groups,
-                    columns=pf.schema_arrow.names,
-                    embedding_type=str(pf.schema_arrow.field('embedding').type),
-                    compression=m.row_group(0).column(0).compression,
-                    created_by=m.created_by,
-                    err=None,
-                )
+                return {
+                    'dataset': n,
+                    'path': path,
+                    'num_rows': m.num_rows,
+                    'row_groups': m.num_row_groups,
+                    'columns': pf.schema_arrow.names,
+                    'embedding_type': str(pf.schema_arrow.field('embedding').type),
+                    'compression': m.row_group(0).column(0).compression,
+                    'created_by': m.created_by,
+                    'err': None,
+                }
             except Exception as e:  # HTTP 429: wait for the rate-limit window
                 err = repr(e)[:200]
                 time.sleep(5 * 2**k)
-        return dict(
-            dataset=n,
-            path=path,
-            num_rows=None,
-            row_groups=None,
-            columns=None,
-            embedding_type=None,
-            compression=None,
-            created_by=None,
-            err=err,
-        )
+        return {
+            'dataset': n,
+            'path': path,
+            'num_rows': None,
+            'row_groups': None,
+            'columns': None,
+            'embedding_type': None,
+            'compression': None,
+            'created_by': None,
+            'err': err,
+        }
 
     with ThreadPoolExecutor(fc.workers) as ex:
         new = pl.DataFrame(list(ex.map(footer, todo)), schema=schema)
@@ -254,20 +254,20 @@ def step_columns(c: Ctx) -> None:
                 for k in range(md.num_columns):
                     cc = md.row_group(rg).column(k)
                     rows.append(
-                        dict(
-                            dataset=d,
-                            path=r['path'],
-                            file_size=r['size'],
-                            column=cc.path_in_schema,
-                            compressed=cc.total_compressed_size,
-                            uncompressed=cc.total_uncompressed_size,
-                            compression=cc.compression,
-                            encodings=str(cc.encodings),
-                        )
+                        {
+                            'dataset': d,
+                            'path': r['path'],
+                            'file_size': r['size'],
+                            'column': cc.path_in_schema,
+                            'compressed': cc.total_compressed_size,
+                            'uncompressed': cc.total_uncompressed_size,
+                            'compression': cc.compression,
+                            'encodings': str(cc.encodings),
+                        }
                     )
     pl.DataFrame(rows).write_parquet(c.R + 'column_bytes_sample.parquet')
     i = api.dataset_info(c.repo('model-registry'), files_metadata=True)
-    reg = pl.DataFrame([dict(path=s.rfilename, size=s.size) for s in i.siblings])
+    reg = pl.DataFrame([{'path': s.rfilename, 'size': s.size} for s in i.siblings])
     reg.write_parquet(c.R + 'hub_registry_files.parquet')
     print(reg)
 
@@ -305,15 +305,15 @@ def step_flops(c: Ctx) -> None:
         x = torch.zeros((1, *cfg['input_size']), device=device)
         with FlopCounterMode(display=False) as f:
             y = m(x)
-        return dict(
-            input_c=cfg['input_size'][0],
-            input_h=cfg['input_size'][1],
-            input_w=cfg['input_size'][2],
-            gflops=f.get_total_flops() / 1e9,
-            parameters_encoder=sum(p.numel() for p in m.parameters()),
-            out_dim=int(y.shape[-1]),
-            device=device,
-        )
+        return {
+            'input_c': cfg['input_size'][0],
+            'input_h': cfg['input_size'][1],
+            'input_w': cfg['input_size'][2],
+            'gflops': f.get_total_flops() / 1e9,
+            'parameters_encoder': sum(p.numel() for p in m.parameters()),
+            'out_dim': int(y.shape[-1]),
+            'device': device,
+        }
 
     keys = [
         'input_c',
@@ -422,19 +422,19 @@ def step_throughput(c: Ctx) -> None:
 
     def measure(name, bs):
         r0 = df.filter(pl.col('model_name') == name).row(0, named=True)
-        row = dict(
-            model_name=name,
-            gflops=r0['gflops'],
-            input_h=r0['input_h'],
-            parameters=r0['parameters_encoder'],
-            batch_size=bs,
-            gpu=gpu,
-            imgs_per_s=None,
-            ms_per_batch=None,
-            peak_mem_gb=None,
-            n_timed=None,
-            error=None,
-        )
+        row = {
+            'model_name': name,
+            'gflops': r0['gflops'],
+            'input_h': r0['input_h'],
+            'parameters': r0['parameters_encoder'],
+            'batch_size': bs,
+            'gpu': gpu,
+            'imgs_per_s': None,
+            'ms_per_batch': None,
+            'peak_mem_gb': None,
+            'n_timed': None,
+            'error': None,
+        }
         m = x = None
         try:
             with torch.device(dev):
@@ -529,13 +529,13 @@ def step_dataloader(c: Ctx) -> None:
             sub = ds.select(range(min(dc.max_images, len(ds))))[b.image_column]
         except Exception as e:
             rows.append(
-                dict(
-                    dataset=k,
-                    num_workers=None,
-                    imgs_per_s=None,
-                    err=repr(e)[:150],
-                    sample_size=None,
-                )
+                {
+                    'dataset': k,
+                    'num_workers': None,
+                    'imgs_per_s': None,
+                    'err': repr(e)[:150],
+                    'sample_size': None,
+                }
             )
             print(k, 'FAILED', repr(e)[:150], flush=True)
             continue
@@ -551,13 +551,13 @@ def step_dataloader(c: Ctx) -> None:
             for batch in dl:
                 n += len(batch)
             rows.append(
-                dict(
-                    dataset=k,
-                    num_workers=nw,
-                    imgs_per_s=n / (time.perf_counter() - t0),
-                    err=None,
-                    sample_size=str(sub[0].size),
-                )
+                {
+                    'dataset': k,
+                    'num_workers': nw,
+                    'imgs_per_s': n / (time.perf_counter() - t0),
+                    'err': None,
+                    'sample_size': str(sub[0].size),
+                }
             )
             print(rows[-1], flush=True)
     pl.DataFrame(rows, infer_schema_length=None).write_parquet(
@@ -580,15 +580,15 @@ def step_traces(c: Ctx) -> None:
             except Exception as e:  # 429: wait for the 5-minute window
                 print('retry', n, str(e)[:60], flush=True)
                 time.sleep(120)
-        for k in cs:
-            rows.append(
-                dict(
-                    dataset=n,
-                    commit=k.commit_id[:8],
-                    date=k.created_at.replace(tzinfo=None),
-                    title=k.title[:80],
-                )
-            )
+        rows.extend(
+            {
+                'dataset': n,
+                'commit': k.commit_id[:8],
+                'date': k.created_at.replace(tzinfo=None),
+                'title': k.title[:80],
+            }
+            for k in cs
+        )
         print(
             n,
             len(cs),
@@ -603,13 +603,13 @@ def step_traces(c: Ctx) -> None:
         st, d = os.stat(p), p.split('/')
         if d[1] in c.datasets:
             loc.append(
-                dict(
-                    dataset=d[1],
-                    split=d[2],
-                    model=d[3],
-                    size=st.st_size,
-                    mtime=dt.datetime.fromtimestamp(st.st_mtime),
-                )
+                {
+                    'dataset': d[1],
+                    'split': d[2],
+                    'model': d[3],
+                    'size': st.st_size,
+                    'mtime': dt.datetime.fromtimestamp(st.st_mtime),
+                }
             )
     pl.DataFrame(loc).write_parquet(c.R + 'local_embedding_files.parquet')
 
@@ -618,44 +618,45 @@ def step_traces(c: Ctx) -> None:
         log = d + 'encode_dataset_all_timm.log'
         if not os.path.exists(log):
             continue
-        ov, cf = (
-            open(d + '.hydra/overrides.yaml').read(),
-            open(d + '.hydra/config.yaml').read(),
-        )
+        with open(d + '.hydra/overrides.yaml') as f_ov:
+            ov = f_ov.read()
+        with open(d + '.hydra/config.yaml') as f_cf:
+            cf = f_cf.read()
         starts = []
-        for line in open(log, errors='ignore'):
-            m = re.match(
-                r'\[([\d\- :,]+)\]\[timm.*Loading pretrained weights from Hugging Face hub \(timm/(.+)\)',
-                line,
-            )
-            if m:
-                starts.append(
-                    (
-                        dt.datetime.strptime(m.group(1), '%Y-%m-%d %H:%M:%S,%f'),
-                        m.group(2),
-                    )
+        with open(log, errors='ignore') as f_log:
+            for line in f_log:
+                m = re.match(
+                    r'\[([\d\- :,]+)\]\[timm.*Loading pretrained weights from Hugging Face hub \(timm/(.+)\)',
+                    line,
                 )
+                if m:
+                    starts.append(
+                        (
+                            dt.datetime.strptime(m.group(1), '%Y-%m-%d %H:%M:%S,%f'),
+                            m.group(2),
+                        )
+                    )
         end = dt.datetime.fromtimestamp(os.path.getmtime(log))
         g = lambda k: (re.search(k + r': (\S+)', cf) or [None, None])[1]  # noqa: E731
         dsname = re.search(r'dataset:\n  name: (\S+)', cf).group(1)
         for i, (t0, mdl) in enumerate(starts):
             t1 = starts[i + 1][0] if i + 1 < len(starts) else end
             passes.append(
-                dict(
-                    run=d[8:-1],
-                    dataset=dsname,
-                    model=mdl,
-                    pass_idx=i,
-                    start=t0,
-                    seconds=(t1 - t0).total_seconds(),
-                    is_last=i + 1 == len(starts),
-                    batch_size=int(g('batch_size')),
-                    num_workers=int(g('num_workers')),
-                    accelerator=g('accelerator'),
-                    overrides=' '.join(
+                {
+                    'run': d[8:-1],
+                    'dataset': dsname,
+                    'model': mdl,
+                    'pass_idx': i,
+                    'start': t0,
+                    'seconds': (t1 - t0).total_seconds(),
+                    'is_last': i + 1 == len(starts),
+                    'batch_size': int(g('batch_size')),
+                    'num_workers': int(g('num_workers')),
+                    'accelerator': g('accelerator'),
+                    'overrides': ' '.join(
                         x[2:] for x in ov.split('\n') if x.startswith('- ')
                     ),
-                )
+                }
             )
     lp = pl.DataFrame(passes)
     lp.write_parquet(c.R + 'log_passes.parquet')
@@ -1013,17 +1014,17 @@ def step_tables(c: Ctx) -> None:
             else rate[(dsn, 1)] * min(1.0, (224 / ih) ** 2)
         )
         chk_rows.append(
-            dict(
-                run=run,
-                dataset=dsn,
-                model=mdl,
-                batch_size=int(g['batch_size'][0]),
-                num_workers=nw_,
-                images=rows_total,
-                measured_seconds=float(g['seconds'].sum()),
-                est_model_only_s=rows_total / thr,
-                est_with_loader_s=rows_total / min(thr, ld),
-            )
+            {
+                'run': run,
+                'dataset': dsn,
+                'model': mdl,
+                'batch_size': int(g['batch_size'][0]),
+                'num_workers': nw_,
+                'images': rows_total,
+                'measured_seconds': float(g['seconds'].sum()),
+                'est_model_only_s': rows_total / thr,
+                'est_with_loader_s': rows_total / min(thr, ld),
+            }
         )
     pl.DataFrame(chk_rows).write_parquet(R + 'crosscheck_nov02_reencode.parquet')
 
@@ -1042,7 +1043,7 @@ def step_tables(c: Ctx) -> None:
         .to_dicts()
     )
     pl.DataFrame(
-        [dict(key=k, value_json=json.dumps(v, default=str)) for k, v in out.items()]
+        [{'key': k, 'value_json': json.dumps(v, default=str)} for k, v in out.items()]
     ).write_parquet(R + 'key_numbers.parquet')
     print(
         json.dumps(
@@ -1066,6 +1067,11 @@ def step_report(c: Ctx) -> None:
         raise ValueError(
             f'report.md describes the full study ({REPORT_DATASETS} benchmarks), got {len(c.datasets)}: drop `report` from `analyses`'
         )
+    cmp_dir = (
+        Path(c.cfg.report.compare_dir)
+        if c.cfg.report.compare_dir
+        else Path('/nonexistent')
+    )  # second GPU, optional
     R, ORDER = c.R, c.ORDER
     K = {
         r['key']: json.loads(r['value_json'])
@@ -1111,10 +1117,18 @@ def step_report(c: Ctx) -> None:
             + '\n'
         )
 
-    gb = lambda b: f'{b / 1e9:,.1f}'
-    mb = lambda b: f'{b / 1e6:,.0f}'
-    fm = lambda x: f'{x:,.0f}'
-    EF = lambda f: f'{f / 1e18:,.1f}'
+    def gb(b):
+        return f'{b / 1e9:,.1f}'
+
+    def mb(b):
+        return f'{b / 1e6:,.0f}'
+
+    def fm(x):
+        return f'{x:,.0f}'
+
+    def EF(f):
+        return f'{f / 1e18:,.1f}'
+
     o = []
     a = o.append
     d = {r['dataset']: r for r in ds.iter_rows(named=True)}
@@ -1134,8 +1148,7 @@ def step_report(c: Ctx) -> None:
         '**How:** `HfApi.dataset_info(files_metadata=True)` on every repo `spaicom-lab/semasia-<dataset>` (sizes of all files, nothing downloaded) [`scalability.py hub` -> `hub_files.parquet`, `hub_repo_meta.parquet`]; row counts and schema from the parquet footers read through HTTP range requests, no data downloaded [`scalability.py footers` -> `hub_footers.parquet`]. Repo state at the time of the query: last modified 2026-11-02 23:20 to 2026-11-03 00:25 UTC (`hub_repo_meta.parquet`).\n'
     )
     a(
-        '**Important limit on the row counts.** The Hub rate limit (1000 API calls / 5 min) stopped the full scan of the 30,578 footers: I read **%s footers** (every (dataset, split) is covered; every shard of every split has at least 40 footers read, from different models). All footers of a given (dataset, split, shard) report the same number of rows (checked, no exception), so the row counts are labelled **exact** for the files read and **computed** (by extension, same value for all models) for the others. File sizes and counts are exact for all 30,578 files.\n'
-        % f'{foot.height:,}'
+        f'**Important limit on the row counts.** The Hub rate limit (1000 API calls / 5 min) stopped the full scan of the 30,578 footers: I read **{foot.height:,} footers** (every (dataset, split) is covered; every shard of every split has at least 40 footers read, from different models). All footers of a given (dataset, split, shard) report the same number of rows (checked, no exception), so the row counts are labelled **exact** for the files read and **computed** (by extension, same value for all models) for the others. File sizes and counts are exact for all 30,578 files.\n'
     )
     rows = []
     for k in ORDER:
@@ -1563,7 +1576,13 @@ def step_report(c: Ctx) -> None:
         f'**Sanity check against real runs** (**exact** measured vs **estimated**): the November 2026 re-encode of the 5 InceptionNeXt models on this machine (`outputs/2026-11-02/*`, RTX 4090 per the `trainer.accelerator=gpu` logs, batch 32-128, 2-8 workers) gives {len(x)} complete (model, dataset) passes, parsed in `scalability.py traces` (a pass starts at the "Loading pretrained weights" line, ends at the next one). Measured total {x["measured_seconds"].sum() / 3600:,.2f} h; the model-only estimate for the same passes is {x["est_model_only_s"].sum() / 3600:,.2f} h and the estimate with loader {x["est_with_loader_s"].sum() / 3600:,.2f} h, so the measured time is {x["measured_seconds"].sum() / x["est_with_loader_s"].sum():.2f}x the estimate with loader (the measured pass also includes the weight download/load, writing the parquet shards and the dataset iteration, which the estimate omits). I therefore add ~20% of fixed overhead to the "with loader" figures in the paper paragraph. This check covers only small models; the large models are extrapolated from the benchmark.\n'
     )
     a(
-        '**Cluster wall-clock**: not converted. The relative speed of an RTX 3090 and of the 8 GB card to the RTX 4090 was not measured here and cannot be justified from the repo; the original number of GPUs actually used simultaneously, batch sizes and per-dataset workers are NOT FOUND. Only the single-GPU (RTX 4090) number is given.\n'
+        '**Cluster wall-clock**: not converted. The original number of GPUs actually used simultaneously, batch sizes and per-dataset workers are NOT FOUND. '
+        + (
+            'A second GPU (RTX 3090) was measured with the same benchmark: section 6. The 8 GB card was not measured.'
+            if cmp_dir.exists()
+            else 'Only the single-GPU (RTX 4090) number is given; no other GPU was measured.'
+        )
+        + '\n'
     )
 
     # ---------------- 4
@@ -1660,6 +1679,80 @@ def step_report(c: Ctx) -> None:
     a(
         '**Does it support multi-label datasets or captions?** Multi-label **yes**: every column listed in `extras` is copied as is (CelebA already uses 40 boolean columns); captions or other per-image text columns would work the same way (string columns in `extras`) because they are only stored next to the embedding. **Not supported / would need code changes:** (a) several captions per image or several images per sample (the loader takes exactly one image column `data`, `collate_fn` converts one PIL image to a tensor; a list-of-strings column should work through Polars but was not tested); (b) per-object embeddings (boxes, crops): the model sees the whole resized/cropped image only; (c) a list of arbitrary models instead of a prefix (only `models_startwith` exists; a `models` list option would be a few lines in `main`); (d) the script returns early with a warning if no HF token is found, and always calls `create_repo(...)` on `<hf.namespace>/semasia-<name>` even with `hf.push=false`, so a token and the right `hf.namespace` are required even for local-only encoding; (e) `configs/hydra/check_hf.yaml` and `configs/hydra/generate_readme.yaml` list the datasets explicitly and must be extended by hand. A text encoder (for captions) would need a separate extraction script, since `timm` models are image-only.\n'
     )
+
+    # ---------------- 6. second GPU
+    if cmp_dir.exists():
+        K2 = {
+            r['key']: json.loads(r['value_json'])
+            for r in pl.read_parquet(cmp_dir / 'key_numbers.parquet').iter_rows(
+                named=True
+            )
+        }
+        hrs2 = pl.read_parquet(cmp_dir / 'gpu_hours_estimate.parquet')
+        th2 = pl.read_parquet(cmp_dir / 'throughput.parquet')
+        gpu1, gpu2 = th['gpu'][0], th2['gpu'][0]
+
+        def H2(sc, est, h=hrs2):
+            return h.filter(
+                (pl.col('method') == A)
+                & (pl.col('scenario') == sc)
+                & (pl.col('estimate') == est)
+            )['hours_total'][0]
+
+        a(f'## 6. Second GPU: {gpu2} (estimated)\n')
+        a(
+            f'Same benchmark (`scalability.py throughput`: same 15 models, batch sizes, fp32, dummy inputs) run on a second machine with a **{gpu2}** (24 GB); parquet in `{cmp_dir}/`. FLOPs, N, data-loading rate and the cross-check are those of section 2-3 (the loader rate was measured on the first machine\'s CPU, so the "+ loader" rows are indicative for the second one). The same measurements ran out of memory on both GPUs (`samvit_huge_patch16.sa1b` at batch 16, 128 and 8, re-measured at 4; `regnety_2560.seer_ft_in1k` at 128): {th2.filter(pl.col("error").is_not_null()).height} failed measurements out of {th2.height}; {th.filter(pl.col("error").is_not_null()).height} out of {th.height} on the first GPU.\n'
+        )
+        mt = lambda k, kk: f'{kk[k]:,.2f}' if k == 'aff_c0_ms' else f'{kk[k]:,.1f}'  # noqa: E731
+        a(
+            T(
+                ['', gpu1, gpu2],
+                [
+                    ['latency c0 (ms)', mt('aff_c0_ms', K), mt('aff_c0_ms', K2)],
+                    [
+                        'sustained rate 1/c1 (TFLOP/s)',
+                        mt('aff_tflops', K),
+                        mt('aff_tflops', K2),
+                    ],
+                    [
+                        'R2 of the latency + rate fit (ln time)',
+                        f'{K["aff_r2"]:.3f}',
+                        f'{K2["aff_r2"]:.3f}',
+                    ],
+                    [
+                        'residual SD of ln(time)',
+                        f'{K["aff_s"]:.3f}',
+                        f'{K2["aff_s"]:.3f}',
+                    ],
+                    [
+                        'R2 of the log-log fit',
+                        f'{K["fit_r2"]:.3f}',
+                        f'{K2["fit_r2"]:.3f}',
+                    ],
+                ],
+            )
+        )
+        rows = []
+        for sc in ['model only', '+ loader, 8 workers', '+ loader, 1 worker']:
+            rows.append(
+                [sc]
+                + [
+                    f'{H2(sc, e, hrs):,.0f} / {H2(sc, e):,.0f}'
+                    for e in ['low', 'central', 'high']
+                ]
+                + [f'{H2(sc, "central") / H2(sc, "central", hrs):.2f}x']
+            )
+        a(f'GPU-hours (estimated, latency + rate fit; each cell = {gpu1} / {gpu2}):\n')
+        a(T(['scenario', 'low', 'central', 'high', f'{gpu2} / {gpu1} (central)'], rows))
+        lo2, ce2, hi2 = (
+            H2('model only', 'low'),
+            H2('model only', 'central'),
+            H2('+ loader, 1 worker', 'high'),
+        )
+        c1w2 = H2('+ loader, 1 worker', 'central')
+        a(
+            f'**Headline (estimated):** on one {gpu2} in fp32 about **{ce2:,.0f} GPU-hours** for the models alone and **{c1w2 * 1.2:,.0f} GPU-hours** with data-loading and I/O overheads (single-worker loader, +20%), within **{lo2:,.0f}-{hi2 * 1.2:,.0f}**, computed with the same rule as the paragraph below. The +20% is the factor measured on the first GPU (section 3.4); it was not measured on the {gpu2}.\n'
+        )
 
     # ---------------- paragraph
     tot_tb = tot_b / 1e12

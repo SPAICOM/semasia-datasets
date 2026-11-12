@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 from typing import TYPE_CHECKING, Literal
 
 import numpy as np
@@ -179,7 +180,9 @@ class Anchor:
         else:
             if n_anchors is not None:
                 clusterer_kwargs.setdefault('n_clusters', n_anchors)
-            clusterer_kwargs.setdefault('random_state', self._seed)
+            # not every clusterer is stochastic (e.g. DBSCAN has no random_state)
+            if 'random_state' in inspect.signature(clusterer_cls).parameters:
+                clusterer_kwargs.setdefault('random_state', self._seed)
             cluster_labels = clusterer_cls(**clusterer_kwargs).fit_predict(
                 self._point_cloud
             )

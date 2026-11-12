@@ -74,3 +74,6 @@ dataloader:
     workers: [1, 8]
     max_images: 2000
     proxy: {imagenet-1k: oxford-flowers} # benchmark not available offline -> rate of this one (large JPEGs)
+
+report:
+    compare_dir: results/scalability_3090 # optional second GPU (same layout; throughput.parquet and tables from another machine); null = none
