@@ -29,6 +29,7 @@ import polars as pl
 import timm
 from huggingface_hub import HfApi
 from huggingface_hub.utils import get_token
+from omegaconf import OmegaConf
 from tqdm.auto import tqdm
 
 from src.utils.huggingface import generate_model_registry_readme
@@ -44,15 +45,26 @@ BATCH_SIZE = 100
 
 
 def pretrain_dataset_to_text(df: pl.DataFrame) -> pl.DataFrame:
-    """pretrain_dataset as text ('A + B') for the refresh_* helpers, which work on strings. A String column is returned unchanged."""
+    """pretrain_dataset as text ('A + B'), as the refresh_* helpers expect.
+
+    A String column is returned unchanged.
+    """
     if df.schema['pretrain_dataset'] == pl.String:
         return df
     return df.with_columns(pl.col('pretrain_dataset').list.join(' + '))
 
 
 def pretrain_dataset_to_list(df: pl.DataFrame) -> pl.DataFrame:
-    """pretrain_dataset as an ordered list of corpora: 'A + B + C' -> ['A', 'B', 'C'] (a single corpus gives a list of one element)."""
-    return df.with_columns(pl.col('pretrain_dataset').str.split('+').list.eval(pl.element().str.strip_chars()))
+    """pretrain_dataset as an ordered list of corpora.
+
+    'A + B + C' -> ['A', 'B', 'C'] (a single corpus gives a list of one element).
+    """
+    return df.with_columns(
+        pl.col('pretrain_dataset')
+        .str.split('+')
+        .list.eval(pl.element().str.strip_chars())
+    )
+
 
 METADATA_SCHEMA: dict[str, pl.DataType] = {
     'model_name': pl.String,
@@ -88,7 +100,8 @@ METADATA_SCHEMA: dict[str, pl.DataType] = {
     'pretrain_dataset': pl.String,
     'pretrain_dataset_size': pl.String,
     'pretrain_method': pl.String,
-    'pretrain_ft': pl.List(pl.String),  # ordered fine-tuning chain, None = no fine-tuning
+    # ordered fine-tuning chain, None = no fine-tuning
+    'pretrain_ft': pl.List(pl.String),
     'pretrain_resolution': pl.Int64,
     'pretrain_ft_resolution': pl.Int64,
     'pretrain_epochs': pl.Int64,
@@ -204,8 +217,9 @@ def main() -> None:
         batch_files = sorted(temp_dir.glob('batch_*.parquet'))
         if batch_files:
             dfs = [pl.read_parquet(f) for f in batch_files]
-            # the models already stored in the local parquet are kept: only the new ones come from the batches
-            # (without this the parquet was overwritten with the new models only)
+            # the models already stored in the local parquet are kept: only the new
+            # ones come from the batches (without this the parquet was overwritten
+            # with the new models only)
             if parquet_path.exists():
                 dfs.insert(0, pretrain_dataset_to_text(pl.read_parquet(parquet_path)))
             df = pl.concat(dfs, how='diagonal_relaxed')
@@ -218,23 +232,29 @@ def main() -> None:
         else:
             df = pl.DataFrame(schema=METADATA_SCHEMA)
 
-    # pretrain_org is recomputed from pretrain_config for every model, also for those already
-    # stored in the local parquet, so that a fix of the organisation parser needs no re-extraction.
-    df = pretrain_dataset_to_text(df)  # a registry already stored with lists is converted back for the refresh_* helpers below
+    # pretrain_org is recomputed from pretrain_config for every model, also for
+    # those already stored in the local parquet, so that a fix of the organisation
+    # parser needs no re-extraction.
+    # a registry already stored with lists is converted back for the refresh_*
+    # helpers below
+    df = pretrain_dataset_to_text(df)
     old_org = df['pretrain_org']
     df = refresh_pretrain_org(df)
     n_ds = df['pretrain_dataset'].null_count()
     df = refresh_pretrain_dataset(df)
-    # pretrain_ft as an ordered list of fine-tuning datasets, recomputed from pretrain_config for every model
+    # pretrain_ft as an ordered list of fine-tuning datasets, recomputed from
+    # pretrain_config for every model
     df = refresh_pretrain_ft(df)
-    print(f'pretrain_dataset filled for {n_ds - df["pretrain_dataset"].null_count()} models')
+    n_filled = n_ds - df['pretrain_dataset'].null_count()
+    print(f'pretrain_dataset filled for {n_filled} models')
     n_changed = int((df['pretrain_org'].fill_null('') != old_org.fill_null('')).sum())
     print(f'pretrain_org changed for {n_changed} models')
 
     # Derived columns (pretrain_tasks, paradigm) are recomputed for every model,
     # also for those already stored in the local parquet.
     df = add_derived_columns(df)
-    df = pretrain_dataset_to_list(df)  # the published registry stores pretrain_dataset as list<string>
+    # the published registry stores pretrain_dataset as list<string>
+    df = pretrain_dataset_to_list(df)
     df.write_parquet(parquet_path)
 
     print(f'DataFrame shape: {df.shape}')
@@ -247,7 +267,8 @@ def main() -> None:
     api = HfApi(token=get_token())
     api.create_repo(repo_id=repo_id, repo_type='dataset', exist_ok=True)
 
-    # Only the registry parquet is uploaded (not the whole folder: no backups, temp batches or other copies).
+    # Only the registry parquet is uploaded (not the whole folder: no backups,
+    # temp batches or other copies).
     api.upload_file(
         repo_id=repo_id,
         repo_type='dataset',
@@ -260,6 +281,9 @@ def main() -> None:
         repo_dir=local_path,
         repo_id=repo_id,
         num_models=len(df),
+        citation_bibtex=OmegaConf.load('configs/hydra/generate_readme.yaml')[
+            'citation_bibtex'
+        ],
         push_online=True,
         commit_message='Update README',
     )

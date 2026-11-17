@@ -272,6 +272,7 @@ def generate_readme_with_configs(
     task_categories: list[str] | None = None,
     tags: list[str] | None = None,
     citation_bibtex: str | None = None,
+    license: str | None = None,
     push_online: bool = True,
     commit_message: str = 'Update README configs (online models only)',
 ) -> None:
@@ -318,6 +319,10 @@ def generate_readme_with_configs(
     citation_bibtex : str, optional
         BibTeX citation to include in a "Citation" section. If None,
         the section is omitted.
+    license : str, optional
+        Hugging Face license identifier of the dataset (e.g.,
+        "cc-by-nc-4.0"). Written to the YAML front-matter and shown in a
+        "License" section. If None, the field and the section are omitted.
     push_online : bool, optional
         Whether to upload the README to Hugging Face. Defaults to True.
     commit_message : str, optional
@@ -361,6 +366,8 @@ def generate_readme_with_configs(
     yaml_top = {
         'pretty_name': pretty_name or f'Latents for {dataset_name} (timm)',
     }
+    if license:
+        yaml_top['license'] = license
     if task_categories:
         yaml_top['task_categories'] = list(task_categories)
     if tags:
@@ -496,6 +503,16 @@ def generate_readme_with_configs(
             + ['    ```']
         )
 
+    license_section = ''
+    if license:
+        license_section = '\n'.join(
+            [
+                '    ## License',
+                '',
+                f'    The embeddings are released under `{license}`.',
+            ]
+        )
+
     badges_block = ''
     if badges:
         badges_block = '\n'.join(
@@ -555,6 +572,8 @@ def generate_readme_with_configs(
     {code_repo_link}
     {model_registry_link}
     {extra_markdown}
+
+{license_section}
 
 {citation_section}
     """)
@@ -776,6 +795,7 @@ def generate_model_registry_readme(
     repo_id: str,
     *,
     num_models: int,
+    citation_bibtex: str | None = None,
     push_online: bool = True,
     commit_message: str = 'Update README',
 ) -> None:
@@ -790,6 +810,9 @@ def generate_model_registry_readme(
         Full Hugging Face repository ID (e.g., "spaicom-lab/semasia-model-registry").
     num_models : int
         Number of models in the registry.
+    citation_bibtex : str, optional
+        BibTeX citation to include in a "Citation" section. If None,
+        the section is omitted.
     push_online : bool, optional
         Whether to upload the README to HuggingFace. Defaults to True.
     commit_message : str, optional
@@ -918,7 +941,15 @@ def generate_model_registry_readme(
         .replace('@@N@@', str(num_models))
     )
 
-    md_body = md_head + fields_md + md_tail
+    citation_md = ''
+    if citation_bibtex:
+        citation_md = (
+            '\n## Citation\n\n'
+            'If you use this registry, please cite:\n\n'
+            f'```bibtex\n{citation_bibtex.strip()}\n```\n'
+        )
+
+    md_body = md_head + fields_md + md_tail + citation_md
 
     out_path = repo_dir / 'README.md'
     out_path.write_text(yaml_text + md_body, encoding='utf-8')

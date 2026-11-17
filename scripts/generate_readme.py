@@ -54,6 +54,7 @@ def main(cfg: DictConfig) -> None:
         task_categories=cfg.get('task_categories'),
         tags=cfg.get('tags'),
         citation_bibtex=cfg.get('citation_bibtex'),
+        license=cfg.get('license'),
         push_online=True,
     )
 
