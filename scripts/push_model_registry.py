@@ -14,6 +14,7 @@ inside ``get_model_metadata``.
 Usage:
     uv run scripts/push_model_registry.py            # build and push
     uv run scripts/push_model_registry.py --no-push  # build locally only
+    uv run scripts/push_model_registry.py --repo-id USER/NAME --private  # test push
 """
 
 import argparse
@@ -145,9 +146,19 @@ def main() -> None:
     parser.add_argument(
         '--no-push', action='store_true', help='update the local registry only'
     )
+    parser.add_argument(
+        '--repo-id',
+        default='spaicom-lab/semasia-model-registry',
+        help='Hub dataset repository to push to (default: the public registry)',
+    )
+    parser.add_argument(
+        '--private',
+        action='store_true',
+        help='create the repository as private (e.g. for a test push)',
+    )
     args = parser.parse_args()
 
-    repo_id = 'spaicom-lab/semasia-model-registry'
+    repo_id = args.repo_id
     local_path = Path('data/semasia-model-registry')
     temp_dir = local_path / 'temp'
     local_path.mkdir(parents=True, exist_ok=True)
@@ -266,7 +277,12 @@ def main() -> None:
         return
 
     api = HfApi(token=get_token())
-    api.create_repo(repo_id=repo_id, repo_type='dataset', exist_ok=True)
+    api.create_repo(
+        repo_id=repo_id,
+        repo_type='dataset',
+        private=True if args.private else None,
+        exist_ok=True,
+    )
 
     # Only the registry parquet is uploaded (not the whole folder: no backups,
     # temp batches or other copies).
