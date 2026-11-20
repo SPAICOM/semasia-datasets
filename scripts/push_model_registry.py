@@ -37,6 +37,7 @@ from src.utils.huggingface import generate_model_registry_readme
 from src.utils.timm_metadata import (
     add_derived_columns,
     get_model_metadata,
+    refresh_hf_url,
     refresh_pretrain_dataset,
     refresh_pretrain_ft,
     refresh_pretrain_org,
@@ -147,6 +148,11 @@ def main() -> None:
         '--no-push', action='store_true', help='update the local registry only'
     )
     parser.add_argument(
+        '--verify-urls',
+        action='store_true',
+        help='check hf_url of every model on the Hub (default: only the new models)',
+    )
+    parser.add_argument(
         '--repo-id',
         default='spaicom-lab/semasia-model-registry',
         help='Hub dataset repository to push to (default: the public registry)',
@@ -176,6 +182,7 @@ def main() -> None:
     processed = load_existing_models(parquet_path)
     failed = load_failed_models(failed_path)
 
+    new_models: set[str] = set()
     models_to_process = [
         m for m in model_names if m not in processed and m not in failed
     ]
@@ -229,6 +236,7 @@ def main() -> None:
         batch_files = sorted(temp_dir.glob('batch_*.parquet'))
         if batch_files:
             dfs = [pl.read_parquet(f) for f in batch_files]
+            new_models = {m for d in dfs for m in d['model_name'].to_list()}
             # the models already stored in the local parquet are kept: only the new
             # ones come from the batches (without this the parquet was overwritten
             # with the new models only)
@@ -265,6 +273,15 @@ def main() -> None:
     # Derived columns (pretrain_tasks, paradigm) are recomputed for every model,
     # also for those already stored in the local parquet.
     df = add_derived_columns(df)
+    # hf_url: from the timm pretrained config, checked on the Hub for the new models
+    # (all models with --verify-urls); the stored value is kept for the others
+    n_url = df['hf_url'].null_count() if 'hf_url' in df.columns else None
+    verify = set(df['model_name'].to_list()) if args.verify_urls else new_models
+    df = refresh_hf_url(df, verify=verify)
+    print(
+        f'hf_url: {len(verify)} models checked on the Hub; '
+        f'{df["hf_url"].null_count()} null (was {n_url})'
+    )
     # the published registry stores pretrain_dataset as list<string>
     df = pretrain_dataset_to_list(df)
     df.write_parquet(parquet_path)

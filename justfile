@@ -169,11 +169,11 @@ alignment-plot:
 
 # Datasets and analyses are chosen in configs/hydra/scalability.yaml; extra args are Hydra overrides, e.g.
 #   just scalability 'datasets=[cifar10,mnist]' output_dir=results/scalability_small 'analyses=[hub,footers,tables]'
-# Scalability study (sizes, FLOPs, GPU-hours, traces) -> results/scalability/report.md
+# Scalability study (sizes, FLOPs, GPU-hours, traces) -> results/scalability/
 scalability *ARGS:
     uv run scripts/scalability.py {{ARGS}}
 
-# One scalability analysis: hub | footers | columns | flops | throughput | dataloader | traces | tables | report
+# One scalability analysis: hub | footers | columns | flops | throughput | dataloader | traces | tables
 scalability-step STEP *ARGS:
     uv run scripts/scalability.py 'analyses=[{{STEP}}]' {{ARGS}}
 

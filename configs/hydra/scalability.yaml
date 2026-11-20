@@ -23,10 +23,9 @@ datasets:
 #   dataloader  data-loading rate per dataset from the local offline HF cache                      -> dataloader_rate_by_dataset
 #   traces      Hub commit history, local embedding files, per-pass times from the Hydra logs      -> hub_commits, local_embedding_files, log_passes
 #   tables      derived tables, throughput fits, GPU-hour estimates, cross-check                   -> table_*, cost_*, gpu_hours_*, key_numbers
-#   report      write report.md from the parquet files (needs ALL 8 benchmarks)
-analyses: [hub, footers, columns, flops, throughput, dataloader, traces, tables, report]
+analyses: [hub, footers, columns, flops, throughput, dataloader, traces, tables]
 
-# Folder of the parquet files and of report.md.  Use another folder for partial runs (e.g. a subset of datasets), so
+# Folder of the parquet files.  Use another folder for partial runs (e.g. a subset of datasets), so
 # that they do not overwrite the tables of the full study.
 output_dir: results/scalability
 
@@ -74,6 +73,3 @@ dataloader:
     workers: [1, 8]
     max_images: 2000
     proxy: {imagenet-1k: oxford-flowers} # benchmark not available offline -> rate of this one (large JPEGs)
-
-report:
-    compare_dir: results/scalability_3090 # optional second GPU (same layout; throughput.parquet and tables from another machine); null = none
