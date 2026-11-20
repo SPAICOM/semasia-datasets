@@ -606,6 +606,13 @@ _MODEL_REGISTRY_FIELDS: list[tuple[str, list[tuple[str, str]]]] = [
                 'Full `timm` model identifier, e.g., `vit_large_patch14_clip_224.openai_ft_in1k`. '
                 'Primary key, joined with the `model_name` column of every SEMASIA dataset.',
             ),
+            (
+                'hf_url',
+                'URL of the model page on the Hugging Face Hub '
+                '(`https://huggingface.co/<hf_hub_id>`), with `hf_hub_id` read from '
+                'the `timm` pretrained config; null if the model has no Hub '
+                'repository or it is not reachable.',
+            ),
         ],
     ),
     (
@@ -709,7 +716,10 @@ _MODEL_REGISTRY_FIELDS: list[tuple[str, list[tuple[str, str]]]] = [
             ),
             (
                 'pretrain_dataset',
-                'Corpus: ImageNet-1K/21K/22K, LAION-2B, WebLI, LVD-142M, ...',
+                'List of the pretraining corpora, one element for most models and '
+                'several for models pretrained on a mixture (for example '
+                '["DFN-2B", "COYO", "HQITP"]); ["Undocumented"] if the corpus is '
+                'not documented. The order of the elements has no meaning.',
             ),
             ('pretrain_dataset_size', 'Corpus size when ambiguous: 400M, s39b, 2.1T.'),
             (
@@ -726,7 +736,10 @@ _MODEL_REGISTRY_FIELDS: list[tuple[str, list[tuple[str, str]]]] = [
             ),
             (
                 'pretrain_ft',
-                'Ordered list of the datasets of the subsequent fine-tuning stages (last = final stage), e.g. [ImageNet-1K] or [ImageNet-22K, ImageNet-1K]; null = no fine-tuning.',
+                'Ordered list of the datasets of the fine-tuning stages, first stage '
+                'first, for example [ImageNet-22K, ImageNet-1K]; null if the model '
+                'was not fine-tuned. The pretraining corpora are in '
+                '`pretrain_dataset`.',
             ),
             ('pretrain_resolution', 'Input resolution at pretraining.'),
             ('pretrain_ft_resolution', 'Input resolution at fine-tuning.'),
@@ -796,6 +809,7 @@ def generate_model_registry_readme(
     *,
     num_models: int,
     citation_bibtex: str | None = None,
+    license: str | None = None,
     push_online: bool = True,
     commit_message: str = 'Update README',
 ) -> None:
@@ -813,6 +827,10 @@ def generate_model_registry_readme(
     citation_bibtex : str, optional
         BibTeX citation to include in a "Citation" section. If None,
         the section is omitted.
+    license : str, optional
+        Hugging Face license identifier of the registry (e.g., "cc-by-4.0").
+        Written to the YAML front-matter and shown in a "License" section.
+        If None, the field and the section are omitted.
     push_online : bool, optional
         Whether to upload the README to HuggingFace. Defaults to True.
     commit_message : str, optional
@@ -838,6 +856,8 @@ def generate_model_registry_readme(
         'pretty_name': 'Timm Model Metadata Registry',
         'num_models': num_models,
     }
+    if license:
+        yaml_top['license'] = license
     yaml_text = '---\n' + yaml.safe_dump(yaml_top, sort_keys=False) + '---\n'
 
     fields_md = '\n\n'.join(
@@ -949,7 +969,13 @@ def generate_model_registry_readme(
             f'```bibtex\n{citation_bibtex.strip()}\n```\n'
         )
 
-    md_body = md_head + fields_md + md_tail + citation_md
+    license_md = (
+        f'\n## License\n\nThe registry is released under `{license}`.\n'
+        if license
+        else ''
+    )
+
+    md_body = md_head + fields_md + md_tail + license_md + citation_md
 
     out_path = repo_dir / 'README.md'
     out_path.write_text(yaml_text + md_body, encoding='utf-8')

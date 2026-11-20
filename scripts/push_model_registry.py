@@ -68,6 +68,7 @@ def pretrain_dataset_to_list(df: pl.DataFrame) -> pl.DataFrame:
 
 METADATA_SCHEMA: dict[str, pl.DataType] = {
     'model_name': pl.String,
+    'hf_url': pl.String,
     'family': pl.String,
     'macro_family': pl.String,
     'model_version': pl.String,
@@ -277,13 +278,13 @@ def main() -> None:
         commit_message='Add/update model metadata registry',
     )
 
+    readme_cfg = OmegaConf.load('configs/hydra/generate_readme.yaml')
     generate_model_registry_readme(
         repo_dir=local_path,
         repo_id=repo_id,
         num_models=len(df),
-        citation_bibtex=OmegaConf.load('configs/hydra/generate_readme.yaml')[
-            'citation_bibtex'
-        ],
+        citation_bibtex=readme_cfg['citation_bibtex'],
+        license=readme_cfg['model_registry_license'],
         push_online=True,
         commit_message='Update README',
     )

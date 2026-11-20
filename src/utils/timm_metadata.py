@@ -2049,6 +2049,15 @@ def add_derived_columns(df):
     )
 
 
+def _hf_url(model_name: str) -> str | None:
+    """Hub model page from the timm pretrained config (None if no hf_hub_id)."""
+    import timm
+
+    cfg = timm.models.get_pretrained_cfg(model_name)
+    h = getattr(cfg, 'hf_hub_id', None) if cfg is not None else None
+    return f'https://huggingface.co/{h}' if h else None
+
+
 def get_model_metadata(model_name: str, use_timm: bool = True) -> dict:
     """
     Given a timm model name (``{model_variant}.{pretrain_config}``),
@@ -2153,6 +2162,7 @@ def get_model_metadata(model_name: str, use_timm: bool = True) -> dict:
 
     return {
         'model_name': model_name,
+        'hf_url': _hf_url(model_name),
         **variant_fields,
         'num_parameters': num_parameters,
         'latent_dim': latent_dim,

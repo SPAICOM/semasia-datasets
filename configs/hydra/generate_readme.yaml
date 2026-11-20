@@ -25,6 +25,8 @@ badges:
 # licenses of the source datasets and of the timm models)
 # --------------------------
 license: cc-by-nc-4.0
+# License of the model registry (metadata only, no embeddings)
+model_registry_license: cc-by-4.0
 
 # --------------------------
 # Hugging Face Hub tags (controls discoverability/filters on the Hub)
