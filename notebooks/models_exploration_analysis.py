@@ -1,7 +1,7 @@
 import marimo
 
-__generated_with = "0.23.6"
-app = marimo.App(width="columns")
+__generated_with = '0.23.6'
+app = marimo.App(width='columns')
 
 
 @app.cell
@@ -171,11 +171,10 @@ def _(df, pl):
 
 @app.cell
 def _(OUT, df, pl):
-    import matplotlib.pyplot as plt
     import matplotlib.patches as mpatches
+    import matplotlib.pyplot as plt
     import matplotlib.ticker as ticker
     import numpy as np
-    import pandas as pd
 
     # ── Reproducible style close to NeurIPS/ICML papers ──────────────────────────
     plt.rcParams.update(
@@ -385,7 +384,9 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(df, pl, px):
     heat_df = (
-        df.explode('pretrain_dataset')  # a model with several corpora counts once for each of them
+        df.explode(
+            'pretrain_dataset'
+        )  # a model with several corpora counts once for each of them
         .group_by(['pretrain_method', 'pretrain_dataset'])
         .len()
         .filter(pl.col('len') > 1)
@@ -737,7 +738,7 @@ def _(OUT, df, np, pl, plt):
             np.ceil(np.log10(y_max_raw)) + 1,
         )
         ax.set_yticks(y_ticks)
-        ax.set_yticklabels([r'$10^{%d}$' % int(t) for t in y_ticks])
+        ax.set_yticklabels([rf'$10^{{{int(t)}}}$' for t in y_ticks])
 
         ax.set_xticks(range(1, n_groups + 1))
         ax.set_xticklabels(x_order, rotation=45, ha='right', rotation_mode='anchor')
@@ -1003,11 +1004,17 @@ def _(df, pl, px):
     # Treemap: pretrain_org -> family -> count
     tree_df = (
         df.filter(pl.col('pretrain_org').is_not_null())
-            # torchvision v1 and v2 recipes are the same organisation: merged here (the registry keeps them apart)
-            .with_columns(pretrain_org=pl.col('pretrain_org').replace({'torchvision-v2': 'torchvision'}))
+        # torchvision v1 and v2 recipes are the same organisation: merged here (the registry keeps them apart)
+        .with_columns(
+            pretrain_org=pl.col('pretrain_org').replace(
+                {'torchvision-v2': 'torchvision'}
+            )
+        )
         .group_by(['pretrain_org', 'family'])
         .len()
-        .sort('len', descending=True)
+        .sort(
+            ['len', 'pretrain_org', 'family'], descending=[True, False, False]
+        )  # ties: alphabetical, so the figures are deterministic
     )
 
     fig_tree = px.treemap(
@@ -1026,7 +1033,6 @@ def _(df, pl, px):
 
 @app.cell
 def _():
-    import kaleido
 
     return
 
@@ -1041,12 +1047,11 @@ def _(OUT, tree_df):
         Labels are placed only where they do not collide with an already placed label.
         """
         import math
-
-        import circlify
-        import matplotlib.pyplot as plt
-        import matplotlib.patheffects as pe
         from types import SimpleNamespace
 
+        import circlify
+        import matplotlib.patheffects as pe
+        import matplotlib.pyplot as plt
         from matplotlib.patches import Circle
 
         plt.rcParams.update(
@@ -1057,12 +1062,24 @@ def _(OUT, tree_df):
                 'ps.fonttype': 42,
             }
         )
-        tree_pd = tree_df.to_pandas()  # polars -> pandas; columns: pretrain_org, family, len
+        tree_pd = (
+            tree_df.to_pandas()
+        )  # polars -> pandas; columns: pretrain_org, family, len
 
         # ── palette: the 11 largest organisations get a hand-picked colour, the others a generated one ──────────
-        COLOURS = ['#E69F00', '#56B4E9', '#009E73', '#0072B2', '#D55E00', '#CC79A7',
-                   '#882255', '#117733', '#DDCC77', '#6699CC', '#AA4499']
-        GREY = '#8C8C8C'
+        COLOURS = [
+            '#E69F00',
+            '#56B4E9',
+            '#009E73',
+            '#0072B2',
+            '#D55E00',
+            '#CC79A7',
+            '#882255',
+            '#117733',
+            '#DDCC77',
+            '#6699CC',
+            '#AA4499',
+        ]
 
         def rgb(h):
             h = h.lstrip('#')
@@ -1075,35 +1092,67 @@ def _(OUT, tree_df):
             return tuple(x * (1 - s) for x in c)
 
         def lum(c):
-            lin = lambda v: v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4
+            def lin(v):
+                return v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4
+
             return 0.2126 * lin(c[0]) + 0.7152 * lin(c[1]) + 0.0722 * lin(c[2])
 
         # The timm training recipes ("timm D recipe", "timm RA2 recipe", ...) are not organisations: they form one macro-group
         # "timm" (organisation -> recipe -> family); every other organisation is organisation -> family.
-        group_of = lambda o: 'TIMM' if o.startswith('timm ') else o
+        def group_of(o):
+            return 'TIMM' if o.startswith('timm ') else o
+
         tree_pd['group'] = tree_pd['pretrain_org'].map(group_of)
-        totals = tree_pd.groupby('group')['len'].sum().sort_values(ascending=False)
+        totals = (
+            tree_pd.groupby('group')['len']
+            .sum()
+            .sort_index()
+            .sort_values(ascending=False, kind='stable')
+        )  # ties: alphabetical
         orgs = totals.index.tolist()  # groups, largest first
         import colorsys
 
-        def extra(i):  # beyond the 11 hand-picked colours: golden-angle hues, so that neighbours in the ranking differ
+        def extra(
+            i,
+        ):  # beyond the 11 hand-picked colours: golden-angle hues, so that neighbours in the ranking differ
             h = (0.05 + 0.618034 * i) % 1.0
-            return colorsys.hsv_to_rgb(h, 0.55 if i % 2 else 0.70, 0.80 if i % 3 else 0.68)
+            return colorsys.hsv_to_rgb(
+                h, 0.55 if i % 2 else 0.70, 0.80 if i % 3 else 0.68
+            )
 
-        hue = {o: rgb(COLOURS[i]) if i < len(COLOURS) else extra(i - len(COLOURS)) for i, o in enumerate(orgs)}
+        hue = {
+            o: rgb(COLOURS[i]) if i < len(COLOURS) else extra(i - len(COLOURS))
+            for i, o in enumerate(orgs)
+        }
         rec_tot = tree_pd.groupby('pretrain_org')['len'].sum()
-        members = {g: rec_tot[tree_pd[tree_pd['group'] == g]['pretrain_org'].unique()].sort_values(ascending=False).index.tolist() for g in orgs}
-        fams = {r: tree_pd[tree_pd['pretrain_org'] == r].sort_values('len', ascending=False).reset_index(drop=True) for r in rec_tot.index}
-        total = int(totals.sum())
-        n_orgs = tree_pd['pretrain_org'].nunique()
-        n_recipes = len(members.get('TIMM', []))
+        members = {
+            g: rec_tot[tree_pd[tree_pd['group'] == g]['pretrain_org'].unique()]
+            .sort_index()
+            .sort_values(ascending=False, kind='stable')
+            .index.tolist()
+            for g in orgs
+        }
+        fams = {
+            r: tree_pd[tree_pd['pretrain_org'] == r]
+            .sort_values(['len', 'family'], ascending=[False, True])
+            .reset_index(drop=True)
+            for r in rec_tot.index
+        }
 
         # ── packing ──────────────────────────────────────────────────────────────────────────────────
         SMALL = 30  # one single packing of all the organisations: the smallest end up at the top left, the biggest at the bottom right
         small_orgs = [o for o in orgs if totals[o] < SMALL]
         big_orgs = [o for o in orgs if totals[o] >= SMALL]
         big_vals = [float(totals[o]) for o in big_orgs]
-        bc = list(reversed(circlify.circlify(big_vals, show_enclosure=False, target_enclosure=circlify.Circle(x=0, y=0, r=1))))
+        bc = list(
+            reversed(
+                circlify.circlify(
+                    big_vals,
+                    show_enclosure=False,
+                    target_enclosure=circlify.Circle(x=0, y=0, r=1),
+                )
+            )
+        )
         pos = {o: SimpleNamespace(x=c.x, y=c.y, r=c.r) for o, c in zip(big_orgs, bc)}
         r_pack = max(math.hypot(c.x, c.y) + c.r for c in bc)
         k = bc[0].r / math.sqrt(big_vals[0])  # same area scale for the small circles
@@ -1115,25 +1164,38 @@ def _(OUT, tree_df):
         discs = [(c.x, c.y, c.r) for c in bc]
         for o in big_orgs:  # the name of a macro-group that does not fit inside is written above it: keep that spot free
             if o == 'TIMM':
-                discs += [(pos[o].x + dx, pos[o].y + pos[o].r + 0.05, 0.06) for dx in (-0.13, 0.0, 0.13)]
+                discs += [
+                    (pos[o].x + dx, pos[o].y + pos[o].r + 0.05, 0.06)
+                    for dx in (-0.13, 0.0, 0.13)
+                ]
         placed_deg = []
-        for o in sorted(small_orgs, key=lambda o: (-totals[o], len(o))):  # innermost first
+        for o in sorted(
+            small_orgs, key=lambda o: (-totals[o], len(o))
+        ):  # innermost first
             r, best = rs[o], None
             for deg in range(0, 360, 2):
                 ux, uy = math.cos(math.radians(deg)), math.sin(math.radians(deg))
                 d = r_pack + r + 0.5
                 STEP = 0.002
-                while d > 0:  # never deeper than the outline of the packing: no small circle sits in a concavity between big ones
+                while (
+                    d > 0
+                ):  # never deeper than the outline of the packing: no small circle sits in a concavity between big ones
                     x, y = (d - STEP) * ux, (d - STEP) * uy
-                    if any(math.hypot(x - cx, y - cy) < cr + r + GAP for cx, cy, cr in discs):
+                    if any(
+                        math.hypot(x - cx, y - cy) < cr + r + GAP
+                        for cx, cy, cr in discs
+                    ):
                         break
                     d -= STEP
-                cost = d + 0.05 * sum(1 for q in placed_deg if abs((deg - q + 180) % 360 - 180) < 25)  # nestle in, but spread around the packing
+                cost = d + 0.05 * sum(
+                    1 for q in placed_deg if abs((deg - q + 180) % 360 - 180) < 25
+                )  # nestle in, but spread around the packing
                 if best is None or cost < best[0]:
                     best = (cost, d * ux, d * uy)
             pos[o] = SimpleNamespace(x=best[1], y=best[2], r=r)
             discs.append((best[1], best[2], r))
             placed_deg.append(math.degrees(math.atan2(best[2], best[1])) % 360)
+
         # A tiny circle enclosed by the others (no free ray to the outside) is moved to the border of the packing, towards the top left,
         # where the other small circles are: it comes in from the outside along a ray and stops when it touches a circle.
         def enclosed(o):
@@ -1141,21 +1203,34 @@ def _(OUT, tree_df):
             others = [(q.x, q.y, q.r) for k, q in pos.items() if k != o]
             for deg in range(0, 360, 5):
                 ux, uy = math.cos(math.radians(deg)), math.sin(math.radians(deg))
-                if all(math.hypot(p.x + t * ux - cx, p.y + t * uy - cy) >= cr + p.r for t in [0.01 * k for k in range(1, 260)] for cx, cy, cr in others):
+                if all(
+                    math.hypot(p.x + t * ux - cx, p.y + t * uy - cy) >= cr + p.r
+                    for t in [0.01 * k for k in range(1, 260)]
+                    for cx, cy, cr in others
+                ):
                     return False
             return True
 
-        for o in [o for o in orgs if totals[o] < 10 and False]:  # only the tiny ones: the big circles are meant to be in the middle
+        for o in [
+            o for o in orgs if totals[o] < 10 and False
+        ]:  # only the tiny ones: the big circles are meant to be in the middle
             others = [(q.x, q.y, q.r) for k, q in pos.items() if k != o]
             r, best = pos[o].r, None
             for deg in range(0, 360, 2):
                 ux, uy = math.cos(math.radians(deg)), math.sin(math.radians(deg))
                 d = r_pack + r + 0.5
                 while d > 0:
-                    if any(math.hypot((d - 0.002) * ux - cx, (d - 0.002) * uy - cy) < cr + r + GAP for cx, cy, cr in others):
+                    if any(
+                        math.hypot((d - 0.002) * ux - cx, (d - 0.002) * uy - cy)
+                        < cr + r + GAP
+                        for cx, cy, cr in others
+                    ):
                         break
                     d -= 0.002
-                diff = abs((math.radians(deg) - math.radians(135) + math.pi) % (2 * math.pi) - math.pi)  # angular distance from the top left
+                diff = abs(
+                    (math.radians(deg) - math.radians(135) + math.pi) % (2 * math.pi)
+                    - math.pi
+                )  # angular distance from the top left
                 if best is None or d + 0.25 * diff < best[0]:
                     best = (d + 0.25 * diff, d * ux, d * uy)
             print('moved to the border (it was enclosed):', o)
@@ -1168,8 +1243,14 @@ def _(OUT, tree_df):
             for _off in range(0, 90, 2):
                 for _sgn in (1, -1):
                     _a = math.radians(225 + _sgn * _off)
-                    _x, _y = _l.x + (_l.r + _g.r + GAP) * math.cos(_a), _l.y + (_l.r + _g.r + GAP) * math.sin(_a)
-                    if all(math.hypot(_x - cx, _y - cy) >= cr + _g.r + GAP * 0.5 for cx, cy, cr in _others):
+                    _x, _y = (
+                        _l.x + (_l.r + _g.r + GAP) * math.cos(_a),
+                        _l.y + (_l.r + _g.r + GAP) * math.sin(_a),
+                    )
+                    if all(
+                        math.hypot(_x - cx, _y - cy) >= cr + _g.r + GAP * 0.5
+                        for cx, cy, cr in _others
+                    ):
                         _best = (_x, _y)
                         break
                 if _best:
@@ -1185,8 +1266,14 @@ def _(OUT, tree_df):
             for _off in range(0, 90, 2):
                 for _sgn in (1, -1):
                     _a = math.radians(315 + _sgn * _off)
-                    _x, _y = _l.x + (_l.r + _g.r + GAP) * math.cos(_a), _l.y + (_l.r + _g.r + GAP) * math.sin(_a)
-                    if all(math.hypot(_x - cx, _y - cy) >= cr + _g.r + GAP * 0.5 for cx, cy, cr in _others):
+                    _x, _y = (
+                        _l.x + (_l.r + _g.r + GAP) * math.cos(_a),
+                        _l.y + (_l.r + _g.r + GAP) * math.sin(_a),
+                    )
+                    if all(
+                        math.hypot(_x - cx, _y - cy) >= cr + _g.r + GAP * 0.5
+                        for cx, cy, cr in _others
+                    ):
                         _best = (_x, _y)
                         break
                 if _best:
@@ -1198,16 +1285,20 @@ def _(OUT, tree_df):
         small_set = set(small_orgs)
         x_lo = min(c.x - c.r for c in outer) - LABEL_W
         x_hi = max(c.x + c.r for c in outer) + LABEL_W
-        y_lo, y_hi = min(c.y - c.r for c in outer) - 0.03, max(c.y + c.r for c in outer) + 0.03
+        y_lo, y_hi = (
+            min(c.y - c.r for c in outer) - 0.03,
+            max(c.y + c.r for c in outer) + 0.03,
+        )
         X_PAD, Y_PAD = 0.0, 0.02
         FIG_W = 12.5
-        FIG_H = FIG_W * ((y_hi - y_lo) + 2 * Y_PAD) / ((x_hi - x_lo) + X_PAD) + 0.95  # + title
+        FIG_H = (
+            FIG_W * ((y_hi - y_lo) + 2 * Y_PAD) / ((x_hi - x_lo) + X_PAD) + 0.95
+        )  # + title
         fig, ax = plt.subplots(figsize=(FIG_W, FIG_H), dpi=150)
         ax.set_aspect('equal')
         ax.axis('off')
         ax.set_xlim(x_lo - 0.02, x_hi + X_PAD)
         ax.set_ylim(y_lo - Y_PAD, y_hi + Y_PAD)
-        lim = r_pack
         fig.canvas.draw()
         renderer = fig.canvas.get_renderer()
         placed = []  # window-space bboxes of the labels already placed
@@ -1229,7 +1320,9 @@ def _(OUT, tree_df):
                 while sz >= floor:
                     t = ax.text(x, y, v, fontsize=sz, zorder=7, linespacing=0.95, **kw)
                     if halo:
-                        t.set_path_effects([pe.withStroke(linewidth=2.2, foreground=halo)])
+                        t.set_path_effects(
+                            [pe.withStroke(linewidth=2.2, foreground=halo)]
+                        )
                     w = t.get_window_extent(renderer)
                     inv = ax.transData.inverted()
                     wd = inv.transform((w.x1, w.y0))[0] - inv.transform((w.x0, w.y0))[0]
@@ -1248,37 +1341,94 @@ def _(OUT, tree_df):
             """Circles (x, y, r) packed inside the circle (x, y, r), same order as `values` (sorted descending)."""
             if len(values) == 1:
                 return [(x, y, r * 0.92)]
-            cs = list(reversed(circlify.circlify(values, show_enclosure=False, target_enclosure=circlify.Circle(x=0, y=0, r=1))))
-            return [(x + c.x * r * shrink, y + c.y * r * shrink, c.r * r * shrink) for c in cs]
+            cs = list(
+                reversed(
+                    circlify.circlify(
+                        values,
+                        show_enclosure=False,
+                        target_enclosure=circlify.Circle(x=0, y=0, r=1),
+                    )
+                )
+            )
+            return [
+                (x + c.x * r * shrink, y + c.y * r * shrink, c.r * r * shrink)
+                for c in cs
+            ]
 
         def draw_families(recipe, x, y, r, base):
             f = fams[recipe]
             n = len(f)
-            for (fx, fy, fr), (rank, row) in zip(pack(f['len'].tolist(), x, y, r), f.iterrows()):
+            for (fx, fy, fr), (rank, row) in zip(
+                pack(f['len'].tolist(), x, y, r), f.iterrows()
+            ):
                 col = tint(base, 0.06 + 0.50 * rank / max(n - 1, 1))
-                ax.add_patch(Circle((fx, fy), fr, facecolor=(*col, 0.95), edgecolor='white', linewidth=0.5, zorder=4))
+                ax.add_patch(
+                    Circle(
+                        (fx, fy),
+                        fr,
+                        facecolor=(*col, 0.95),
+                        edgecolor='white',
+                        linewidth=0.5,
+                        zorder=4,
+                    )
+                )
                 fam_draw.append((fx, fy, fr, row['family'], int(row['len']), col))
 
         for circ, org in zip(outer, orgs):
             cx, cy, cr = circ.x, circ.y, circ.r
             base, dark = hue[org], shade(hue[org], 0.35)
-            ax.add_patch(Circle((cx, cy), cr, facecolor=(*dark, 0.09), edgecolor=(*dark, 0.75), linewidth=1.1, zorder=2))
+            ax.add_patch(
+                Circle(
+                    (cx, cy),
+                    cr,
+                    facecolor=(*dark, 0.09),
+                    edgecolor=(*dark, 0.75),
+                    linewidth=1.1,
+                    zorder=2,
+                )
+            )
             if members[org] == [org]:
                 draw_families(org, cx, cy, cr, base)
             else:  # macro-group: one circle per recipe, families inside
-                for (rx, ry, rr), rec in zip(pack([float(rec_tot[m]) for m in members[org]], cx, cy, cr, 0.95), members[org]):
-                    ax.add_patch(Circle((rx, ry), rr, facecolor=(*tint(base, 0.80), 0.55), edgecolor=(*dark, 0.55), linewidth=0.7, zorder=3))
+                for (rx, ry, rr), rec in zip(
+                    pack([float(rec_tot[m]) for m in members[org]], cx, cy, cr, 0.95),
+                    members[org],
+                ):
+                    ax.add_patch(
+                        Circle(
+                            (rx, ry),
+                            rr,
+                            facecolor=(*tint(base, 0.80), 0.55),
+                            edgecolor=(*dark, 0.55),
+                            linewidth=0.7,
+                            zorder=3,
+                        )
+                    )
                     draw_families(rec, rx, ry, rr, base)
                     rec_draw.append((rx, ry, rr, rec, int(rec_tot[rec]), dark))
 
         # ── recipe labels, before the organisation labels so that they keep priority (inside the recipe circle; "timm " is implied by the group) ──────────────────
         for rx, ry, rr, name, cnt, dark in sorted(rec_draw, key=lambda r: -r[2]):
-            short = name.removeprefix('timm ').removesuffix(' recipe')  # "D", "RA2", ...
-            put(rx, ry + rr * 0.76, [f'{short}  ({cnt})', f'{short}\n({cnt})'], fit_w=rr * 1.8, size=10, min_size=5.0,
-                ha='center', va='center', color=shade(dark, 0.1), fontweight='bold', halo=(1, 1, 1, 0.85))
+            short = name.removeprefix('timm ').removesuffix(
+                ' recipe'
+            )  # "D", "RA2", ...
+            put(
+                rx,
+                ry + rr * 0.76,
+                [f'{short}  ({cnt})', f'{short}\n({cnt})'],
+                fit_w=rr * 1.8,
+                size=10,
+                min_size=5.0,
+                ha='center',
+                va='center',
+                color=shade(dark, 0.1),
+                fontweight='bold',
+                halo=(1, 1, 1, 0.85),
+            )
 
         # ── organisation labels ─────────────────────────────────────────────────────────────────────
         order_by_size = sorted(range(len(orgs)), key=lambda i: -outer[i].r)
+
         def around(i, s_, dark):
             """Name of a small circle next to it, on the side where it disturbs the least (it may touch the neighbouring circles a bit,
             but never another label); returns True when placed."""
@@ -1288,14 +1438,44 @@ def _(OUT, tree_df):
             best = None
             for sz in (9.5, 9, 8.5):
                 for deg in (0, 30, -30, 60, -60, 90, -90, 120, -120, 150, -150, 180):
-                    ux, uy = math.cos(out + math.radians(deg)), math.sin(out + math.radians(deg))
+                    ux, uy = (
+                        math.cos(out + math.radians(deg)),
+                        math.sin(out + math.radians(deg)),
+                    )
                     ha = 'left' if ux > 0.45 else 'right' if ux < -0.45 else 'center'
-                    va = 'bottom' if (ha == 'center' and uy > 0) else 'top' if (ha == 'center' and uy < 0) else 'center'
-                    t = ax.text(c.x + (c.r + 0.008) * ux, c.y + (c.r + 0.008) * uy, s_, ha=ha, va=va, fontsize=sz, fontweight='bold', color=dark, zorder=7)
+                    va = (
+                        'bottom'
+                        if (ha == 'center' and uy > 0)
+                        else 'top'
+                        if (ha == 'center' and uy < 0)
+                        else 'center'
+                    )
+                    t = ax.text(
+                        c.x + (c.r + 0.008) * ux,
+                        c.y + (c.r + 0.008) * uy,
+                        s_,
+                        ha=ha,
+                        va=va,
+                        fontsize=sz,
+                        fontweight='bold',
+                        color=dark,
+                        zorder=7,
+                    )
                     ok, bb = free(t)
                     if ok:
-                        (x0, y0), (x1, y1) = inv_.transform((bb.x0, bb.y0)), inv_.transform((bb.x1, bb.y1))
-                        pen = sum(1 for j, o in enumerate(outer) if j != i and math.hypot(min(max(o.x, x0), x1) - o.x, min(max(o.y, y0), y1) - o.y) < o.r)
+                        (x0, y0), (x1, y1) = (
+                            inv_.transform((bb.x0, bb.y0)),
+                            inv_.transform((bb.x1, bb.y1)),
+                        )
+                        pen = sum(
+                            1
+                            for j, o in enumerate(outer)
+                            if j != i
+                            and math.hypot(
+                                min(max(o.x, x0), x1) - o.x, min(max(o.y, y0), y1) - o.y
+                            )
+                            < o.r
+                        )
                         pen += 0.05 * abs(deg) / 30
                         if best is None or pen < best[0]:
                             best = (pen, ux, uy, ha, va, sz, bb)
@@ -1305,8 +1485,20 @@ def _(OUT, tree_df):
             if best is None:
                 return False
             _, ux, uy, ha, va, sz, bb = best
-            t = ax.text(c.x + (c.r + 0.008) * ux, c.y + (c.r + 0.008) * uy, s_, ha=ha, va=va, fontsize=sz, fontweight='bold', color=dark, zorder=7)
-            t.set_path_effects([pe.withStroke(linewidth=2.2, foreground=(1, 1, 1, 0.95))])
+            t = ax.text(
+                c.x + (c.r + 0.008) * ux,
+                c.y + (c.r + 0.008) * uy,
+                s_,
+                ha=ha,
+                va=va,
+                fontsize=sz,
+                fontweight='bold',
+                color=dark,
+                zorder=7,
+            )
+            t.set_path_effects(
+                [pe.withStroke(linewidth=2.2, foreground=(1, 1, 1, 0.95))]
+            )
             placed.append(bb)
             return True
 
@@ -1319,11 +1511,26 @@ def _(OUT, tree_df):
             t = None
             size0 = 11.5 if c.r > 0.15 else 9.5
             small = org in small_set
-            spots = [0.0] if small else [0.78] if members[org] != [org] else [0.78, 0.0]  # a macro-group keeps its centre for the recipes
-            for floor in ((8.0,) if small else (7.5, 6.0)):  # first try to keep the name large, then let it shrink; top of the circle first
+            spots = (
+                [0.0] if small else [0.78] if members[org] != [org] else [0.78, 0.0]
+            )  # a macro-group keeps its centre for the recipes
+            for floor in (
+                (8.0,) if small else (7.5, 6.0)
+            ):  # first try to keep the name large, then let it shrink; top of the circle first
                 for yf in spots:
-                    t = put(c.x, c.y + c.r * yf, [one, two], fit_w=c.r * 1.55, size=size0, min_size=floor,
-                            ha='center', va='center', color=dark, fontweight='bold', halo=(1, 1, 1, 0.9))
+                    t = put(
+                        c.x,
+                        c.y + c.r * yf,
+                        [one, two],
+                        fit_w=c.r * 1.55,
+                        size=size0,
+                        min_size=floor,
+                        ha='center',
+                        va='center',
+                        color=dark,
+                        fontweight='bold',
+                        halo=(1, 1, 1, 0.9),
+                    )
                     if t is not None:
                         break
                 if t is not None:
@@ -1332,7 +1539,17 @@ def _(OUT, tree_df):
                 if not around(i, one, dark):
                     ring.append(i)
             elif t is None:
-                t = ax.text(c.x, c.y + c.r + 0.01, one, ha='center', va='bottom', fontsize=10, fontweight='bold', color=dark, zorder=7)
+                t = ax.text(
+                    c.x,
+                    c.y + c.r + 0.01,
+                    one,
+                    ha='center',
+                    va='bottom',
+                    fontsize=10,
+                    fontweight='bold',
+                    color=dark,
+                    zorder=7,
+                )
                 placed.append(free(t)[1])
 
         # ── small organisations: names in two columns beside the packing, in the vertical order of their circles, joined by a thin line ──
@@ -1348,16 +1565,23 @@ def _(OUT, tree_df):
         import random
 
         def seg_x(p, q, r, s_):
-            d = lambda a, b, c: (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+            def d(a, b, c):
+                return (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+
             return d(p, q, r) * d(p, q, s_) < 0 and d(r, s_, p) * d(r, s_, q) < 0
 
         def inside_len(p, q, skip):
             n_in = 0
             for k in range(1, 40):
                 x, y = p[0] + (q[0] - p[0]) * k / 40, p[1] + (q[1] - p[1]) * k / 40
-                if any(math.hypot(x - o.x, y - o.y) < o.r for j, o in enumerate(outer) if j != skip):
+                if any(
+                    math.hypot(x - o.x, y - o.y) < o.r
+                    for j, o in enumerate(outer)
+                    if j != skip
+                ):
                     n_in += 1
             return n_in
+
         for side in (-1,):
             items = list(ring)
             n = len(items)
@@ -1365,7 +1589,9 @@ def _(OUT, tree_df):
                 continue
             xl = x_right if side > 0 else x_left
             mid = sum(outer[i].y for i in items) / n
-            top = max(min(mid + row_h * (n - 1) / 2, y_top_all), y_bot + row_h * (n - 1))
+            top = max(
+                min(mid + row_h * (n - 1) / 2, y_top_all), y_bot + row_h * (n - 1)
+            )
             slots = [top - row_h * k for k in range(n)]
             order = sorted(items, key=lambda i: -outer[i].y)
 
@@ -1375,21 +1601,34 @@ def _(OUT, tree_df):
             def base(i, k):
                 if (i, k) not in base_c:
                     p, q = P[i], (xl, slots[k])
-                    base_c[(i, k)] = 0.3 * math.hypot(q[0] - p[0], q[1] - p[1]) + 0.15 * inside_len(p, q, i)
+                    base_c[(i, k)] = 0.3 * math.hypot(
+                        q[0] - p[0], q[1] - p[1]
+                    ) + 0.15 * inside_len(p, q, i)
                 return base_c[(i, k)]
 
-            def crosses(i, k, j, l):
-                key = (i, k, j, l) if (i, k) < (j, l) else (j, l, i, k)
+            def crosses(i, k, j, m):
+                key = (i, k, j, m) if (i, k) < (j, m) else (j, m, i, k)
                 if key not in cross_c:
-                    cross_c[key] = 6.0 if seg_x(P[i], (xl, slots[k]), P[j], (xl, slots[l])) else 0.0
+                    cross_c[key] = (
+                        6.0
+                        if seg_x(P[i], (xl, slots[k]), P[j], (xl, slots[m]))
+                        else 0.0
+                    )
                 return cross_c[key]
 
             def local(order, a_, b_):
-                tot = base(order[a_], a_) + base(order[b_], b_) + crosses(order[a_], a_, order[b_], b_)
+                tot = (
+                    base(order[a_], a_)
+                    + base(order[b_], b_)
+                    + crosses(order[a_], a_, order[b_], b_)
+                )
                 for m in range(n):
                     if m != a_ and m != b_:
-                        tot += crosses(order[a_], a_, order[m], m) + crosses(order[b_], b_, order[m], m)
+                        tot += crosses(order[a_], a_, order[m], m) + crosses(
+                            order[b_], b_, order[m], m
+                        )
                 return tot
+
             rnd = random.Random(0)
             T0, N_IT = 1.0, 60000
             for it in range(N_IT):
@@ -1406,9 +1645,24 @@ def _(OUT, tree_df):
                 c, org = outer[i], orgs[i]
                 dx, dy = xl - c.x, y - c.y
                 d = math.hypot(dx, dy)
-                ax.plot([c.x + c.r * dx / d, xl - side * 0.01], [c.y + c.r * dy / d, y], color=(*shade(hue[org], 0.35), 0.8), lw=0.6, zorder=6)
-                t = ax.text(xl + side * 0.015, y, f'{org}  ({int(totals[org])})', ha='left' if side > 0 else 'right', va='center', fontsize=9,
-                            fontweight='bold', color=shade(hue[org], 0.45), zorder=7)
+                ax.plot(
+                    [c.x + c.r * dx / d, xl - side * 0.01],
+                    [c.y + c.r * dy / d, y],
+                    color=(*shade(hue[org], 0.35), 0.8),
+                    lw=0.6,
+                    zorder=6,
+                )
+                t = ax.text(
+                    xl + side * 0.015,
+                    y,
+                    f'{org}  ({int(totals[org])})',
+                    ha='left' if side > 0 else 'right',
+                    va='center',
+                    fontsize=9,
+                    fontweight='bold',
+                    color=shade(hue[org], 0.45),
+                    zorder=7,
+                )
                 placed.append(free(t)[1])
 
         # ── family labels: biggest circles first, only where there is room and nothing is covered ─────
@@ -1416,44 +1670,142 @@ def _(OUT, tree_df):
             if fr < 0.020:
                 continue
             fg = (0.97, 0.97, 0.97) if lum(col) < 0.33 else (0.10, 0.10, 0.10)
-            t = put(fx, fy + (fr * 0.12 if fr > 0.04 else 0), name, fit_w=fr * 1.75, size=min(10.5, 4 + fr * 95), min_size=5.5,
-                    ha='center', va='center', color=fg)
+            t = put(
+                fx,
+                fy + (fr * 0.12 if fr > 0.04 else 0),
+                name,
+                fit_w=fr * 1.75,
+                size=min(10.5, 4 + fr * 95),
+                min_size=5.5,
+                ha='center',
+                va='center',
+                color=fg,
+            )
             if t is not None and fr > 0.04:
-                put(fx, fy - fr * 0.34, f'{cnt}', fit_w=fr * 1.2, size=max(5.5, t.get_fontsize() * 0.8), min_size=5.0,
-                    ha='center', va='center', color=(*fg, 0.8))
+                put(
+                    fx,
+                    fy - fr * 0.34,
+                    f'{cnt}',
+                    fit_w=fr * 1.2,
+                    size=max(5.5, t.get_fontsize() * 0.8),
+                    min_size=5.0,
+                    ha='center',
+                    va='center',
+                    color=(*fg, 0.8),
+                )
 
         # ── title ───────────────────────────────────────────────────────────────────────────────────
-        fig.subplots_adjust(left=0.01, right=0.99, top=1 - 0.9 / FIG_H, bottom=0.05 / FIG_H)
+        fig.subplots_adjust(
+            left=0.01, right=0.99, top=1 - 0.9 / FIG_H, bottom=0.05 / FIG_H
+        )
         fig.canvas.draw()
-        x_left = min(t.get_window_extent(fig.canvas.get_renderer()).x0 for t in ax.texts)  # leftmost label: the title starts there
+        x_left = min(
+            t.get_window_extent(fig.canvas.get_renderer()).x0 for t in ax.texts
+        )  # leftmost label: the title starts there
         x_title = fig.transFigure.inverted().transform((x_left, 0))[0]
-        t_title = fig.text(x_title, 0.99, '(a) Models by training organization', ha='left', va='top', fontsize=20, fontweight='bold', color='#111111')
-        t_sub = fig.text(x_title, 1 - 0.52 / FIG_H, 'Pretrained checkpoints by training organisation and model family', ha='left', va='top', fontsize=12.5, color='#555555')
+        t_title = fig.text(
+            x_title,
+            0.99,
+            '(a) Models by training organization',
+            ha='left',
+            va='top',
+            fontsize=20,
+            fontweight='bold',
+            color='#111111',
+        )
+        t_sub = fig.text(
+            x_title,
+            1 - 0.52 / FIG_H,
+            'Pretrained checkpoints by training organisation and model family',
+            ha='left',
+            va='top',
+            fontsize=12.5,
+            color='#555555',
+        )
 
         # crop to what is drawn (circles, labels, title): the axes rectangle would otherwise count in matplotlib's tight box
         from matplotlib.transforms import Bbox
 
         rend = fig.canvas.get_renderer()
-        bbs = [x.get_window_extent(rend) for x in (*ax.patches, *ax.texts, *ax.lines, *fig.texts)]
-        box = Bbox.from_extents(min(b.x0 for b in bbs), min(b.y0 for b in bbs), max(b.x1 for b in bbs), max(b.y1 for b in bbs))
+        bbs = [
+            x.get_window_extent(rend)
+            for x in (*ax.patches, *ax.texts, *ax.lines, *fig.texts)
+        ]
+        box = Bbox.from_extents(
+            min(b.x0 for b in bbs),
+            min(b.y0 for b in bbs),
+            max(b.x1 for b in bbs),
+            max(b.y1 for b in bbs),
+        )
         box = box.transformed(fig.dpi_scale_trans.inverted())
         box = Bbox.from_extents(box.x0 - 0.1, box.y0 - 0.1, box.x1 + 0.1, box.y1 + 0.1)
         for ext in ('pdf', 'png'):
-            fig.savefig(str(OUT / f'models_per_company_packed.{ext}'), dpi=300, bbox_inches=box, facecolor='white', edgecolor='none')
+            fig.savefig(
+                str(OUT / f'models_per_company_packed.{ext}'),
+                dpi=300,
+                bbox_inches=box,
+                facecolor='white',
+                edgecolor='none',
+            )
         print('Saved: models_per_company_packed.pdf  +  models_per_company_packed.png')
         # variant without the subtitle (used by the side-by-side figure): the title moves down and the crop follows it
         t_sub.set_visible(False)
         t_title.set_y(0.99 - 0.40 / FIG_H)
-        bbs = [x.get_window_extent(rend) for x in (*ax.patches, *ax.texts, *ax.lines, *fig.texts) if x.get_visible()]
-        box = Bbox.from_extents(min(b.x0 for b in bbs), min(b.y0 for b in bbs), max(b.x1 for b in bbs), max(b.y1 for b in bbs)).transformed(fig.dpi_scale_trans.inverted())
+        bbs = [
+            x.get_window_extent(rend)
+            for x in (*ax.patches, *ax.texts, *ax.lines, *fig.texts)
+            if x.get_visible()
+        ]
+        box = Bbox.from_extents(
+            min(b.x0 for b in bbs),
+            min(b.y0 for b in bbs),
+            max(b.x1 for b in bbs),
+            max(b.y1 for b in bbs),
+        ).transformed(fig.dpi_scale_trans.inverted())
         box = Bbox.from_extents(box.x0 - 0.1, box.y0 - 0.1, box.x1 + 0.1, box.y1 + 0.1)
         for ext in ('pdf', 'png'):
-            fig.savefig(str(OUT / f'models_per_company_packed_nosub.{ext}'), dpi=300, bbox_inches=box, facecolor='white', edgecolor='none')
+            fig.savefig(
+                str(OUT / f'models_per_company_packed_nosub.{ext}'),
+                dpi=300,
+                bbox_inches=box,
+                facecolor='white',
+                edgecolor='none',
+            )
         t_sub.set_visible(True)
         t_title.set_y(0.99)
-        return fig, {o: tuple(hue[o]) for o in orgs}  # the figure and the colour of every organisation (reused by the Sankey)
-
-
+        # variants without the panel letter in the title (same layout, same crop rule)
+        t_title.set_text('Models by training organization')
+        for suffix, with_sub in (('', True), ('_nosub', False)):
+            t_sub.set_visible(with_sub)
+            t_title.set_y(0.99 if with_sub else 0.99 - 0.40 / FIG_H)
+            bbs = [
+                x.get_window_extent(rend)
+                for x in (*ax.patches, *ax.texts, *ax.lines, *fig.texts)
+                if x.get_visible()
+            ]
+            box = Bbox.from_extents(
+                min(b.x0 for b in bbs),
+                min(b.y0 for b in bbs),
+                max(b.x1 for b in bbs),
+                max(b.y1 for b in bbs),
+            ).transformed(fig.dpi_scale_trans.inverted())
+            box = Bbox.from_extents(
+                box.x0 - 0.1, box.y0 - 0.1, box.x1 + 0.1, box.y1 + 0.1
+            )
+            for ext in ('pdf', 'png'):
+                fig.savefig(
+                    str(OUT / f'models_per_company_packed{suffix}_noletter.{ext}'),
+                    dpi=300,
+                    bbox_inches=box,
+                    facecolor='white',
+                    edgecolor='none',
+                )
+        t_sub.set_visible(True)
+        t_title.set_y(0.99)
+        t_title.set_text('(a) Models by training organization')
+        return fig, {
+            o: tuple(hue[o]) for o in orgs
+        }  # the figure and the colour of every organisation (reused by the Sankey)
 
     fig_packed, org_hue = _()
     fig_packed
@@ -1471,12 +1823,11 @@ def _(OUT, df, pl):
         Labels are placed only where they do not collide with an already placed label.
         """
         import math
-
-        import circlify
-        import matplotlib.pyplot as plt
-        import matplotlib.patheffects as pe
         from types import SimpleNamespace
 
+        import circlify
+        import matplotlib.patheffects as pe
+        import matplotlib.pyplot as plt
         from matplotlib.patches import Circle
 
         plt.rcParams.update(
@@ -1489,10 +1840,17 @@ def _(OUT, df, pl):
         )
         # Column "pretrain_org" holds the middle-level key (the stage): the pretraining dataset alone, or "dataset → fine-tuning dataset".
         tree_pd = (
-            df.filter(pl.col('pretrain_dataset').is_not_null()).with_columns(pretrain_dataset=pl.col('pretrain_dataset').list.join(' + '))  # run-time key: one unit per checkpoint (pretrain_dataset is a list)
+            df.filter(pl.col('pretrain_dataset').is_not_null())
+            .with_columns(
+                pretrain_dataset=pl.col('pretrain_dataset').list.join(' + ')
+            )  # run-time key: one unit per checkpoint (pretrain_dataset is a list)
             .with_columns(
                 pretrain_org=pl.when(pl.col('pretrain_ft').is_not_null())
-                .then(pl.col('pretrain_dataset') + ' → ' + pl.col('pretrain_ft').list.join(' → '))
+                .then(
+                    pl.col('pretrain_dataset')
+                    + ' → '
+                    + pl.col('pretrain_ft').list.join(' → ')
+                )
                 .otherwise(pl.col('pretrain_dataset'))
             )
             .group_by(['pretrain_org'])
@@ -1501,8 +1859,19 @@ def _(OUT, df, pl):
         )
 
         # ── palette: the 11 largest organisations get a colour, the others a neutral grey ──────────
-        COLOURS = ['#E69F00', '#56B4E9', '#009E73', '#0072B2', '#D55E00', '#CC79A7',
-                   '#882255', '#117733', '#DDCC77', '#6699CC', '#AA4499']
+        COLOURS = [
+            '#E69F00',
+            '#56B4E9',
+            '#009E73',
+            '#0072B2',
+            '#D55E00',
+            '#CC79A7',
+            '#882255',
+            '#117733',
+            '#DDCC77',
+            '#6699CC',
+            '#AA4499',
+        ]
         GREY = '#8C8C8C'
 
         def rgb(h):
@@ -1516,17 +1885,35 @@ def _(OUT, df, pl):
             return tuple(x * (1 - s) for x in c)
 
         def lum(c):
-            lin = lambda v: v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4
+            def lin(v):
+                return v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4
+
             return 0.2126 * lin(c[0]) + 0.7152 * lin(c[1]) + 0.0722 * lin(c[2])
 
         # Outer circle = pretraining dataset; inside it one circle per fine-tuning stage ("A → B"), then the model families.
-        group_of = lambda o: o.split(' → ')[0]
+        def group_of(o):
+            return o.split(' → ')[0]
+
         tree_pd['group'] = tree_pd['pretrain_org'].map(group_of)
-        totals = tree_pd.groupby('group')['len'].sum().sort_values(ascending=False)
+        totals = (
+            tree_pd.groupby('group')['len']
+            .sum()
+            .sort_index()
+            .sort_values(ascending=False, kind='stable')
+        )  # ties: alphabetical
         orgs = totals.index.tolist()  # groups, largest first
-        hue = {o: rgb(COLOURS[i]) if i < len(COLOURS) else rgb(GREY) for i, o in enumerate(orgs)}
+        hue = {
+            o: rgb(COLOURS[i]) if i < len(COLOURS) else rgb(GREY)
+            for i, o in enumerate(orgs)
+        }
         rec_tot = tree_pd.groupby('pretrain_org')['len'].sum()
-        members = {g: rec_tot[tree_pd[tree_pd['group'] == g]['pretrain_org'].unique()].sort_values(ascending=False).index.tolist() for g in orgs}
+        members = {
+            g: rec_tot[tree_pd[tree_pd['group'] == g]['pretrain_org'].unique()]
+            .sort_index()
+            .sort_values(ascending=False, kind='stable')
+            .index.tolist()
+            for g in orgs
+        }
         total = int(totals.sum())
         n_orgs = tree_pd['pretrain_org'].nunique()
         n_ft = sum(1 for o in tree_pd['pretrain_org'].unique() if ' → ' in o)
@@ -1536,7 +1923,15 @@ def _(OUT, df, pl):
         small_orgs = [o for o in orgs if totals[o] < SMALL]
         big_orgs = [o for o in orgs if totals[o] >= SMALL]
         big_vals = [float(totals[o]) for o in big_orgs]
-        bc = list(reversed(circlify.circlify(big_vals, show_enclosure=False, target_enclosure=circlify.Circle(x=0, y=0, r=1))))
+        bc = list(
+            reversed(
+                circlify.circlify(
+                    big_vals,
+                    show_enclosure=False,
+                    target_enclosure=circlify.Circle(x=0, y=0, r=1),
+                )
+            )
+        )
         pos = {o: SimpleNamespace(x=c.x, y=c.y, r=c.r) for o, c in zip(big_orgs, bc)}
         r_pack = max(math.hypot(c.x, c.y) + c.r for c in bc)
         k = bc[0].r / math.sqrt(big_vals[0])  # same area scale for the small circles
@@ -1544,7 +1939,10 @@ def _(OUT, df, pl):
 
         # two columns, largest first, top to bottom; labels (right-aligned) to the left of each circle
         GAP, LABEL_W, COL_GAP = 0.035, 0.52, 0.07
-        height = lambda os_: sum(2 * rs[o] + GAP for o in os_)
+
+        def height(os_):
+            return sum(2 * rs[o] + GAP for o in os_)
+
         col_b, acc = [], 0.0  # column B: the one next to the big packing
         for o in small_orgs:
             if acc >= (height(small_orgs)) / 2:
@@ -1553,7 +1951,13 @@ def _(OUT, df, pl):
             acc += 2 * rs[o] + GAP
         col_a = [o for o in small_orgs if o not in col_b]
         xb = min(c.x - c.r for c in bc) - COL_GAP - max(rs[o] for o in col_b)
-        xa = xb - max(rs[o] for o in col_b) - LABEL_W - COL_GAP - max(rs[o] for o in col_a)
+        xa = (
+            xb
+            - max(rs[o] for o in col_b)
+            - LABEL_W
+            - COL_GAP
+            - max(rs[o] for o in col_a)
+        )
         for col, xc in ((col_b, xb), (col_a, xa)):
             y = height(col) / 2
             for o in col:
@@ -1564,15 +1968,19 @@ def _(OUT, df, pl):
         x_lo = xa - max(rs[o] for o in col_a) - LABEL_W - 0.02
         x_hi = max(c.x + c.r for c in bc)
         y_lo, y_hi = min(c.y - c.r for c in outer), max(c.y + c.r for c in outer)
-        X_PAD, Y_PAD = 0.60, 0.06  # room on the right for a label of the big packing, and a small margin (y)
+        X_PAD, Y_PAD = (
+            0.60,
+            0.06,
+        )  # room on the right for a label of the big packing, and a small margin (y)
         FIG_W = 12.5
-        FIG_H = FIG_W * ((y_hi - y_lo) + 2 * Y_PAD) / ((x_hi - x_lo) + X_PAD) + 1.5  # + title and caption
+        FIG_H = (
+            FIG_W * ((y_hi - y_lo) + 2 * Y_PAD) / ((x_hi - x_lo) + X_PAD) + 1.5
+        )  # + title and caption
         fig, ax = plt.subplots(figsize=(FIG_W, FIG_H), dpi=150)
         ax.set_aspect('equal')
         ax.axis('off')
         ax.set_xlim(x_lo - 0.02, x_hi + X_PAD)
         ax.set_ylim(y_lo - Y_PAD, y_hi + Y_PAD)
-        lim = r_pack
         fig.canvas.draw()
         renderer = fig.canvas.get_renderer()
         placed = []  # window-space bboxes of the labels already placed
@@ -1594,7 +2002,9 @@ def _(OUT, df, pl):
                 while sz >= floor:
                     t = ax.text(x, y, v, fontsize=sz, zorder=7, linespacing=0.95, **kw)
                     if halo:
-                        t.set_path_effects([pe.withStroke(linewidth=2.2, foreground=halo)])
+                        t.set_path_effects(
+                            [pe.withStroke(linewidth=2.2, foreground=halo)]
+                        )
                     w = t.get_window_extent(renderer)
                     inv = ax.transData.inverted()
                     wd = inv.transform((w.x1, w.y0))[0] - inv.transform((w.x0, w.y0))[0]
@@ -1613,28 +2023,91 @@ def _(OUT, df, pl):
             """Circles (x, y, r) packed inside the circle (x, y, r), same order as `values` (sorted descending)."""
             if len(values) == 1:
                 return [(x, y, r * 0.92)]
-            cs = list(reversed(circlify.circlify(values, show_enclosure=False, target_enclosure=circlify.Circle(x=0, y=0, r=1))))
-            return [(x + c.x * r * shrink, y + c.y * r * shrink, c.r * r * shrink) for c in cs]
+            cs = list(
+                reversed(
+                    circlify.circlify(
+                        values,
+                        show_enclosure=False,
+                        target_enclosure=circlify.Circle(x=0, y=0, r=1),
+                    )
+                )
+            )
+            return [
+                (x + c.x * r * shrink, y + c.y * r * shrink, c.r * r * shrink)
+                for c in cs
+            ]
 
         for circ, org in zip(outer, orgs):
             cx, cy, cr = circ.x, circ.y, circ.r
             base, dark = hue[org], shade(hue[org], 0.35)
-            if members[org] == [org]:  # no fine-tuned checkpoints: the dataset circle is the leaf
-                ax.add_patch(Circle((cx, cy), cr, facecolor=(*tint(base, 0.15), 0.95), edgecolor=(*dark, 0.8), linewidth=1.1, zorder=3))
+            if members[org] == [
+                org
+            ]:  # no fine-tuned checkpoints: the dataset circle is the leaf
+                ax.add_patch(
+                    Circle(
+                        (cx, cy),
+                        cr,
+                        facecolor=(*tint(base, 0.15), 0.95),
+                        edgecolor=(*dark, 0.8),
+                        linewidth=1.1,
+                        zorder=3,
+                    )
+                )
                 continue
-            ax.add_patch(Circle((cx, cy), cr, facecolor=(*dark, 0.09), edgecolor=(*dark, 0.75), linewidth=1.1, zorder=2))
+            ax.add_patch(
+                Circle(
+                    (cx, cy),
+                    cr,
+                    facecolor=(*dark, 0.09),
+                    edgecolor=(*dark, 0.75),
+                    linewidth=1.1,
+                    zorder=2,
+                )
+            )
             n = len(members[org])
-            for rank, ((rx, ry, rr), st) in enumerate(zip(pack([float(rec_tot[m]) for m in members[org]], cx, cy, cr, 0.95), members[org])):
+            for rank, ((rx, ry, rr), st) in enumerate(
+                zip(
+                    pack([float(rec_tot[m]) for m in members[org]], cx, cy, cr, 0.95),
+                    members[org],
+                )
+            ):
                 col = tint(base, 0.10 + 0.45 * rank / max(n - 1, 1))
-                ax.add_patch(Circle((rx, ry), rr, facecolor=(*col, 0.95), edgecolor='white', linewidth=0.8, zorder=4))
+                ax.add_patch(
+                    Circle(
+                        (rx, ry),
+                        rr,
+                        facecolor=(*col, 0.95),
+                        edgecolor='white',
+                        linewidth=0.8,
+                        zorder=4,
+                    )
+                )
                 stage_draw.append((rx, ry, rr, st, int(rec_tot[st]), col))
 
         # ── stage labels, before the dataset labels so that they keep priority ──────────────────
         for rx, ry, rr, name, cnt, col in sorted(stage_draw, key=lambda r: -r[2]):
-            short = '→ ' + ' → '.join(name.split(' → ')[1:]) if ' → ' in name else 'no fine-tuning'
+            short = (
+                '→ ' + ' → '.join(name.split(' → ')[1:])
+                if ' → ' in name
+                else 'no fine-tuning'
+            )
             fg = (0.97, 0.97, 0.97) if lum(col) < 0.33 else (0.10, 0.10, 0.10)
-            abbr = short.replace('ImageNet-', 'IN-').replace('fine-tuning', 'no FT') if short.startswith('→') else 'no FT'
-            put(rx, ry, [f'{short}  ({cnt})', f'{short}\n({cnt})', f'{abbr}\n({cnt})'], fit_w=rr * 1.8, size=10, min_size=5.0, ha='center', va='center', color=fg)
+            abbr = (
+                short.replace('ImageNet-', 'IN-').replace('fine-tuning', 'no FT')
+                if short.startswith('→')
+                else 'no FT'
+            )
+            put(
+                rx,
+                ry,
+                [f'{short}  ({cnt})', f'{short}\n({cnt})', f'{abbr}\n({cnt})'],
+                fit_w=rr * 1.8,
+                size=10,
+                min_size=5.0,
+                ha='center',
+                va='center',
+                color=fg,
+            )
 
         # ── organisation labels ─────────────────────────────────────────────────────────────────────
         order_by_size = sorted(range(len(orgs)), key=lambda i: -outer[i].r)
@@ -1642,26 +2115,68 @@ def _(OUT, df, pl):
         for i in order_by_size:
             c, org = outer[i], orgs[i]
             if org in small_set:
-                ax.text(c.x - c.r - 0.03, c.y, f'{org}  ({int(totals[org])})', ha='right', va='center', fontsize=9, fontweight='bold',
-                        color=shade(hue[org], 0.45), zorder=7)
+                ax.text(
+                    c.x - c.r - 0.03,
+                    c.y,
+                    f'{org}  ({int(totals[org])})',
+                    ha='right',
+                    va='center',
+                    fontsize=9,
+                    fontweight='bold',
+                    color=shade(hue[org], 0.45),
+                    zorder=7,
+                )
                 continue
             one = f'{org}  ({int(totals[org])})'
             two = f'{org}\n({int(totals[org])})'
             dark = shade(hue[org], 0.45)
             t = None
             size0 = 11.5 if c.r > 0.15 else 9.5
-            spots = [0.78] if members[org] != [org] else [0.78, 0.0]  # a macro-group keeps its centre for the recipes
-            for floor in (7.5, 6.0):  # first try to keep the name large, then let it shrink; top of the circle first
+            spots = (
+                [0.78] if members[org] != [org] else [0.78, 0.0]
+            )  # a macro-group keeps its centre for the recipes
+            for floor in (
+                7.5,
+                6.0,
+            ):  # first try to keep the name large, then let it shrink; top of the circle first
                 for yf in spots:
-                    t = put(c.x, c.y + c.r * yf, [one, two], fit_w=c.r * 1.55, size=size0, min_size=floor,
-                            ha='center', va='center', color=dark, fontweight='bold', halo=(1, 1, 1, 0.9))
+                    t = put(
+                        c.x,
+                        c.y + c.r * yf,
+                        [one, two],
+                        fit_w=c.r * 1.55,
+                        size=size0,
+                        min_size=floor,
+                        ha='center',
+                        va='center',
+                        color=dark,
+                        fontweight='bold',
+                        halo=(1, 1, 1, 0.9),
+                    )
                     if t is not None:
                         break
                 if t is not None:
                     break
-            if t is None and c.x < 0:  # no room inside, and the right-hand ring would need a long leader line: outside the circle, no width limit
-                for dy, va in ((c.r + 0.01, 'bottom'), (-c.r - 0.01, 'top'), (c.r * 0.55, 'center')):
-                    t = put(c.x, c.y + dy, one, size=9, min_size=6.5, ha='center', va=va, color=dark, fontweight='bold', halo=(1, 1, 1, 0.9))
+            if (
+                t is None and c.x < 0
+            ):  # no room inside, and the right-hand ring would need a long leader line: outside the circle, no width limit
+                for dy, va in (
+                    (c.r + 0.01, 'bottom'),
+                    (-c.r - 0.01, 'top'),
+                    (c.r * 0.55, 'center'),
+                ):
+                    t = put(
+                        c.x,
+                        c.y + dy,
+                        one,
+                        size=9,
+                        min_size=6.5,
+                        ha='center',
+                        va=va,
+                        color=dark,
+                        fontweight='bold',
+                        halo=(1, 1, 1, 0.9),
+                    )
                     if t is not None:
                         break
             if t is None:
@@ -1672,7 +2187,10 @@ def _(OUT, df, pl):
         if skipped:
             print('WARNING: no room for the label of', skipped)
         for side in (+1,):
-            items = sorted([i for i in ring if (outer[i].x >= 0) == (side > 0)], key=lambda i: outer[i].y)
+            items = sorted(
+                [i for i in ring if (outer[i].x >= 0) == (side > 0)],
+                key=lambda i: outer[i].y,
+            )
             ys = []
             for k, i in enumerate(items):
                 y = outer[i].y
@@ -1687,25 +2205,72 @@ def _(OUT, df, pl):
                 c, org = outer[i], orgs[i]
                 x_lab = side * (math.sqrt(max(r_pack**2 - y**2, 0.0)) + 0.07)
                 ang = math.atan2(y - c.y, x_lab - c.x)
-                ax.plot([c.x + c.r * math.cos(ang), x_lab - side * 0.012], [c.y + c.r * math.sin(ang), y],
-                        color=(*shade(hue[org], 0.35), 0.8), lw=0.7, zorder=1)
-                t = ax.text(x_lab, y, f'{org}  ({int(totals[org])})', ha='left' if side > 0 else 'right', va='center', fontsize=8.5,
-                            color=shade(hue[org], 0.45), fontweight='bold', zorder=7)
+                ax.plot(
+                    [c.x + c.r * math.cos(ang), x_lab - side * 0.012],
+                    [c.y + c.r * math.sin(ang), y],
+                    color=(*shade(hue[org], 0.35), 0.8),
+                    lw=0.7,
+                    zorder=1,
+                )
+                t = ax.text(
+                    x_lab,
+                    y,
+                    f'{org}  ({int(totals[org])})',
+                    ha='left' if side > 0 else 'right',
+                    va='center',
+                    fontsize=8.5,
+                    color=shade(hue[org], 0.45),
+                    fontweight='bold',
+                    zorder=7,
+                )
                 placed.append(t.get_window_extent(renderer).expanded(1.02, 1.1))
 
         # ── title / caption ─────────────────────────────────────────────────────────────────────────
-        fig.text(0.015, 0.99, 'What was it trained on?', ha='left', va='top', fontsize=20, fontweight='bold', color='#111111')
-        fig.text(0.015, 1 - 0.52 / FIG_H, 'Pretrained checkpoints by pretraining dataset and fine-tuning dataset', ha='left', va='top', fontsize=12.5, color='#555555')
-        fig.text(0.015, 0.012,
-                 f'Circle area is proportional to the number of checkpoints; only the {total:,} checkpoints with a known pretraining dataset '
-                 f'({n_orgs} datasets) are shown. Outer circle: pretraining dataset (the 11 largest have their own colour, the others are grey); '
-                 f'inside a dataset with fine-tuned checkpoints: one circle per fine-tuning dataset ("→ X", {n_ft} stages) and one for the checkpoints '
-                 'without fine-tuning ("no FT"; IN = ImageNet). Names are followed by their number of checkpoints; stages with very few checkpoints are not labelled.',
-                 ha='left', va='bottom', fontsize=8.5, color='#666666', style='italic', wrap=True)
-        fig.subplots_adjust(left=0.01, right=0.99, top=1 - 1.0 / FIG_H, bottom=0.55 / FIG_H)
+        fig.text(
+            0.015,
+            0.99,
+            'What was it trained on?',
+            ha='left',
+            va='top',
+            fontsize=20,
+            fontweight='bold',
+            color='#111111',
+        )
+        fig.text(
+            0.015,
+            1 - 0.52 / FIG_H,
+            'Pretrained checkpoints by pretraining dataset and fine-tuning dataset',
+            ha='left',
+            va='top',
+            fontsize=12.5,
+            color='#555555',
+        )
+        fig.text(
+            0.015,
+            0.012,
+            f'Circle area is proportional to the number of checkpoints; only the {total:,} checkpoints with a known pretraining dataset '
+            f'({n_orgs} datasets) are shown. Outer circle: pretraining dataset (the 11 largest have their own colour, the others are grey); '
+            f'inside a dataset with fine-tuned checkpoints: one circle per fine-tuning dataset ("→ X", {n_ft} stages) and one for the checkpoints '
+            'without fine-tuning ("no FT"; IN = ImageNet). Names are followed by their number of checkpoints; stages with very few checkpoints are not labelled.',
+            ha='left',
+            va='bottom',
+            fontsize=8.5,
+            color='#666666',
+            style='italic',
+            wrap=True,
+        )
+        fig.subplots_adjust(
+            left=0.01, right=0.99, top=1 - 1.0 / FIG_H, bottom=0.55 / FIG_H
+        )
 
         for ext in ('pdf', 'png'):
-            fig.savefig(str(OUT / f'pretrain_datasets.{ext}'), dpi=300, bbox_inches='tight', facecolor='white', edgecolor='none')
+            fig.savefig(
+                str(OUT / f'pretrain_datasets.{ext}'),
+                dpi=300,
+                bbox_inches='tight',
+                facecolor='white',
+                edgecolor='none',
+            )
         print('Saved: pretrain_datasets.pdf  +  pretrain_datasets.png')
         return fig
 
@@ -1721,64 +2286,139 @@ def _(OUT, df, pl):
 
         SMALL = 10  # datasets with fewer checkpoints are merged into "Other"
         d = (
-            df.filter(pl.col('pretrain_dataset').is_not_null()).with_columns(pretrain_dataset=pl.col('pretrain_dataset').list.join(' + '))  # run-time key: one unit per checkpoint (pretrain_dataset is a list)
+            df.filter(pl.col('pretrain_dataset').is_not_null())
             .with_columns(
-                ft=pl.when(pl.col('pretrain_ft').is_not_null()).then(pl.lit('→ ') + pl.col('pretrain_ft').list.join(' → ')).otherwise(pl.lit('no fine-tuning')),
+                pretrain_dataset=pl.col('pretrain_dataset').list.join(' + ')
+            )  # run-time key: one unit per checkpoint (pretrain_dataset is a list)
+            .with_columns(
+                ft=pl.when(pl.col('pretrain_ft').is_not_null())
+                .then(pl.lit('→ ') + pl.col('pretrain_ft').list.join(' → '))
+                .otherwise(pl.lit('no fine-tuning')),
                 paradigm=pl.col('paradigm').str.replace_all('_', ' '),
             )
         )
         size = d.group_by('pretrain_dataset').len()
         small = size.filter(pl.col('len') < SMALL)['pretrain_dataset'].to_list()
         d = d.with_columns(
-            ds=pl.when(pl.col('pretrain_dataset').is_in(small)).then(pl.lit(f'Other ({len(small)} datasets)')).otherwise(pl.col('pretrain_dataset'))
+            ds=pl.when(pl.col('pretrain_dataset').is_in(small))
+            .then(pl.lit(f'Other ({len(small)} datasets)'))
+            .otherwise(pl.col('pretrain_dataset'))
         )
-        ds_order = d.group_by('ds').len().sort('len', descending=True)['ds'].to_list()
-        ds_order = [x for x in ds_order if not x.startswith('Other')] + [x for x in ds_order if x.startswith('Other')]
-        ft_order = ['no fine-tuning'] + sorted({x for x in d['ft'].unique().to_list() if x != 'no fine-tuning'})
-        pa_order = d.group_by('paradigm').len().sort('len', descending=True)['paradigm'].to_list()
+        ds_order = (
+            d.group_by('ds')
+            .len()
+            .sort(['len', 'ds'], descending=[True, False])['ds']
+            .to_list()
+        )
+        ds_order = [x for x in ds_order if not x.startswith('Other')] + [
+            x for x in ds_order if x.startswith('Other')
+        ]
+        ft_order = ['no fine-tuning'] + sorted(
+            {x for x in d['ft'].unique().to_list() if x != 'no fine-tuning'}
+        )
+        pa_order = (
+            d.group_by('paradigm')
+            .len()
+            .sort(['len', 'paradigm'], descending=[True, False])['paradigm']
+            .to_list()
+        )
 
-        labels = ds_order + ft_order + pa_order
         idx = {('ds', k): i for i, k in enumerate(ds_order)}
         idx |= {('ft', k): len(ds_order) + i for i, k in enumerate(ft_order)}
-        idx |= {('pa', k): len(ds_order) + len(ft_order) + i for i, k in enumerate(pa_order)}
+        idx |= {
+            ('pa', k): len(ds_order) + len(ft_order) + i for i, k in enumerate(pa_order)
+        }
 
-        OI = ['#E69F00', '#56B4E9', '#009E73', '#0072B2', '#D55E00', '#CC79A7', '#882255', '#117733', '#DDCC77', '#6699CC', '#AA4499']
+        OI = [
+            '#E69F00',
+            '#56B4E9',
+            '#009E73',
+            '#0072B2',
+            '#D55E00',
+            '#CC79A7',
+            '#882255',
+            '#117733',
+            '#DDCC77',
+            '#6699CC',
+            '#AA4499',
+        ]
         GREY = '#8C8C8C'
-        col_ds = {k: OI[i] if i < len(OI) and not k.startswith('Other') else GREY for i, k in enumerate(ds_order)}
-        col_pa = dict(zip(pa_order, ['#0072B2', '#D55E00', '#009E73', '#CC79A7', '#E69F00'][: len(pa_order)]))
-        rgba = lambda h, a: f"rgba({int(h[1:3], 16)},{int(h[3:5], 16)},{int(h[5:7], 16)},{a})"
+        col_ds = {
+            k: OI[i] if i < len(OI) and not k.startswith('Other') else GREY
+            for i, k in enumerate(ds_order)
+        }
+        col_pa = dict(
+            zip(
+                pa_order,
+                ['#0072B2', '#D55E00', '#009E73', '#CC79A7', '#E69F00'][
+                    : len(pa_order)
+                ],
+            )
+        )
+
+        def rgba(h, a):
+            return f'rgba({int(h[1:3], 16)},{int(h[3:5], 16)},{int(h[5:7], 16)},{a})'
 
         src, tgt, val, lcol = [], [], [], []
         for a, b, n in d.group_by('ds', 'ft').len().iter_rows():
-            src.append(idx[('ds', a)]); tgt.append(idx[('ft', b)]); val.append(n); lcol.append(rgba(col_ds[a], 0.45))
+            src.append(idx[('ds', a)])
+            tgt.append(idx[('ft', b)])
+            val.append(n)
+            lcol.append(rgba(col_ds[a], 0.45))
         for a, b, n in d.group_by('ft', 'paradigm').len().iter_rows():
-            src.append(idx[('ft', a)]); tgt.append(idx[('pa', b)]); val.append(n); lcol.append(rgba(col_pa[b], 0.45))
-        ncol = [col_ds[k] for k in ds_order] + ['#B8B8B8'] * len(ft_order) + [col_pa[k] for k in pa_order]
+            src.append(idx[('ft', a)])
+            tgt.append(idx[('pa', b)])
+            val.append(n)
+            lcol.append(rgba(col_pa[b], 0.45))
+        ncol = (
+            [col_ds[k] for k in ds_order]
+            + ['#B8B8B8'] * len(ft_order)
+            + [col_pa[k] for k in pa_order]
+        )
         tot = {('ds', k): int(v) for k, v in d.group_by('ds').len().iter_rows()}
         tot |= {('ft', k): int(v) for k, v in d.group_by('ft').len().iter_rows()}
         tot |= {('pa', k): int(v) for k, v in d.group_by('paradigm').len().iter_rows()}
-        nlabels = [f'{k}  ({tot[(c, k)]})' for c, ks in (('ds', ds_order), ('ft', ft_order), ('pa', pa_order)) for k in ks]
+        nlabels = [
+            f'{k}  ({tot[(c, k)]})'
+            for c, ks in (('ds', ds_order), ('ft', ft_order), ('pa', pa_order))
+            for k in ks
+        ]
 
-        fig = go.Figure(go.Sankey(
-            arrangement='snap',
-            node=dict(label=nlabels, color=ncol, pad=14, thickness=16, line=dict(color='white', width=0.5)),
-            link=dict(source=src, target=tgt, value=val, color=lcol),
-        ))
+        fig = go.Figure(
+            go.Sankey(
+                arrangement='snap',
+                node=dict(
+                    label=nlabels,
+                    color=ncol,
+                    pad=14,
+                    thickness=16,
+                    line=dict(color='white', width=0.5),
+                ),
+                link=dict(source=src, target=tgt, value=val, color=lcol),
+            )
+        )
         fig.update_layout(
-            title=dict(text=f'<b>What was it trained on?</b><br><sup>{d.height:,} checkpoints: pretraining dataset → fine-tuning dataset → paradigm '
-                            f'(datasets with fewer than {SMALL} checkpoints merged into "Other")</sup>', x=0.01),
-            font=dict(family='Times New Roman, serif', size=13), height=520, width=1250, margin=dict(l=10, r=10, t=90, b=10),
+            title=dict(
+                text=f'<b>What was it trained on?</b><br><sup>{d.height:,} checkpoints: pretraining dataset → fine-tuning dataset → paradigm '
+                f'(datasets with fewer than {SMALL} checkpoints merged into "Other")</sup>',
+                x=0.01,
+            ),
+            font=dict(family='Times New Roman, serif', size=13),
+            height=520,
+            width=1250,
+            margin=dict(l=10, r=10, t=90, b=10),
             paper_bgcolor='white',
         )
         fig.write_html(str(OUT / 'pretrain_sankey.html'))
         try:
             for ext in ('pdf', 'png'):
-                fig.write_image(str(OUT / f'pretrain_sankey.{ext}'), scale=3 if ext == 'png' else 1)
+                fig.write_image(
+                    str(OUT / f'pretrain_sankey.{ext}'), scale=3 if ext == 'png' else 1
+                )
             print('Saved: pretrain_sankey.html / .pdf / .png')
         except Exception as e:  # kaleido needs a Chrome
             print('Saved: pretrain_sankey.html only;', type(e).__name__, str(e)[:120])
         return fig
-
 
     _()
     return
@@ -1792,23 +2432,73 @@ def _(OUT, df, pl):
         import matplotlib.pyplot as plt
         from matplotlib.patches import Rectangle
 
-        plt.rcParams.update({'font.family': 'serif', 'font.serif': ['Times New Roman', 'DejaVu Serif'], 'pdf.fonttype': 42, 'ps.fonttype': 42})
+        plt.rcParams.update(
+            {
+                'font.family': 'serif',
+                'font.serif': ['Times New Roman', 'DejaVu Serif'],
+                'pdf.fonttype': 42,
+                'ps.fonttype': 42,
+            }
+        )
         SMALL = 10  # datasets with fewer checkpoints are merged into "Other"
         W, H = 10.0, 4.8
         d = (
-            df.filter(pl.col('pretrain_dataset').is_not_null()).with_columns(pretrain_dataset=pl.col('pretrain_dataset').list.join(' + '))  # run-time key: one unit per checkpoint (pretrain_dataset is a list)
-            .with_columns(ft=pl.when(pl.col('pretrain_ft').is_not_null()).then(pl.lit('→ ') + pl.col('pretrain_ft').list.join(' → ')).otherwise(pl.lit('no fine-tuning')))
+            df.filter(pl.col('pretrain_dataset').is_not_null())
+            .with_columns(
+                pretrain_dataset=pl.col('pretrain_dataset').list.join(' + ')
+            )  # run-time key: one unit per checkpoint (pretrain_dataset is a list)
+            .with_columns(
+                ft=pl.when(pl.col('pretrain_ft').is_not_null())
+                .then(pl.lit('→ ') + pl.col('pretrain_ft').list.join(' → '))
+                .otherwise(pl.lit('no fine-tuning'))
+            )
         )
-        small = d.group_by('pretrain_dataset').len().filter(pl.col('len') < SMALL)['pretrain_dataset'].to_list()
-        d = d.with_columns(ds=pl.when(pl.col('pretrain_dataset').is_in(small)).then(pl.lit(f'Other ({len(small)} datasets)')).otherwise(pl.col('pretrain_dataset')))
-        ds_order = d.group_by('ds').len().sort('len', descending=True)['ds'].to_list()
-        ds_order = [x for x in ds_order if not x.startswith('Other')] + [x for x in ds_order if x.startswith('Other')]
-        OI = ['#E69F00', '#56B4E9', '#009E73', '#0072B2', '#D55E00', '#CC79A7', '#882255', '#117733', '#DDCC77', '#6699CC', '#AA4499', '#44AA99']
-        col = {k: (OI[i] if i < len(OI) and not k.startswith('Other') else '#9A9A9A') for i, k in enumerate(ds_order)}
-        rgb = lambda h: tuple(int(h[i:i + 2], 16) / 255 for i in (1, 3, 5))
+        small = (
+            d.group_by('pretrain_dataset')
+            .len()
+            .filter(pl.col('len') < SMALL)['pretrain_dataset']
+            .to_list()
+        )
+        d = d.with_columns(
+            ds=pl.when(pl.col('pretrain_dataset').is_in(small))
+            .then(pl.lit(f'Other ({len(small)} datasets)'))
+            .otherwise(pl.col('pretrain_dataset'))
+        )
+        ds_order = (
+            d.group_by('ds')
+            .len()
+            .sort(['len', 'ds'], descending=[True, False])['ds']
+            .to_list()
+        )
+        ds_order = [x for x in ds_order if not x.startswith('Other')] + [
+            x for x in ds_order if x.startswith('Other')
+        ]
+        OI = [
+            '#E69F00',
+            '#56B4E9',
+            '#009E73',
+            '#0072B2',
+            '#D55E00',
+            '#CC79A7',
+            '#882255',
+            '#117733',
+            '#DDCC77',
+            '#6699CC',
+            '#AA4499',
+            '#44AA99',
+        ]
+        col = {
+            k: (OI[i] if i < len(OI) and not k.startswith('Other') else '#9A9A9A')
+            for i, k in enumerate(ds_order)
+        }
+
+        def rgb(h):
+            return tuple(int(h[i : i + 2], 16) / 255 for i in (1, 3, 5))
 
         def lum(c):
-            lin = lambda v: v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4
+            def lin(v):
+                return v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4
+
             return 0.2126 * lin(c[0]) + 0.7152 * lin(c[1]) + 0.0722 * lin(c[2])
 
         def squarify(vals, x, y, w, h):
@@ -1825,7 +2515,9 @@ def _(OUT, df, pl):
                 side = min(w, h)
                 row = [areas[i]]
                 j = i + 1
-                while j < len(areas) and worst(row + [areas[j]], side) <= worst(row, side):
+                while j < len(areas) and worst(row + [areas[j]], side) <= worst(
+                    row, side
+                ):
                     row.append(areas[j])
                     j += 1
                 s = sum(row)
@@ -1847,54 +2539,146 @@ def _(OUT, df, pl):
         TOP, BOT = 0.75, 0.55  # room for the title and for the colour key
         fig = plt.figure(figsize=(W, H + TOP + BOT), dpi=150)
         ax = fig.add_axes([0, BOT / (H + TOP + BOT), 1, H / (H + TOP + BOT)])
-        ax.set_xlim(0, W); ax.set_ylim(H, 0); ax.axis('off')  # y downwards
+        ax.set_xlim(0, W)
+        ax.set_ylim(H, 0)
+        ax.axis('off')  # y downwards
         fig.canvas.draw()
         rend = fig.canvas.get_renderer()
 
-        def fit(x, y, w, h, variants, colour, sizes=(10, 9, 8, 7, 6.5, 6, 5.5), bold=False):
+        def fit(
+            x, y, w, h, variants, colour, sizes=(10, 9, 8, 7, 6.5, 6, 5.5), bold=False
+        ):
             """Centred text in the rectangle: first variant/size that fits; returns the text or None."""
             for v in variants:
                 for sz in sizes:
-                    t = ax.text(x + w / 2, y + h / 2, v, ha='center', va='center', fontsize=sz, color=colour, fontweight='bold' if bold else 'normal', linespacing=0.95)
+                    t = ax.text(
+                        x + w / 2,
+                        y + h / 2,
+                        v,
+                        ha='center',
+                        va='center',
+                        fontsize=sz,
+                        color=colour,
+                        fontweight='bold' if bold else 'normal',
+                        linespacing=0.95,
+                    )
                     bb = t.get_window_extent(rend)
-                    if bb.width / fig.dpi <= w - 0.05 and bb.height / fig.dpi <= h - 0.04:
+                    if (
+                        bb.width / fig.dpi <= w - 0.05
+                        and bb.height / fig.dpi <= h - 0.04
+                    ):
                         return t
                     t.remove()
             return None
 
         ft_tot = {k: int(v) for k, v in d.group_by('ft').len().iter_rows()}
-        groups = sorted(ft_tot, key=lambda k: -ft_tot[k])
+        groups = sorted(
+            ft_tot, key=lambda k: (-ft_tot[k], k)
+        )  # ties: alphabetical, so the layout is deterministic
         failed = []
         PAD, HEAD = 0.05, 0.34
-        for ft, (gx, gy, gw, gh) in zip(groups, squarify([ft_tot[g] for g in groups], 0, 0, W, H)):
-            ax.add_patch(Rectangle((gx + PAD / 2, gy + PAD / 2), gw - PAD, gh - PAD, facecolor='#EDEDED', edgecolor='none'))
+        for ft, (gx, gy, gw, gh) in zip(
+            groups, squarify([ft_tot[g] for g in groups], 0, 0, W, H)
+        ):
+            ax.add_patch(
+                Rectangle(
+                    (gx + PAD / 2, gy + PAD / 2),
+                    gw - PAD,
+                    gh - PAD,
+                    facecolor='#EDEDED',
+                    edgecolor='none',
+                )
+            )
             title = f'{ft}  ({ft_tot[ft]})'
-            if fit(gx + PAD / 2, gy + PAD / 2, gw - PAD, HEAD, [title, title.replace('  (', '\n(')], '#333333', sizes=(10, 9, 8, 7, 6.5, 6, 5.5), bold=True) is None:
+            if (
+                fit(
+                    gx + PAD / 2,
+                    gy + PAD / 2,
+                    gw - PAD,
+                    HEAD,
+                    [title, title.replace('  (', '\n(')],
+                    '#333333',
+                    sizes=(10, 9, 8, 7, 6.5, 6, 5.5),
+                    bold=True,
+                )
+                is None
+            ):
                 failed.append(('group', ft))
-            sub = d.filter(pl.col('ft') == ft).group_by('ds').len().sort('len', descending=True)
+            sub = (
+                d.filter(pl.col('ft') == ft)
+                .group_by('ds')
+                .len()
+                .sort(['len', 'ds'], descending=[True, False])
+            )
             names, vals = sub['ds'].to_list(), sub['len'].to_list()
-            ix, iy, iw, ih = gx + PAD, gy + PAD / 2 + HEAD, gw - 2 * PAD, gh - PAD - HEAD
-            for name, v, (tx, ty, tw, th) in zip(names, vals, squarify(vals, ix, iy, iw, ih)):
+            ix, iy, iw, ih = (
+                gx + PAD,
+                gy + PAD / 2 + HEAD,
+                gw - 2 * PAD,
+                gh - PAD - HEAD,
+            )
+            for name, v, (tx, ty, tw, th) in zip(
+                names, vals, squarify(vals, ix, iy, iw, ih)
+            ):
                 c = rgb(col[name])
-                ax.add_patch(Rectangle((tx, ty), tw, th, facecolor=c, edgecolor='white', linewidth=1.2))
+                ax.add_patch(
+                    Rectangle(
+                        (tx, ty), tw, th, facecolor=c, edgecolor='white', linewidth=1.2
+                    )
+                )
                 fg = (1, 1, 1) if lum(c) < 0.30 else (0.1, 0.1, 0.1)
-                if fit(tx, ty, tw, th, [f'{name}\n{v}', f'{name} {v}', f'{v}'], fg) is None:
+                if (
+                    fit(tx, ty, tw, th, [f'{name}\n{v}', f'{name} {v}', f'{v}'], fg)
+                    is None
+                ):
                     failed.append((ft, name, v, round(tw, 2), round(th, 2)))
         print('tiles whose text does not fit:', failed)
         Ht = H + TOP + BOT
-        fig.text(0.008, 1 - 0.02 / Ht, 'Fine-tuning stage and pretraining dataset', ha='left', va='top', fontsize=16, fontweight='bold', color='#111111')
-        fig.text(0.008, 1 - 0.40 / Ht, f'{d.height:,} checkpoints; area proportional to the number of checkpoints. Outer boxes: fine-tuning stage; tiles: pretraining dataset '
-                 f'(datasets with fewer than {SMALL} checkpoints are merged into "Other").', ha='left', va='top', fontsize=8.5, color='#555555')
+        fig.text(
+            0.008,
+            1 - 0.02 / Ht,
+            'Fine-tuning stage and pretraining dataset',
+            ha='left',
+            va='top',
+            fontsize=16,
+            fontweight='bold',
+            color='#111111',
+        )
+        fig.text(
+            0.008,
+            1 - 0.40 / Ht,
+            f'{d.height:,} checkpoints; area proportional to the number of checkpoints. Outer boxes: fine-tuning stage; tiles: pretraining dataset '
+            f'(datasets with fewer than {SMALL} checkpoints are merged into "Other").',
+            ha='left',
+            va='top',
+            fontsize=8.5,
+            color='#555555',
+        )
         from matplotlib.patches import Patch
 
         shown = [k for k in ds_order if d.filter(pl.col('ds') == k).height]
-        fig.legend([Patch(facecolor=col[k], edgecolor='none') for k in shown], [k for k in shown], loc='lower center', bbox_to_anchor=(0.5, 0.0),
-                   ncol=7, frameon=False, fontsize=8.5, handlelength=1.0, handleheight=1.0, columnspacing=1.4, handletextpad=0.5)
+        fig.legend(
+            [Patch(facecolor=col[k], edgecolor='none') for k in shown],
+            list(shown),
+            loc='lower center',
+            bbox_to_anchor=(0.5, 0.0),
+            ncol=7,
+            frameon=False,
+            fontsize=8.5,
+            handlelength=1.0,
+            handleheight=1.0,
+            columnspacing=1.4,
+            handletextpad=0.5,
+        )
         for ext in ('pdf', 'png'):
-            fig.savefig(str(OUT / f'treemap_finetuning_dataset.{ext}'), dpi=300, bbox_inches='tight', facecolor='white')
+            fig.savefig(
+                str(OUT / f'treemap_finetuning_dataset.{ext}'),
+                dpi=300,
+                bbox_inches='tight',
+                facecolor='white',
+            )
         print('Saved: treemap_finetuning_dataset.pdf  +  .png')
         return fig
-
 
     fig_tm_ft = _()
     fig_tm_ft
@@ -1908,49 +2692,101 @@ def _(OUT, df, pl):
         One data unit = one inch, so that the text sizes can be checked against the size of every circle."""
         import math
 
-        import numpy as np
-
         import circlify
         import matplotlib.patheffects as pe
         import matplotlib.pyplot as plt
+        import numpy as np
         from matplotlib.patches import Circle, Ellipse, Patch
 
-        plt.rcParams.update({'font.family': 'serif', 'font.serif': ['Times New Roman', 'DejaVu Serif'], 'pdf.fonttype': 42, 'ps.fonttype': 42})
+        plt.rcParams.update(
+            {
+                'font.family': 'serif',
+                'font.serif': ['Times New Roman', 'DejaVu Serif'],
+                'pdf.fonttype': 42,
+                'ps.fonttype': 42,
+            }
+        )
         W = 11.5
         d = (
-            df.filter(pl.col('pretrain_dataset').is_not_null()).with_columns(pretrain_dataset=pl.col('pretrain_dataset').list.join(' + '))  # run-time key: one unit per checkpoint (pretrain_dataset is a list)
-            .with_columns(ft=pl.when(pl.col('pretrain_ft').is_not_null()).then(pl.lit('→ ') + pl.col('pretrain_ft').list.join(' → ')).otherwise(pl.lit('Single-Stage Training')))
+            df.filter(pl.col('pretrain_dataset').is_not_null())
+            .with_columns(
+                pretrain_dataset=pl.col('pretrain_dataset').list.join(' + ')
+            )  # run-time key: one unit per checkpoint (pretrain_dataset is a list)
+            .with_columns(
+                ft=pl.when(pl.col('pretrain_ft').is_not_null())
+                .then(pl.lit('→ ') + pl.col('pretrain_ft').list.join(' → '))
+                .otherwise(pl.lit('Single-Stage Training'))
+            )
         )
         d = d.with_columns(ds=pl.col('pretrain_dataset'))
-        ds_order = d.group_by('ds').len().sort('len', descending=True)['ds'].to_list()
-        OI = ['#E69F00', '#56B4E9', '#009E73', '#0072B2', '#D55E00', '#CC79A7', '#882255', '#117733', '#DDCC77', '#6699CC', '#AA4499', '#44AA99']
+        ds_order = (
+            d.group_by('ds')
+            .len()
+            .sort(['len', 'ds'], descending=[True, False])['ds']
+            .to_list()
+        )
+        OI = [
+            '#E69F00',
+            '#56B4E9',
+            '#009E73',
+            '#0072B2',
+            '#D55E00',
+            '#CC79A7',
+            '#882255',
+            '#117733',
+            '#DDCC77',
+            '#6699CC',
+            '#AA4499',
+            '#44AA99',
+        ]
         import colorsys
 
         def extra(i):  # golden-angle hues, alternating lightness
-            r, g, b = colorsys.hls_to_rgb((i * 0.618034) % 1, (0.42, 0.58, 0.5)[i % 3], 0.55)
-            return '#%02X%02X%02X' % (round(r * 255), round(g * 255), round(b * 255))
+            r, g, b = colorsys.hls_to_rgb(
+                (i * 0.618034) % 1, (0.42, 0.58, 0.5)[i % 3], 0.55
+            )
+            return f'#{round(r * 255):02X}{round(g * 255):02X}{round(b * 255):02X}'
 
         col = {k: (OI[i] if i < len(OI) else extra(i)) for i, k in enumerate(ds_order)}
-        rgb = lambda h: tuple(int(h[i:i + 2], 16) / 255 for i in (1, 3, 5))
+
+        def rgb(h):
+            return tuple(int(h[i : i + 2], 16) / 255 for i in (1, 3, 5))
 
         def lum(c):
-            lin = lambda v: v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4
+            def lin(v):
+                return v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4
+
             return 0.2126 * lin(c[0]) + 0.7152 * lin(c[1]) + 0.0722 * lin(c[2])
 
         def pack(values):
             """Unit-circle packing: circles (x, y, r) in the order of `values` (descending)."""
             if len(values) == 1:
                 return [(0.0, 0.0, 1.0)]
-            cs = list(reversed(circlify.circlify(values, show_enclosure=False, target_enclosure=circlify.Circle(x=0, y=0, r=1))))
+            cs = list(
+                reversed(
+                    circlify.circlify(
+                        values,
+                        show_enclosure=False,
+                        target_enclosure=circlify.Circle(x=0, y=0, r=1),
+                    )
+                )
+            )
             return [(c.x, c.y, c.r) for c in cs]
 
         ft_tot = {k: int(v) for k, v in d.group_by('ft').len().iter_rows()}
-        groups = sorted(ft_tot, key=lambda k: -ft_tot[k])
+        groups = sorted(
+            ft_tot, key=lambda k: (-ft_tot[k], k)
+        )  # ties: alphabetical, so the layout is deterministic
         gpos = pack([float(ft_tot[g]) for g in groups])
         INNER, GAP = 0.93, 0.02
 
         def members(ft):
-            sub = d.filter(pl.col('ft') == ft).group_by('ds').len().sort('len', descending=True)
+            sub = (
+                d.filter(pl.col('ft') == ft)
+                .group_by('ds')
+                .len()
+                .sort(['len', 'ds'], descending=[True, False])
+            )
             names, vals = sub['ds'].to_list(), sub['len'].to_list()
             return names, vals, pack([float(v) for v in vals])
 
@@ -1959,7 +2795,12 @@ def _(OUT, df, pl):
         pts = []
         for px, py, pr in members(groups[0])[2]:
             t = np.linspace(0, 2 * np.pi, 72, endpoint=False)
-            pts.append(np.c_[INNER * px + (INNER * pr * 0.97 + 0.03) * np.cos(t), INNER * py + (INNER * pr * 0.97 + 0.03) * np.sin(t)])
+            pts.append(
+                np.c_[
+                    INNER * px + (INNER * pr * 0.97 + 0.03) * np.cos(t),
+                    INNER * py + (INNER * pr * 0.97 + 0.03) * np.sin(t),
+                ]
+            )
         pts = np.vstack(pts)
         best = None
         for a_ in np.linspace(0.7, 1.05, 36):
@@ -1976,11 +2817,17 @@ def _(OUT, df, pl):
             u = np.array([np.cos(theta), np.sin(theta)])
             for s_ in np.arange(0.0, 6 * r0, 0.02 * r0):
                 c = u * s_
-                if (c[0] / EA) ** 2 + (c[1] / EB) ** 2 > 1 and np.hypot(*(bnd - c).T).min() >= r + GAP * r0 and all(np.hypot(*(c - o)) >= r + ro + GAP * r0 for o, ro in others):
+                if (
+                    (c[0] / EA) ** 2 + (c[1] / EB) ** 2 > 1
+                    and np.hypot(*(bnd - c).T).min() >= r + GAP * r0
+                    and all(np.hypot(*(c - o)) >= r + ro + GAP * r0 for o, ro in others)
+                ):
                     return c
             return None
 
-        small = [g[2] for g in gpos[1:]]  # radii of the fine-tuning groups (chains), by size
+        small = [
+            g[2] for g in gpos[1:]
+        ]  # radii of the fine-tuning groups (chains), by size
         r1 = small[0]
         others = small[1:]
         # the groups form a column on the left of the ellipse: the largest chain at the bottom, the others in rows of two right above it;
@@ -1992,19 +2839,35 @@ def _(OUT, df, pl):
         # its title, touching the circle; the two larger chains form one row above them (titles of that row at the same height)
         GP = 0.04 * r0
         r10, r7 = others[2], others[3]
-        for _ in range(6):  # the column widens by what the two small circles need beyond the circle of IN-1K (distances in inches -> data units)
+        for _ in range(
+            6
+        ):  # the column widens by what the two small circles need beyond the circle of IN-1K (distances in inches -> data units)
             k0 = W / (x1 - x0)
             th_ = 0.5 / k0  # height of a (two-line) title, in data units
-            dxl, dxr = 1.05 / k0 + r10, 1.05 / k0 + r7  # the title of IN-1K stays free between the two small circles
+            dxl, dxr = (
+                1.05 / k0 + r10,
+                1.05 / k0 + r7,
+            )  # the title of IN-1K stays free between the two small circles
             xl_c = -(EA + r1 + max(0.0, dxr + r7 - r1) + 0.05 * r0)
             x0 = min(xl_c - r1, xl_c - dxl - r10, xl_c - 1.85 / k0)
-        y1c = -EB + r1 + 0.45 / k0  # the column is lifted a bit above the bottom of the ellipse, away from the legend
-        dyl, dyr = [((r1 + r) ** 2 - dx ** 2) ** 0.5 for r, dx in ((r10, dxl), (r7, dxr))]
-        dyl, dyr = dyl + 0.15 / k0, dyr + 0.15 / k0  # lifted a little: the two small circles do not touch the circle of IN-1K
+        y1c = (
+            -EB + r1 + 0.45 / k0
+        )  # the column is lifted a bit above the bottom of the ellipse, away from the legend
+        dyl, dyr = [((r1 + r) ** 2 - dx**2) ** 0.5 for r, dx in ((r10, dxl), (r7, dxr))]
+        dyl, dyr = (
+            dyl + 0.15 / k0,
+            dyr + 0.15 / k0,
+        )  # lifted a little: the two small circles do not touch the circle of IN-1K
         row2 = others[:2]
         ytop_small = max(y1c + dyl + r10, y1c + dyr + r7, y1c + r1) + th_
         ya = ytop_small + GP + max(row2)
-        cs = [(xl_c, y1c), (xl_c - 1.0 / k0, ya), (xl_c + 1.0 / k0, ya), (xl_c - dxl, y1c + dyl), (xl_c + dxr, y1c + dyr)]
+        cs = [
+            (xl_c, y1c),
+            (xl_c - 1.0 / k0, ya),
+            (xl_c + 1.0 / k0, ya),
+            (xl_c - dxl, y1c + dyl),
+            (xl_c + dxr, y1c + dyr),
+        ]
         tops = [None, r1, max(row2), max(row2), r10, r7]
         y0, y1 = -EB, max(EB, ya + max(row2))
         gpos = [(0.0, 0.0, r0)] + [(c[0], c[1], r) for c, r in zip(cs, small)]
@@ -2016,19 +2879,48 @@ def _(OUT, df, pl):
         TOP, BOT = 0.9, 1.45
         fig = plt.figure(figsize=(W, H + TOP + BOT), dpi=150)
         ax = fig.add_axes([0, BOT / (H + TOP + BOT), 1, H / (H + TOP + BOT)])
-        ax.set_xlim(-W / 2, W / 2); ax.set_ylim(-H / 2, H / 2); ax.set_aspect('equal'); ax.axis('off')
+        ax.set_xlim(-W / 2, W / 2)
+        ax.set_ylim(-H / 2, H / 2)
+        ax.set_aspect('equal')
+        ax.axis('off')
         fig.canvas.draw()
         rend = fig.canvas.get_renderer()
 
-        def put(x, y, variants, colour, r=None, sizes=(13, 12, 11, 10, 9, 8, 7.5, 7, 6.5, 6), bold=False, halo=None, **kw):
+        def put(
+            x,
+            y,
+            variants,
+            colour,
+            r=None,
+            sizes=(13, 12, 11, 10, 9, 8, 7.5, 7, 6.5, 6),
+            bold=False,
+            halo=None,
+            **kw,
+        ):
             """Text at (x, y); first variant/size that fits inside a circle of radius r (None: anywhere). Returns the text or None."""
             for v in variants:
                 for sz in sizes:
-                    t = ax.text(x, y, v, fontsize=sz, color=colour, fontweight='bold' if bold else 'normal', linespacing=0.95, zorder=6, **kw)
+                    t = ax.text(
+                        x,
+                        y,
+                        v,
+                        fontsize=sz,
+                        color=colour,
+                        fontweight='bold' if bold else 'normal',
+                        linespacing=0.95,
+                        zorder=6,
+                        **kw,
+                    )
                     if halo:
-                        t.set_path_effects([pe.withStroke(linewidth=2.2, foreground=halo)])
+                        t.set_path_effects(
+                            [pe.withStroke(linewidth=2.2, foreground=halo)]
+                        )
                     bb = t.get_window_extent(rend)
-                    if r is None or math.hypot(bb.width / fig.dpi, bb.height / fig.dpi) / 2 <= r * 0.97:
+                    if (
+                        r is None
+                        or math.hypot(bb.width / fig.dpi, bb.height / fig.dpi) / 2
+                        <= r * 0.97
+                    ):
                         return t
                     t.remove()
             return None
@@ -2037,47 +2929,156 @@ def _(OUT, df, pl):
         for n_, (ft, (gx, gy, gr)) in enumerate(zip(groups, gpos)):
             X, Y, R = (gx - cx0) * k, (gy - cy0) * k, gr * k
             if n_ == 0:
-                ax.add_patch(Ellipse((X, Y), 2 * EA * k, 2 * EB * k, facecolor='#EDEDED', edgecolor='#B8B8B8', linewidth=0.8, zorder=1))
+                ax.add_patch(
+                    Ellipse(
+                        (X, Y),
+                        2 * EA * k,
+                        2 * EB * k,
+                        facecolor='#EDEDED',
+                        edgecolor='#B8B8B8',
+                        linewidth=0.8,
+                        zorder=1,
+                    )
+                )
             else:
-                ax.add_patch(Circle((X, Y), R, facecolor='#EDEDED', edgecolor='#B8B8B8', linewidth=0.8, zorder=1))
+                ax.add_patch(
+                    Circle(
+                        (X, Y),
+                        R,
+                        facecolor='#EDEDED',
+                        edgecolor='#B8B8B8',
+                        linewidth=0.8,
+                        zorder=1,
+                    )
+                )
             names, vals, pk = members(ft)
             inner = R * INNER
             for name, v, (px, py, pr) in zip(names, vals, pk):
                 cx, cy, cr = X + px * inner, Y + py * inner, pr * inner * 0.97
                 c = rgb(col[name])
-                ax.add_patch(Circle((cx, cy), cr, facecolor=c, edgecolor='white', linewidth=1.0, zorder=3))
+                ax.add_patch(
+                    Circle(
+                        (cx, cy),
+                        cr,
+                        facecolor=c,
+                        edgecolor='white',
+                        linewidth=1.0,
+                        zorder=3,
+                    )
+                )
                 fg = (1, 1, 1) if lum(c) < 0.30 else (0.1, 0.1, 0.1)
-                if put(cx, cy, [f'{name}\n{v}', f'{name} {v}', f'{v}'], fg, r=cr, ha='center', va='center') is None:
+                if (
+                    put(
+                        cx,
+                        cy,
+                        [f'{name}\n{v}', f'{name} {v}', f'{v}'],
+                        fg,
+                        r=cr,
+                        ha='center',
+                        va='center',
+                    )
+                    is None
+                ):
                     failed.append((ft, name, v, round(2 * cr, 2)))
             gcirc.append((ft, X, Y, EB * k if n_ == 0 else tops[n_] * k, R))
 
         # group titles: centred right above their own shape
-        Yb, Bb = gcirc[0][2], gcirc[0][3]
         for ft, X, Y, top, R in gcirc:
             big = R > 1.0
             below = False  # a group under the ellipse: its title goes under it, not into the ellipse
-            put(X, Y - top - 0.02 if below else Y + top + 0.02, [f'{ft}  ({ft_tot[ft]})'.replace('ImageNet-', 'IN-')] if big else [f'{ft}\n({ft_tot[ft]})'.replace('ImageNet-', 'IN-')], '#333333', bold=True, halo=(1, 1, 1, 0.9),
-                sizes=(16, 15) if big else (14, 13, 12), ha='center', va='top' if below else 'bottom')
+            put(
+                X,
+                Y - top - 0.02 if below else Y + top + 0.02,
+                [f'{ft}  ({ft_tot[ft]})'.replace('ImageNet-', 'IN-')]
+                if big
+                else [f'{ft}\n({ft_tot[ft]})'.replace('ImageNet-', 'IN-')],
+                '#333333',
+                bold=True,
+                halo=(1, 1, 1, 0.9),
+                sizes=(16, 15) if big else (14, 13, 12),
+                ha='center',
+                va='top' if below else 'bottom',
+            )
         print('circles whose text does not fit:', failed)
         Ht = H + TOP + BOT
-        t_title = fig.text(0.008, 1 - 0.02 / Ht, '(b) Pretraining dataset and fine-tuning stage', ha='left', va='top', fontsize=20, fontweight='bold', color='#111111')
-        t_sub = fig.text(0.008, 1 - 0.50 / Ht, f'{d.height:,} checkpoints; circle area proportional to the number of checkpoints. Outer circles: fine-tuning stage; inner circles: pretraining dataset '
-                 f'(all {len(ds_order)} datasets shown).', ha='left', va='top', fontsize=11, color='#555555')
+        t_title = fig.text(
+            0.008,
+            1 - 0.02 / Ht,
+            '(b) Pretraining dataset and fine-tuning stage',
+            ha='left',
+            va='top',
+            fontsize=20,
+            fontweight='bold',
+            color='#111111',
+        )
+        t_sub = fig.text(
+            0.008,
+            1 - 0.50 / Ht,
+            f'{d.height:,} checkpoints; circle area proportional to the number of checkpoints. Outer circles: fine-tuning stage; inner circles: pretraining dataset '
+            f'(all {len(ds_order)} datasets shown).',
+            ha='left',
+            va='top',
+            fontsize=11,
+            color='#555555',
+        )
         shown = [k_ for k_ in ds_order if d.filter(pl.col('ds') == k_).height]
-        _leg = fig.legend([Patch(facecolor=col[k_], edgecolor='none') for k_ in shown], shown, loc='lower center', bbox_to_anchor=(0.5, 0.0),
-                   ncol=8, frameon=False, fontsize=11, title='Pretraining Dataset', title_fontsize=17, alignment='left', handlelength=1.0, handleheight=1.0, columnspacing=1.4, handletextpad=0.5)
+        _leg = fig.legend(
+            [Patch(facecolor=col[k_], edgecolor='none') for k_ in shown],
+            shown,
+            loc='lower center',
+            bbox_to_anchor=(0.5, 0.0),
+            ncol=8,
+            frameon=False,
+            fontsize=11,
+            title='Pretraining Dataset',
+            title_fontsize=17,
+            alignment='left',
+            handlelength=1.0,
+            handleheight=1.0,
+            columnspacing=1.4,
+            handletextpad=0.5,
+        )
         _leg.get_title().set_fontweight('bold')
         for ext in ('pdf', 'png'):
-            fig.savefig(str(OUT / f'treemap_finetuning_dataset_circles.{ext}'), dpi=300, bbox_inches='tight', facecolor='white')
+            fig.savefig(
+                str(OUT / f'treemap_finetuning_dataset_circles.{ext}'),
+                dpi=300,
+                bbox_inches='tight',
+                facecolor='white',
+            )
         print('Saved: treemap_finetuning_dataset_circles.pdf  +  .png')
-        t_sub.set_visible(False)  # variant without the subtitle (used by the side-by-side figure)
+        t_sub.set_visible(
+            False
+        )  # variant without the subtitle (used by the side-by-side figure)
         t_title.set_y(1 - 0.42 / Ht)
         for ext in ('pdf', 'png'):
-            fig.savefig(str(OUT / f'treemap_finetuning_dataset_circles_nosub.{ext}'), dpi=300, bbox_inches='tight', facecolor='white')
+            fig.savefig(
+                str(OUT / f'treemap_finetuning_dataset_circles_nosub.{ext}'),
+                dpi=300,
+                bbox_inches='tight',
+                facecolor='white',
+            )
         t_sub.set_visible(True)
         t_title.set_y(1 - 0.02 / Ht)
+        # variants without the panel letter in the title
+        t_title.set_text('Pretraining dataset and fine-tuning stage')
+        for suffix, with_sub in (('', True), ('_nosub', False)):
+            t_sub.set_visible(with_sub)
+            t_title.set_y(1 - 0.02 / Ht if with_sub else 1 - 0.42 / Ht)
+            for ext in ('pdf', 'png'):
+                fig.savefig(
+                    str(
+                        OUT
+                        / f'treemap_finetuning_dataset_circles{suffix}_noletter.{ext}'
+                    ),
+                    dpi=300,
+                    bbox_inches='tight',
+                    facecolor='white',
+                )
+        t_sub.set_visible(True)
+        t_title.set_y(1 - 0.02 / Ht)
+        t_title.set_text('(b) Pretraining dataset and fine-tuning stage')
         return fig
-
 
     fig_circ_ft = _()
     fig_circ_ft
@@ -2090,9 +3091,14 @@ def _(OUT):
     from PIL import Image
 
     Image.MAX_IMAGE_PIXELS = None
-    _ims = [Image.open(OUT / 'models_per_company_packed_nosub.png').convert('RGB'), Image.open(OUT / 'treemap_finetuning_dataset_circles_nosub.png').convert('RGB')]
+    _ims = [
+        Image.open(OUT / 'models_per_company_packed_nosub.png').convert('RGB'),
+        Image.open(OUT / 'treemap_finetuning_dataset_circles_nosub.png').convert('RGB'),
+    ]
     _h = min(im.height for im in _ims)
-    _ims = [im.resize((round(im.width * _h / im.height), _h), Image.LANCZOS) for im in _ims]
+    _ims = [
+        im.resize((round(im.width * _h / im.height), _h), Image.LANCZOS) for im in _ims
+    ]
     _gap = 40
     _canvas = Image.new('RGB', (sum(im.width for im in _ims) + _gap, _h), 'white')
     _canvas.paste(_ims[0], (0, 0))
@@ -2114,80 +3120,177 @@ def _(OUT, df, pl):
         import plotly.graph_objects as go
 
         TASKS = {
-            'image_classification': 'classification', 'image_text_contrastive': 'contrastive', 'masked_image_modeling': 'MIM',
-            'vision_language_generative': 'VL-gen', 'joint_embedding': 'joint-emb', 'promptable_segmentation': 'segm.',
-            'masked_vision_language_modeling': 'masked VL', 'vision_language_multitask': 'VL multitask',
+            'image_classification': 'classification',
+            'image_text_contrastive': 'contrastive',
+            'masked_image_modeling': 'MIM',
+            'vision_language_generative': 'VL-gen',
+            'joint_embedding': 'joint-emb',
+            'promptable_segmentation': 'segm.',
+            'masked_vision_language_modeling': 'masked VL',
+            'vision_language_multitask': 'VL multitask',
         }
         SMALL = 20  # datasets with fewer checkpoints are merged into "Other"
         d = (
-            df.filter(pl.col('pretrain_dataset').is_not_null()).with_columns(pretrain_dataset=pl.col('pretrain_dataset').list.join(' + '))  # run-time key: one unit per checkpoint (pretrain_dataset is a list)
+            df.filter(pl.col('pretrain_dataset').is_not_null())
             .with_columns(
-                ft=pl.when(pl.col('pretrain_ft').is_not_null()).then(pl.lit('→ ') + pl.col('pretrain_ft').list.join(' → ')).otherwise(pl.lit('no fine-tuning')),
-                paradigm=pl.col('pretrain_tasks').list.eval(pl.element().replace(TASKS)).list.join(' + '),  # last column: pretraining tasks
+                pretrain_dataset=pl.col('pretrain_dataset').list.join(' + ')
+            )  # run-time key: one unit per checkpoint (pretrain_dataset is a list)
+            .with_columns(
+                ft=pl.when(pl.col('pretrain_ft').is_not_null())
+                .then(pl.lit('→ ') + pl.col('pretrain_ft').list.join(' → '))
+                .otherwise(pl.lit('no fine-tuning')),
+                paradigm=pl.col('pretrain_tasks')
+                .list.eval(pl.element().replace(TASKS))
+                .list.join(' + '),  # last column: pretraining tasks
             )
         )
         size = d.group_by('pretrain_dataset').len()
         small = size.filter(pl.col('len') < SMALL)['pretrain_dataset'].to_list()
         d = d.with_columns(
-            ds=pl.when(pl.col('pretrain_dataset').is_in(small)).then(pl.lit(f'Other ({len(small)} datasets)')).otherwise(pl.col('pretrain_dataset'))
+            ds=pl.when(pl.col('pretrain_dataset').is_in(small))
+            .then(pl.lit(f'Other ({len(small)} datasets)'))
+            .otherwise(pl.col('pretrain_dataset'))
         )
-        ds_order = d.group_by('ds').len().sort('len', descending=True)['ds'].to_list()
-        ds_order = [x for x in ds_order if not x.startswith('Other')] + [x for x in ds_order if x.startswith('Other')]
-        ft_order = ['no fine-tuning'] + sorted({x for x in d['ft'].unique().to_list() if x != 'no fine-tuning'})
-        pa_size = d.group_by('paradigm').len().sort('len', descending=True)['paradigm'].to_list()  # colours follow this ranking
+        ds_order = (
+            d.group_by('ds')
+            .len()
+            .sort(['len', 'ds'], descending=[True, False])['ds']
+            .to_list()
+        )
+        ds_order = [x for x in ds_order if not x.startswith('Other')] + [
+            x for x in ds_order if x.startswith('Other')
+        ]
+        ft_order = ['no fine-tuning'] + sorted(
+            {x for x in d['ft'].unique().to_list() if x != 'no fine-tuning'}
+        )
+        pa_size = (
+            d.group_by('paradigm')
+            .len()
+            .sort(['len', 'paradigm'], descending=[True, False])['paradigm']
+            .to_list()
+        )  # colours follow this ranking
         # The tiny nodes are interleaved between the bigger ones (smallest first), so that their labels do not overlap on a short figure.
         big, tiny = pa_size[:6], pa_size[6:][::-1]
-        pa_order = [k for i in range(max(len(big), len(tiny))) for k in (big[i:i + 1] + tiny[i:i + 1])]
+        pa_order = [
+            k
+            for i in range(max(len(big), len(tiny)))
+            for k in (big[i : i + 1] + tiny[i : i + 1])
+        ]
 
-        labels = ds_order + ft_order + pa_order
         idx = {('ds', k): i for i, k in enumerate(ds_order)}
         idx |= {('ft', k): len(ds_order) + i for i, k in enumerate(ft_order)}
-        idx |= {('pa', k): len(ds_order) + len(ft_order) + i for i, k in enumerate(pa_order)}
+        idx |= {
+            ('pa', k): len(ds_order) + len(ft_order) + i for i, k in enumerate(pa_order)
+        }
 
-        OI = ['#E69F00', '#56B4E9', '#009E73', '#0072B2', '#D55E00', '#CC79A7', '#882255', '#117733', '#DDCC77', '#6699CC', '#AA4499']
+        OI = [
+            '#E69F00',
+            '#56B4E9',
+            '#009E73',
+            '#0072B2',
+            '#D55E00',
+            '#CC79A7',
+            '#882255',
+            '#117733',
+            '#DDCC77',
+            '#6699CC',
+            '#AA4499',
+        ]
         GREY = '#8C8C8C'
-        col_ds = {k: OI[i] if i < len(OI) and not k.startswith('Other') else GREY for i, k in enumerate(ds_order)}
-        TASK_COLS = ['#3B3B98', '#B33771', '#2C9C91', '#E15F41', '#82589F', '#1B9CFC', '#786FA6', '#596275', '#A3A3A3']
+        col_ds = {
+            k: OI[i] if i < len(OI) and not k.startswith('Other') else GREY
+            for i, k in enumerate(ds_order)
+        }
+        TASK_COLS = [
+            '#3B3B98',
+            '#B33771',
+            '#2C9C91',
+            '#E15F41',
+            '#82589F',
+            '#1B9CFC',
+            '#786FA6',
+            '#596275',
+            '#A3A3A3',
+        ]
         col_pa = {k: TASK_COLS[i % len(TASK_COLS)] for i, k in enumerate(pa_size)}
-        rgba = lambda h, a: f"rgba({int(h[1:3], 16)},{int(h[3:5], 16)},{int(h[5:7], 16)},{a})"
+
+        def rgba(h, a):
+            return f'rgba({int(h[1:3], 16)},{int(h[3:5], 16)},{int(h[5:7], 16)},{a})'
 
         src, tgt, val, lcol = [], [], [], []
         for a, b, n in d.group_by('ds', 'ft').len().iter_rows():
-            src.append(idx[('ds', a)]); tgt.append(idx[('ft', b)]); val.append(n); lcol.append(rgba(col_ds[a], 0.45))
+            src.append(idx[('ds', a)])
+            tgt.append(idx[('ft', b)])
+            val.append(n)
+            lcol.append(rgba(col_ds[a], 0.45))
         for a, b, n in d.group_by('ft', 'paradigm').len().iter_rows():
-            src.append(idx[('ft', a)]); tgt.append(idx[('pa', b)]); val.append(n); lcol.append(rgba(col_pa[b], 0.45))
-        ncol = [col_ds[k] for k in ds_order] + ['#B8B8B8'] * len(ft_order) + [col_pa[k] for k in pa_order]
+            src.append(idx[('ft', a)])
+            tgt.append(idx[('pa', b)])
+            val.append(n)
+            lcol.append(rgba(col_pa[b], 0.45))
+        ncol = (
+            [col_ds[k] for k in ds_order]
+            + ['#B8B8B8'] * len(ft_order)
+            + [col_pa[k] for k in pa_order]
+        )
         tot = {('ds', k): int(v) for k, v in d.group_by('ds').len().iter_rows()}
         tot |= {('ft', k): int(v) for k, v in d.group_by('ft').len().iter_rows()}
         tot |= {('pa', k): int(v) for k, v in d.group_by('paradigm').len().iter_rows()}
-        nlabels = [f'{k}  ({tot[(c, k)]})' for c, ks in (('ds', ds_order), ('ft', ft_order), ('pa', pa_order)) for k in ks]
+        nlabels = [
+            f'{k}  ({tot[(c, k)]})'
+            for c, ks in (('ds', ds_order), ('ft', ft_order), ('pa', pa_order))
+            for k in ks
+        ]
 
         n0 = len(nlabels)
         for k in pa_order:  # invisible sink per task
-            src.append(idx[('pa', k)]); tgt.append(n0 + pa_order.index(k)); val.append(tot[('pa', k)]); lcol.append('rgba(0,0,0,0)')
+            src.append(idx[('pa', k)])
+            tgt.append(n0 + pa_order.index(k))
+            val.append(tot[('pa', k)])
+            lcol.append('rgba(0,0,0,0)')
         nlabels += [''] * len(pa_order)
         ncol += ['rgba(0,0,0,0)'] * len(pa_order)
 
-        fig = go.Figure(go.Sankey(
-            arrangement='snap',
-            node=dict(label=nlabels, color=ncol, pad=10, thickness=14, line=dict(color='white', width=0.5)),
-            link=dict(source=src, target=tgt, value=val, color=lcol),
-        ))
+        fig = go.Figure(
+            go.Sankey(
+                arrangement='snap',
+                node=dict(
+                    label=nlabels,
+                    color=ncol,
+                    pad=10,
+                    thickness=14,
+                    line=dict(color='white', width=0.5),
+                ),
+                link=dict(source=src, target=tgt, value=val, color=lcol),
+            )
+        )
         fig.update_layout(
-            title=dict(text=f'<b>What was it trained on?</b><br><sup>{d.height:,} checkpoints: pretraining dataset → fine-tuning dataset → pretraining tasks '
-                            f'(datasets with fewer than {SMALL} checkpoints merged into "Other")</sup>', x=0.01),
-            font=dict(family='Times New Roman, serif', size=10), height=600, width=1350, margin=dict(l=10, r=10, t=70, b=5),
+            title=dict(
+                text=f'<b>What was it trained on?</b><br><sup>{d.height:,} checkpoints: pretraining dataset → fine-tuning dataset → pretraining tasks '
+                f'(datasets with fewer than {SMALL} checkpoints merged into "Other")</sup>',
+                x=0.01,
+            ),
+            font=dict(family='Times New Roman, serif', size=10),
+            height=600,
+            width=1350,
+            margin=dict(l=10, r=10, t=70, b=5),
             paper_bgcolor='white',
         )
         fig.write_html(str(OUT / 'pretrain_sankey_tasks.html'))
         try:
             for ext in ('pdf', 'png'):
-                fig.write_image(str(OUT / f'pretrain_sankey_tasks.{ext}'), scale=3 if ext == 'png' else 1)
+                fig.write_image(
+                    str(OUT / f'pretrain_sankey_tasks.{ext}'),
+                    scale=3 if ext == 'png' else 1,
+                )
             print('Saved: pretrain_sankey_tasks.html / .pdf / .png')
         except Exception as e:  # kaleido needs a Chrome
-            print('Saved: pretrain_sankey_tasks.html only;', type(e).__name__, str(e)[:120])
+            print(
+                'Saved: pretrain_sankey_tasks.html only;',
+                type(e).__name__,
+                str(e)[:120],
+            )
         return fig
-
 
     fig_sankey = _()
     fig_sankey
@@ -2210,8 +3313,8 @@ def _(OUT, df):
           • matplotlib and numpy are available
         """
 
-        import matplotlib.pyplot as plt
         import matplotlib.patches as mpatches
+        import matplotlib.pyplot as plt
         import matplotlib.ticker as ticker
         import numpy as np
 
@@ -2415,7 +3518,7 @@ def _(OUT, df):
                 np.floor(np.log10(raw_min)), np.ceil(np.log10(raw_max)) + 1
             )
             ax.set_yticks(y_ticks)
-            ax.set_yticklabels([r'$10^{%d}$' % int(t) for t in y_ticks])
+            ax.set_yticklabels([rf'$10^{{{int(t)}}}$' for t in y_ticks])
 
             ax.set_xticks(range(1, n_groups + 1))
             ax.set_xticklabels(x_order, rotation=45, ha='right', rotation_mode='anchor')
@@ -2495,8 +3598,8 @@ def _(OUT, df):
           • matplotlib and numpy are available
         """
 
-        import matplotlib.pyplot as plt
         import matplotlib.patches as mpatches
+        import matplotlib.pyplot as plt
         import matplotlib.ticker as ticker
         import numpy as np
 
@@ -2711,7 +3814,7 @@ def _(OUT, df):
                 np.ceil(np.log10(raw_max)) + 1,
             )
             ax.set_yticks(y_ticks)
-            ax.set_yticklabels([r'$10^{%d}$' % int(t) for t in y_ticks])
+            ax.set_yticklabels([rf'$10^{{{int(t)}}}$' for t in y_ticks])
 
             ax.set_xticks(range(1, N_GROUPS + 1))
             ax.set_xticklabels(x_order, rotation=45, ha='right', rotation_mode='anchor')
@@ -2774,8 +3877,8 @@ def _(OUT, df):
         and the macro-family legend sits BELOW row 2.
         """
 
-        import matplotlib.pyplot as plt
         import matplotlib.patches as mpatches
+        import matplotlib.pyplot as plt
         import matplotlib.ticker as ticker
         import numpy as np
 
@@ -3033,7 +4136,7 @@ def _(OUT, df):
                 np.ceil(np.log10(raw_max)) + 1,
             )
             ax.set_yticks(y_ticks)
-            ax.set_yticklabels([r'$10^{%d}$' % int(t) for t in y_ticks])
+            ax.set_yticklabels([rf'$10^{{{int(t)}}}$' for t in y_ticks])
 
             # X-tick labels removed: groups are identified by the row legend.
             ax.set_xticks(range(1, n_groups + 1))
@@ -3183,9 +4286,7 @@ def _(OUT, df):
         )
         leg2.get_title().set_fontweight('bold')
 
-        plt.savefig(
-            str(OUT / 'combined_plots_2x3_legend_correct.pdf'), format='pdf'
-        )
+        plt.savefig(str(OUT / 'combined_plots_2x3_legend_correct.pdf'), format='pdf')
         return plt.show()
 
     _combined_2x3_plot()
@@ -3386,7 +4487,9 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(df, px):
     _pretrain_counts = (
-        df.explode('pretrain_dataset')  # a model with several corpora counts once for each of them
+        df.explode(
+            'pretrain_dataset'
+        )  # a model with several corpora counts once for each of them
         .group_by('pretrain_dataset')
         .len()
         .sort('len', descending=True)
@@ -3818,5 +4921,5 @@ def _(G, G_meta, px):
     return
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     app.run()
