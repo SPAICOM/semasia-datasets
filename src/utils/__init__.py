@@ -1,3 +1,4 @@
+from src.utils.coco import join_coco2017, load_coco2017
 from src.utils.huggingface import (
     collect_models_by_split,
     collect_unloaded_model_folders,
@@ -10,6 +11,8 @@ from src.utils.io import latents_to_parquet_shards
 from src.utils.local import collect_local_models_by_split, remove_matching
 
 __all__ = [
+    'join_coco2017',
+    'load_coco2017',
     'collect_models_by_split',
     'collect_unloaded_model_folders',
     'collect_unloaded_parquet_files',

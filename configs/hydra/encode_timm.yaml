@@ -20,9 +20,9 @@ parquet:
     max_rows_per_shard: 100_000
 
 dataloader:
-    num_workers: 1
+    num_workers: 20
     pin_memory: true
-    batch_size: 8
+    batch_size: 16
 
 # --------------------------
 # Hugging Face Hub settings

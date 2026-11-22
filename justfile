@@ -26,8 +26,8 @@ readme:
     uv run scripts/generate_readme.py
 
 # Just encode a dataset for timm models
-timm-encode DATASET:
-    uv run scripts/encode_dataset_all_timm.py dataset={{DATASET}} hf.push=false
+timm-encode DATASET *ARGS:
+    uv run scripts/encode_dataset_all_timm.py dataset={{DATASET}} hf.push=false {{ARGS}}
 
 # Push models of a dataset to HF & update readme
 push DATASET:

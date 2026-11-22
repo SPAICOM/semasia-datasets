@@ -265,6 +265,9 @@ def generate_readme_with_configs(
     pretty_name: str | None = None,
     extra_markdown: str = '',
     original_dataset_id: str | None = None,
+    source_dataset_ids: list[str] | None = None,
+    id_description: str | None = None,
+    field_descriptions: dict[str, str] | None = None,
     code_repo_url: str | None = None,
     model_registry_repo_id: str | None = None,
     extra_fields: list[str] | None = None,
@@ -292,7 +295,21 @@ def generate_readme_with_configs(
     extra_markdown : str, optional
         Additional markdown content to append to the Notes section.
     original_dataset_id : str, optional
-        Original dataset ID to link to (e.g., "uoft-cs/cifar10").
+        Original dataset ID to link to (e.g., "uoft-cs/cifar10"). The README
+        states that the row order matches that of the original split, so it
+        is only for datasets that are a copy of a single Hub dataset.
+    source_dataset_ids : list[str], optional
+        IDs of the Hub datasets joined to build the benchmark (e.g., COCO 2017),
+        linked in the Notes instead of `original_dataset_id`. Since the row
+        order does not match that of any of them, `id_description` is required.
+    id_description : str, optional
+        Description of the `id` field, replacing the default one (row index
+        within the shard, matching the original split). Required with
+        `source_dataset_ids`.
+    field_descriptions : dict[str, str], optional
+        Description of the fields of `extra_fields`, replacing the default
+        "Original dataset field, copied as-is from the source dataset.". The
+        `id` field is described by `id_description`, so it is not repeated.
     code_repo_url : str, optional
         URL of the code repository used to generate this dataset. If None,
         the link is omitted.
@@ -333,6 +350,12 @@ def generate_readme_with_configs(
     None
         This function is called for its side effects only.
     """
+    if source_dataset_ids and not id_description:
+        raise ValueError(
+            '`id_description` is required with `source_dataset_ids`: the row '
+            'order does not match that of a single original dataset.'
+        )
+
     token = get_token()
     if token is None:
         raise RuntimeError(
@@ -432,6 +455,11 @@ def generate_readme_with_configs(
         'source dataset, so `id` can be used to map a row back to '
         'its source sample.'
     )
+    id_cell = id_description or (
+        'Row index within the shard (unique per split/model, not across models); '
+        f'the {id_note}'
+    )
+    field_descriptions = field_descriptions or {}
     fields_section = '\n'.join(
         [
             '    ## Fields',
@@ -440,18 +468,21 @@ def generate_readme_with_configs(
             '',
             '    | Field | Description |',
             '    |-------|-------------|',
-            '    | `id` | Row index within the shard '
-            '(unique per split/model, not across models); the '
-            f'{id_note} |',
+            f'    | `id` | {id_cell} |',
             '    | `model_name` | `timm` model that produced this '
             "row's embedding (constant within a config). |",
             '    | `embedding` | Precomputed latent representation '
             f'extracted by the model {embedding_dim_note} |',
         ]
         + [
-            f'    | `{field}` | Original dataset field, copied '
-            'as-is from the source dataset. |'
+            f'    | `{field}` | '
+            + field_descriptions.get(
+                field,
+                'Original dataset field, copied as-is from the source dataset.',
+            )
+            + ' |'
             for field in (extra_fields or [])
+            if field != 'id'
         ]
     )
 
@@ -466,12 +497,17 @@ def generate_readme_with_configs(
         ]
     )
 
-    original_dataset_link = (
-        f'- Based on [{original_dataset_id}]'
-        f'(https://huggingface.co/datasets/{original_dataset_id})'
-        if original_dataset_id
-        else ''
-    )
+    if source_dataset_ids:
+        original_dataset_link = '- Built by joining ' + ' and '.join(
+            f'[{d}](https://huggingface.co/datasets/{d})' for d in source_dataset_ids
+        )
+    elif original_dataset_id:
+        original_dataset_link = (
+            f'- Based on [{original_dataset_id}]'
+            f'(https://huggingface.co/datasets/{original_dataset_id})'
+        )
+    else:
+        original_dataset_link = ''
     code_repo_link = (
         f'- Code: [{code_repo_url.split("://")[-1]}]({code_repo_url})'
         if code_repo_url

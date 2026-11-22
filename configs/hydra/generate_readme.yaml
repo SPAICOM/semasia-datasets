@@ -57,4 +57,4 @@ hydra:
     mode: MULTIRUN
     sweeper:
         params:
-            dataset: cifar10,cifar100,mnist,fashion_mnist,tiny_imagenet,imagenet-1k,celeba,oxford-flowers
+            dataset: cifar10,cifar100,mnist,fashion_mnist,tiny_imagenet,imagenet-1k,celeba,oxford-flowers,coco2017
