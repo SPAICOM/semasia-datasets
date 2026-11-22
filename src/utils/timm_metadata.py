@@ -1645,7 +1645,9 @@ def _parse_pretrain_config(pretrain_config: str) -> dict:
     # fine-tuning chain: every dataset named after '_ft_' (two stages for in1k_ft_in22k_in1k, ...);
     # otherwise the single target found above
     stages = _ft_stages(cfg)
-    ft_list: list[str] | None = stages if len(stages) >= 2 else ([ft_target] if ft_target else None)
+    ft_list: list[str] | None = (
+        stages if len(stages) >= 2 else ([ft_target] if ft_target else None)
+    )
 
     return {
         'pretrain_config': pretrain_config,
@@ -1896,9 +1898,7 @@ def infer_pretrain_tasks(
         tasks = ['image_text_contrastive']
     elif 'beit3' in variant:
         tasks = ['masked_vision_language_modeling']
-    elif method == 'Autoregressive' or fam == 'AIMv2':
-        tasks = ['vision_language_generative']
-    elif 'intern300m' in variant:
+    elif method == 'Autoregressive' or fam == 'AIMv2' or 'intern300m' in variant:
         tasks = ['vision_language_generative']
     elif fam.startswith('SAM'):
         tasks = ['promptable_segmentation', 'masked_image_modeling']
@@ -1954,7 +1954,11 @@ def _load_org_overrides() -> dict[str, str]:
     import csv
     from pathlib import Path
 
-    with open(Path(__file__).with_name('pretrain_org_overrides.csv'), newline='', encoding='utf-8') as f:
+    with open(
+        Path(__file__).with_name('pretrain_org_overrides.csv'),
+        newline='',
+        encoding='utf-8',
+    ) as f:
         return {r['model_name']: r['pretrain_org'] for r in csv.DictReader(f)}
 
 
@@ -1988,7 +1992,9 @@ def refresh_pretrain_dataset(df):
 
     filled = [
         d if d is not None else _DATASET_BY_CONFIG.get(c.lower() if c else '')
-        for d, c in zip(df['pretrain_dataset'].to_list(), df['pretrain_config'].to_list())
+        for d, c in zip(
+            df['pretrain_dataset'].to_list(), df['pretrain_config'].to_list()
+        )
     ]
     return df.with_columns(pl.Series('pretrain_dataset', filled, dtype=pl.String))
 
@@ -2005,7 +2011,9 @@ def refresh_pretrain_ft(df):
 
     ft, ds = [], []
     for c, d, f_old in zip(
-        df['pretrain_config'].to_list(), df['pretrain_dataset'].to_list(), df['pretrain_ft'].to_list()
+        df['pretrain_config'].to_list(),
+        df['pretrain_dataset'].to_list(),
+        df['pretrain_ft'].to_list(),
     ):
         parsed = _parse_pretrain_config(c) if c else None
         chain = parsed['pretrain_ft'] if parsed else None
@@ -2049,6 +2057,109 @@ def add_derived_columns(df):
     )
 
 
+def _hf_hub_id(model_name: str) -> str | None:
+    """Hub repository id from the timm pretrained config (None if missing)."""
+    import timm
+
+    cfg = timm.models.get_pretrained_cfg(model_name)
+    return getattr(cfg, 'hf_hub_id', None) if cfg is not None else None
+
+
+def _hf_url(model_name: str) -> str | None:
+    """Hub model page from the timm pretrained config (None if no hf_hub_id)."""
+    h = _hf_hub_id(model_name)
+    return f'https://huggingface.co/{h}' if h else None
+
+
+def _hub_repo_is_public(api, repo_id: str, retries: int = 8) -> bool:
+    """True if the Hub repository exists and is public (anonymous request).
+
+    A gated repository counts as public (its page is). Rate limits and server
+    errors are retried with exponential backoff; if every retry fails the
+    repository is reported as not reachable.
+    """
+    import time
+
+    from huggingface_hub.errors import (
+        GatedRepoError,
+        HfHubHTTPError,
+        RepositoryNotFoundError,
+    )
+
+    for k in range(retries):
+        try:
+            info = api.model_info(repo_id, token=False)
+        except GatedRepoError:
+            return True
+        except RepositoryNotFoundError:
+            return False
+        except HfHubHTTPError as e:
+            code = e.response.status_code if e.response is not None else None
+            if code == 429 or (code is not None and code >= 500):
+                time.sleep(min(5 * 2**k, 120))
+                continue
+            return False
+        except Exception:
+            time.sleep(min(5 * 2**k, 120))
+            continue
+        return not getattr(info, 'private', False)
+    return False
+
+
+def refresh_hf_url(df, verify=None, checker=None, workers: int = 8):
+    """
+    Return the registry with ``hf_url`` (Hugging Face model page) second, right
+    after ``model_name``.
+
+    The repository id is read from the timm pretrained config (``hf_hub_id``),
+    never guessed, and the repository must exist and be public (checked on the
+    Hub, anonymously); otherwise the value is null. The check needs the network,
+    so it runs only for the models in ``verify`` (e.g. the newly extracted ones);
+    the other models keep the value already stored. If the column is missing it
+    is built for every model.
+
+    Parameters
+    ----------
+    df : polars.DataFrame
+        Registry with a ``model_name`` column.
+    verify : iterable of str, optional
+        Models whose ``hf_url`` is (re)computed and checked on the Hub.
+    checker : callable, optional
+        ``checker(repo_id) -> bool``; default: public repository on the Hub.
+    workers : int, default 8
+        Threads used for the Hub requests.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    import polars as pl
+
+    names = df['model_name'].to_list()
+    has = 'hf_url' in df.columns
+    stored = dict(zip(names, df['hf_url'].to_list(), strict=True)) if has else {}
+    todo = set(names) if not has else set(verify or ()) & set(names)
+    ids = {n: _hf_hub_id(n) for n in todo}
+    repos = sorted({h for h in ids.values() if h})
+    if checker is None:
+        from huggingface_hub import HfApi
+
+        api = HfApi()
+
+        def checker(repo_id):
+            return _hub_repo_is_public(api, repo_id)
+
+    with ThreadPoolExecutor(workers) as ex:
+        public = dict(zip(repos, ex.map(checker, repos), strict=True))
+    urls = [
+        (f'https://huggingface.co/{ids[n]}' if ids[n] and public[ids[n]] else None)
+        if n in todo
+        else stored[n]
+        for n in names
+    ]
+    out = df.drop('hf_url') if has else df.clone()
+    out.insert_column(1, pl.Series('hf_url', urls, dtype=pl.String))
+    return out
+
+
 def get_model_metadata(model_name: str, use_timm: bool = True) -> dict:
     """
     Given a timm model name (``{model_variant}.{pretrain_config}``),
@@ -2075,7 +2186,9 @@ def get_model_metadata(model_name: str, use_timm: bool = True) -> dict:
 
     variant_fields = _parse_variant(model_variant)
     pretrain_fields = _parse_pretrain_config(pretrain_config)
-    pretrain_fields['pretrain_org'] = _org_for_model(model_variant, pretrain_config) or _load_org_overrides().get(model_name)
+    pretrain_fields['pretrain_org'] = _org_for_model(
+        model_variant, pretrain_config
+    ) or _load_org_overrides().get(model_name)
 
     # Cross-field inference:
     # 0. Config-side distillation token — CaiT, RepViT, SwiftFormer encode
@@ -2153,6 +2266,7 @@ def get_model_metadata(model_name: str, use_timm: bool = True) -> dict:
 
     return {
         'model_name': model_name,
+        'hf_url': _hf_url(model_name),
         **variant_fields,
         'num_parameters': num_parameters,
         'latent_dim': latent_dim,

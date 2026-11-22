@@ -1,0 +1,58 @@
+# COCO 2017 is not on the Hub as a single dataset: it is the join, on the COCO `image_id`, of
+# two datasets (see src/utils/coco.py), so this config has `sources` instead of a single `name`
+# on the Hub. `name` is only the name of the benchmark (repo `<namespace>/semasia-coco2017`).
+#
+# `id` of SEMASIA is the official COCO `image_id`, not a row index.
+name: coco2017
+
+# Splits of SEMASIA. The name of the split of each source is in `sources.*.split`.
+split:
+    - train
+    - validation
+data: image
+extras:
+    - id
+    - objects
+    - captions
+    - captions_ids
+    - license
+    - coco_url
+    - flickr_url
+
+# Description of the fields in the README of the repo (scripts/generate_readme.py).
+readme:
+    id: >-
+        Official COCO 2017 `image_id` of the image (not a row index): unique within a split and the
+        same for every model, so it maps a row back to the image in COCO.
+    fields:
+        objects: >-
+            Annotations of the objects in the image, as lists with one entry per object (empty if the
+            image has none): `id` (id of the object), `area`, `bbox` (`x, y, width, height` in absolute
+            coordinates), `label` (index of the category in the 92-class list of COCO, of which 80 are
+            used) and `iscrowd`.
+        captions: Captions of the image (5 to 7 per image).
+        captions_ids: >-
+            Ids of the captions, in the same order as `captions` (they are not ids of the objects).
+        license: Integer code of the license of the image, as in the COCO 2017 annotations.
+        coco_url: URL of the image on cocodataset.org.
+        flickr_url: URL of the image on Flickr.
+
+sources:
+    # image, image_id and objects (id, area, bbox, label, iscrowd). This dataset is a loading
+    # script, so its parquet files are read from the automatic conversion of the Hub.
+    images:
+        name: rafaelpadilla/coco2017
+        revision: refs/convert/parquet
+        data_files: default/{split}/*.parquet
+        split:
+            train: train
+            validation: val
+    # image_id, captions, ids (ids of the captions, not of the objects), license, coco_url and
+    # flickr_url. It is renamed: ids -> captions_ids, image_id -> id.
+    captions:
+        name: phiyodr/coco2017
+        revision: main
+        data_files: data/{split}-*.parquet
+        split:
+            train: train
+            validation: validation

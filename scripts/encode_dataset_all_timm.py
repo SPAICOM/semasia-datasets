@@ -24,23 +24,24 @@ from datasets import load_dataset
 from huggingface_hub import create_repo
 from huggingface_hub.utils import get_token
 from lightning.pytorch import Trainer, seed_everything
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 from timm.data import resolve_data_config
 from timm.data.transforms_factory import create_transform
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 
-from src.models.timm import check_embedding
 from src import (
     LatentExtractor,
     collect_local_models_by_split,
     collect_models_by_split,
     encoder_params_below_threshold,
     latents_to_parquet_shards,
+    load_coco2017,
     load_model,
     push_folder_to_hub,
     remove_matching,
 )
+from src.models.timm import check_embedding
 
 
 def collate_fn(batch: list[Any], transform: Any) -> torch.Tensor:
@@ -92,17 +93,24 @@ def main(cfg: DictConfig) -> None:
     # parquet files to the requested splits (`split=` alone still fetches all of them);
     # the recorded-splits check is skipped since the other splits are not downloaded.
     splits = list(cfg.dataset.split)
-    dataset = dict(
-        zip(
-            splits,
-            load_dataset(
-                cfg.dataset.name,
-                data_files={s: f'**/{s}-*.parquet' for s in splits},
-                split=splits,
-                verification_mode='no_checks',
-            ),
+    if cfg.dataset.get('sources') is not None:
+        # Benchmark built by joining several Hub datasets (e.g. COCO 2017).
+        dataset = load_coco2017(
+            sources=OmegaConf.to_container(cfg.dataset.sources, resolve=True),
+            splits=splits,
         )
-    )
+    else:
+        dataset = dict(
+            zip(
+                splits,
+                load_dataset(
+                    cfg.dataset.name,
+                    data_files={s: f'**/{s}-*.parquet' for s in splits},
+                    split=splits,
+                    verification_mode='no_checks',
+                ),
+            )
+        )
 
     dataset_export_root = export_root / dataset_name
     for split in cfg.dataset.split:
@@ -226,7 +234,10 @@ def main(cfg: DictConfig) -> None:
                 temp['model_name'] = model_name
                 temp['embedding'] = latents.numpy()
 
-                df = pl.DataFrame(temp).with_row_index('id')
+                df = pl.DataFrame(temp)
+                if 'id' not in df.columns:
+                    # Benchmarks with their own `id` (COCO: image_id) keep it.
+                    df = df.with_row_index('id')
 
                 latents_to_parquet_shards(
                     df=df,

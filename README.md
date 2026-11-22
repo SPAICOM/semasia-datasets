@@ -20,6 +20,7 @@
     
 [![arXiv](https://img.shields.io/badge/Arxiv-2605.09485-b31b1b.svg?logo=arXiv)](https://arxiv.org/abs/2605.09485)
 [![License](https://img.shields.io/badge/Code%20License-MIT-yellow)](https://github.com/SPAICOM/semasia-datasets/blob/main/LICENSE)
+[![Data License](https://img.shields.io/badge/Data%20License-CC%20BY--NC%204.0-lightgrey)](https://creativecommons.org/licenses/by-nc/4.0/)
 [![HuggingFace](https://img.shields.io/badge/HuggingFace-SEMASIA-white?logo=huggingface&logoColor=FF9D00)](https://huggingface.co/collections/spaicom-lab/semasia)
 [![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/SPAICOM/semasia-datasets/blob/main/notebooks/semasia.py)
 

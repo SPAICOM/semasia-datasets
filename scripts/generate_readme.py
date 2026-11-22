@@ -15,7 +15,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import hydra
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 
 from src import generate_readme_with_configs
 
@@ -42,11 +42,22 @@ def main(cfg: DictConfig) -> None:
     repo_id: str = f'{cfg.hf.namespace}/{cfg.hf.repo_prefix}{dataset_name}'
     dataset_dir = exports_root / dataset_name
 
+    # Benchmarks built by joining several Hub datasets (e.g. COCO 2017) have `sources`
+    # and a `readme` block with the description of their fields.
+    sources = cfg.dataset.get('sources')
+    readme = cfg.dataset.get('readme') or {}
+    field_descriptions = readme.get('fields')
+
     generate_readme_with_configs(
         repo_dir=dataset_dir,
         dataset_name=dataset_name,
         repo_id=repo_id,
-        original_dataset_id=cfg.dataset.name,
+        original_dataset_id=None if sources else cfg.dataset.name,
+        source_dataset_ids=[src.name for src in sources.values()] if sources else None,
+        id_description=readme.get('id'),
+        field_descriptions=(
+            OmegaConf.to_container(field_descriptions) if field_descriptions else None
+        ),
         code_repo_url=cfg.get('code_repo_url'),
         model_registry_repo_id=cfg.hf.get('model_registry_repo_id'),
         extra_fields=cfg.dataset.get('extras'),
@@ -54,6 +65,7 @@ def main(cfg: DictConfig) -> None:
         task_categories=cfg.get('task_categories'),
         tags=cfg.get('tags'),
         citation_bibtex=cfg.get('citation_bibtex'),
+        license=cfg.get('license'),
         push_online=True,
     )
 

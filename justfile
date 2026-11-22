@@ -26,17 +26,17 @@ readme:
     uv run scripts/generate_readme.py
 
 # Just encode a dataset for timm models
-timm-encode DATASET:
-    uv run scripts/encode_dataset_all_timm.py dataset={{DATASET}} hf.push=false
+timm-encode DATASET *ARGS:
+    uv run scripts/encode_dataset_all_timm.py dataset={{DATASET}} hf.push=false {{ARGS}}
 
 # Push models of a dataset to HF & update readme
 push DATASET:
     uv run scripts/push_to_hf.py dataset={{DATASET}}
     just readme
 
-# Push timm model metadata registry to HuggingFace
-model-registry:
-    uv run scripts/push_model_registry.py
+# Push timm model metadata registry to HuggingFace (extra args go to the script, e.g. --no-push)
+model-registry *ARGS:
+    uv run scripts/push_model_registry.py {{ARGS}}
 
 # Run the tda signature extraction for all the timm models
 tda-extraction:
@@ -169,11 +169,11 @@ alignment-plot:
 
 # Datasets and analyses are chosen in configs/hydra/scalability.yaml; extra args are Hydra overrides, e.g.
 #   just scalability 'datasets=[cifar10,mnist]' output_dir=results/scalability_small 'analyses=[hub,footers,tables]'
-# Scalability study (sizes, FLOPs, GPU-hours, traces) -> results/scalability/report.md
+# Scalability study (sizes, FLOPs, GPU-hours, traces) -> results/scalability/
 scalability *ARGS:
     uv run scripts/scalability.py {{ARGS}}
 
-# One scalability analysis: hub | footers | columns | flops | throughput | dataloader | traces | tables | report
+# One scalability analysis: hub | footers | columns | flops | throughput | dataloader | traces | tables
 scalability-step STEP *ARGS:
     uv run scripts/scalability.py 'analyses=[{{STEP}}]' {{ARGS}}
 

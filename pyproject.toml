@@ -62,6 +62,10 @@ markers = [
 "notebooks/*" = ["E501", "C408"]
 # the report text of the scalability script is written as long string literals
 "scripts/scalability.py" = ["E501"]
+# the README text of the Hugging Face repositories is written as long string literals
+"src/utils/huggingface.py" = ["E501"]
+# the docstrings and comments of the metadata parsers are written as long lines
+"src/utils/timm_metadata.py" = ["E501"]
 
 [tool.ruff.lint.pydocstyle]
 convention = 'numpy'

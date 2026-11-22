@@ -14,6 +14,7 @@ inside ``get_model_metadata``.
 Usage:
     uv run scripts/push_model_registry.py            # build and push
     uv run scripts/push_model_registry.py --no-push  # build locally only
+    uv run scripts/push_model_registry.py --repo-id USER/NAME --private  # test push
 """
 
 import argparse
@@ -29,12 +30,14 @@ import polars as pl
 import timm
 from huggingface_hub import HfApi
 from huggingface_hub.utils import get_token
+from omegaconf import OmegaConf
 from tqdm.auto import tqdm
 
 from src.utils.huggingface import generate_model_registry_readme
 from src.utils.timm_metadata import (
     add_derived_columns,
     get_model_metadata,
+    refresh_hf_url,
     refresh_pretrain_dataset,
     refresh_pretrain_ft,
     refresh_pretrain_org,
@@ -44,18 +47,30 @@ BATCH_SIZE = 100
 
 
 def pretrain_dataset_to_text(df: pl.DataFrame) -> pl.DataFrame:
-    """pretrain_dataset as text ('A + B') for the refresh_* helpers, which work on strings. A String column is returned unchanged."""
+    """pretrain_dataset as text ('A + B'), as the refresh_* helpers expect.
+
+    A String column is returned unchanged.
+    """
     if df.schema['pretrain_dataset'] == pl.String:
         return df
     return df.with_columns(pl.col('pretrain_dataset').list.join(' + '))
 
 
 def pretrain_dataset_to_list(df: pl.DataFrame) -> pl.DataFrame:
-    """pretrain_dataset as an ordered list of corpora: 'A + B + C' -> ['A', 'B', 'C'] (a single corpus gives a list of one element)."""
-    return df.with_columns(pl.col('pretrain_dataset').str.split('+').list.eval(pl.element().str.strip_chars()))
+    """pretrain_dataset as an ordered list of corpora.
+
+    'A + B + C' -> ['A', 'B', 'C'] (a single corpus gives a list of one element).
+    """
+    return df.with_columns(
+        pl.col('pretrain_dataset')
+        .str.split('+')
+        .list.eval(pl.element().str.strip_chars())
+    )
+
 
 METADATA_SCHEMA: dict[str, pl.DataType] = {
     'model_name': pl.String,
+    'hf_url': pl.String,
     'family': pl.String,
     'macro_family': pl.String,
     'model_version': pl.String,
@@ -88,7 +103,8 @@ METADATA_SCHEMA: dict[str, pl.DataType] = {
     'pretrain_dataset': pl.String,
     'pretrain_dataset_size': pl.String,
     'pretrain_method': pl.String,
-    'pretrain_ft': pl.List(pl.String),  # ordered fine-tuning chain, None = no fine-tuning
+    # ordered fine-tuning chain, None = no fine-tuning
+    'pretrain_ft': pl.List(pl.String),
     'pretrain_resolution': pl.Int64,
     'pretrain_ft_resolution': pl.Int64,
     'pretrain_epochs': pl.Int64,
@@ -131,9 +147,24 @@ def main() -> None:
     parser.add_argument(
         '--no-push', action='store_true', help='update the local registry only'
     )
+    parser.add_argument(
+        '--verify-urls',
+        action='store_true',
+        help='check hf_url of every model on the Hub (default: only the new models)',
+    )
+    parser.add_argument(
+        '--repo-id',
+        default='spaicom-lab/semasia-model-registry',
+        help='Hub dataset repository to push to (default: the public registry)',
+    )
+    parser.add_argument(
+        '--private',
+        action='store_true',
+        help='create the repository as private (e.g. for a test push)',
+    )
     args = parser.parse_args()
 
-    repo_id = 'spaicom-lab/semasia-model-registry'
+    repo_id = args.repo_id
     local_path = Path('data/semasia-model-registry')
     temp_dir = local_path / 'temp'
     local_path.mkdir(parents=True, exist_ok=True)
@@ -151,6 +182,7 @@ def main() -> None:
     processed = load_existing_models(parquet_path)
     failed = load_failed_models(failed_path)
 
+    new_models: set[str] = set()
     models_to_process = [
         m for m in model_names if m not in processed and m not in failed
     ]
@@ -204,8 +236,10 @@ def main() -> None:
         batch_files = sorted(temp_dir.glob('batch_*.parquet'))
         if batch_files:
             dfs = [pl.read_parquet(f) for f in batch_files]
-            # the models already stored in the local parquet are kept: only the new ones come from the batches
-            # (without this the parquet was overwritten with the new models only)
+            new_models = {m for d in dfs for m in d['model_name'].to_list()}
+            # the models already stored in the local parquet are kept: only the new
+            # ones come from the batches (without this the parquet was overwritten
+            # with the new models only)
             if parquet_path.exists():
                 dfs.insert(0, pretrain_dataset_to_text(pl.read_parquet(parquet_path)))
             df = pl.concat(dfs, how='diagonal_relaxed')
@@ -218,23 +252,38 @@ def main() -> None:
         else:
             df = pl.DataFrame(schema=METADATA_SCHEMA)
 
-    # pretrain_org is recomputed from pretrain_config for every model, also for those already
-    # stored in the local parquet, so that a fix of the organisation parser needs no re-extraction.
-    df = pretrain_dataset_to_text(df)  # a registry already stored with lists is converted back for the refresh_* helpers below
+    # pretrain_org is recomputed from pretrain_config for every model, also for
+    # those already stored in the local parquet, so that a fix of the organisation
+    # parser needs no re-extraction.
+    # a registry already stored with lists is converted back for the refresh_*
+    # helpers below
+    df = pretrain_dataset_to_text(df)
     old_org = df['pretrain_org']
     df = refresh_pretrain_org(df)
     n_ds = df['pretrain_dataset'].null_count()
     df = refresh_pretrain_dataset(df)
-    # pretrain_ft as an ordered list of fine-tuning datasets, recomputed from pretrain_config for every model
+    # pretrain_ft as an ordered list of fine-tuning datasets, recomputed from
+    # pretrain_config for every model
     df = refresh_pretrain_ft(df)
-    print(f'pretrain_dataset filled for {n_ds - df["pretrain_dataset"].null_count()} models')
+    n_filled = n_ds - df['pretrain_dataset'].null_count()
+    print(f'pretrain_dataset filled for {n_filled} models')
     n_changed = int((df['pretrain_org'].fill_null('') != old_org.fill_null('')).sum())
     print(f'pretrain_org changed for {n_changed} models')
 
     # Derived columns (pretrain_tasks, paradigm) are recomputed for every model,
     # also for those already stored in the local parquet.
     df = add_derived_columns(df)
-    df = pretrain_dataset_to_list(df)  # the published registry stores pretrain_dataset as list<string>
+    # hf_url: from the timm pretrained config, checked on the Hub for the new models
+    # (all models with --verify-urls); the stored value is kept for the others
+    n_url = df['hf_url'].null_count() if 'hf_url' in df.columns else None
+    verify = set(df['model_name'].to_list()) if args.verify_urls else new_models
+    df = refresh_hf_url(df, verify=verify)
+    print(
+        f'hf_url: {len(verify)} models checked on the Hub; '
+        f'{df["hf_url"].null_count()} null (was {n_url})'
+    )
+    # the published registry stores pretrain_dataset as list<string>
+    df = pretrain_dataset_to_list(df)
     df.write_parquet(parquet_path)
 
     print(f'DataFrame shape: {df.shape}')
@@ -245,9 +294,15 @@ def main() -> None:
         return
 
     api = HfApi(token=get_token())
-    api.create_repo(repo_id=repo_id, repo_type='dataset', exist_ok=True)
+    api.create_repo(
+        repo_id=repo_id,
+        repo_type='dataset',
+        private=True if args.private else None,
+        exist_ok=True,
+    )
 
-    # Only the registry parquet is uploaded (not the whole folder: no backups, temp batches or other copies).
+    # Only the registry parquet is uploaded (not the whole folder: no backups,
+    # temp batches or other copies).
     api.upload_file(
         repo_id=repo_id,
         repo_type='dataset',
@@ -256,10 +311,13 @@ def main() -> None:
         commit_message='Add/update model metadata registry',
     )
 
+    readme_cfg = OmegaConf.load('configs/hydra/generate_readme.yaml')
     generate_model_registry_readme(
         repo_dir=local_path,
         repo_id=repo_id,
         num_models=len(df),
+        citation_bibtex=readme_cfg['citation_bibtex'],
+        license=readme_cfg['model_registry_license'],
         push_online=True,
         commit_message='Update README',
     )

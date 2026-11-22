@@ -21,6 +21,14 @@ badges:
     - "[![Open in molab](https://marimo.io/molab-shield.svg)](https://molab.marimo.io/github/SPAICOM/semasia-datasets/blob/main/notebooks/semasia.py)"
 
 # --------------------------
+# License of the embedding repositories (most restrictive choice, see the
+# licenses of the source datasets and of the timm models)
+# --------------------------
+license: cc-by-nc-4.0
+# License of the model registry (metadata only, no embeddings)
+model_registry_license: cc-by-4.0
+
+# --------------------------
 # Hugging Face Hub tags (controls discoverability/filters on the Hub)
 # --------------------------
 task_categories:
@@ -49,4 +57,4 @@ hydra:
     mode: MULTIRUN
     sweeper:
         params:
-            dataset: cifar10,cifar100,mnist,fashion_mnist,tiny_imagenet,imagenet-1k,celeba,oxford-flowers
+            dataset: cifar10,cifar100,mnist,fashion_mnist,tiny_imagenet,imagenet-1k,celeba,oxford-flowers,coco2017

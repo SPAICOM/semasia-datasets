@@ -265,6 +265,9 @@ def generate_readme_with_configs(
     pretty_name: str | None = None,
     extra_markdown: str = '',
     original_dataset_id: str | None = None,
+    source_dataset_ids: list[str] | None = None,
+    id_description: str | None = None,
+    field_descriptions: dict[str, str] | None = None,
     code_repo_url: str | None = None,
     model_registry_repo_id: str | None = None,
     extra_fields: list[str] | None = None,
@@ -272,6 +275,7 @@ def generate_readme_with_configs(
     task_categories: list[str] | None = None,
     tags: list[str] | None = None,
     citation_bibtex: str | None = None,
+    license: str | None = None,
     push_online: bool = True,
     commit_message: str = 'Update README configs (online models only)',
 ) -> None:
@@ -291,7 +295,21 @@ def generate_readme_with_configs(
     extra_markdown : str, optional
         Additional markdown content to append to the Notes section.
     original_dataset_id : str, optional
-        Original dataset ID to link to (e.g., "uoft-cs/cifar10").
+        Original dataset ID to link to (e.g., "uoft-cs/cifar10"). The README
+        states that the row order matches that of the original split, so it
+        is only for datasets that are a copy of a single Hub dataset.
+    source_dataset_ids : list[str], optional
+        IDs of the Hub datasets joined to build the benchmark (e.g., COCO 2017),
+        linked in the Notes instead of `original_dataset_id`. Since the row
+        order does not match that of any of them, `id_description` is required.
+    id_description : str, optional
+        Description of the `id` field, replacing the default one (row index
+        within the shard, matching the original split). Required with
+        `source_dataset_ids`.
+    field_descriptions : dict[str, str], optional
+        Description of the fields of `extra_fields`, replacing the default
+        "Original dataset field, copied as-is from the source dataset.". The
+        `id` field is described by `id_description`, so it is not repeated.
     code_repo_url : str, optional
         URL of the code repository used to generate this dataset. If None,
         the link is omitted.
@@ -318,6 +336,10 @@ def generate_readme_with_configs(
     citation_bibtex : str, optional
         BibTeX citation to include in a "Citation" section. If None,
         the section is omitted.
+    license : str, optional
+        Hugging Face license identifier of the dataset (e.g.,
+        "cc-by-nc-4.0"). Written to the YAML front-matter and shown in a
+        "License" section. If None, the field and the section are omitted.
     push_online : bool, optional
         Whether to upload the README to Hugging Face. Defaults to True.
     commit_message : str, optional
@@ -328,6 +350,12 @@ def generate_readme_with_configs(
     None
         This function is called for its side effects only.
     """
+    if source_dataset_ids and not id_description:
+        raise ValueError(
+            '`id_description` is required with `source_dataset_ids`: the row '
+            'order does not match that of a single original dataset.'
+        )
+
     token = get_token()
     if token is None:
         raise RuntimeError(
@@ -361,6 +389,8 @@ def generate_readme_with_configs(
     yaml_top = {
         'pretty_name': pretty_name or f'Latents for {dataset_name} (timm)',
     }
+    if license:
+        yaml_top['license'] = license
     if task_categories:
         yaml_top['task_categories'] = list(task_categories)
     if tags:
@@ -425,6 +455,11 @@ def generate_readme_with_configs(
         'source dataset, so `id` can be used to map a row back to '
         'its source sample.'
     )
+    id_cell = id_description or (
+        'Row index within the shard (unique per split/model, not across models); '
+        f'the {id_note}'
+    )
+    field_descriptions = field_descriptions or {}
     fields_section = '\n'.join(
         [
             '    ## Fields',
@@ -433,18 +468,21 @@ def generate_readme_with_configs(
             '',
             '    | Field | Description |',
             '    |-------|-------------|',
-            '    | `id` | Row index within the shard '
-            '(unique per split/model, not across models); the '
-            f'{id_note} |',
+            f'    | `id` | {id_cell} |',
             '    | `model_name` | `timm` model that produced this '
             "row's embedding (constant within a config). |",
             '    | `embedding` | Precomputed latent representation '
             f'extracted by the model {embedding_dim_note} |',
         ]
         + [
-            f'    | `{field}` | Original dataset field, copied '
-            'as-is from the source dataset. |'
+            f'    | `{field}` | '
+            + field_descriptions.get(
+                field,
+                'Original dataset field, copied as-is from the source dataset.',
+            )
+            + ' |'
             for field in (extra_fields or [])
+            if field != 'id'
         ]
     )
 
@@ -459,12 +497,17 @@ def generate_readme_with_configs(
         ]
     )
 
-    original_dataset_link = (
-        f'- Based on [{original_dataset_id}]'
-        f'(https://huggingface.co/datasets/{original_dataset_id})'
-        if original_dataset_id
-        else ''
-    )
+    if source_dataset_ids:
+        original_dataset_link = '- Built by joining ' + ' and '.join(
+            f'[{d}](https://huggingface.co/datasets/{d})' for d in source_dataset_ids
+        )
+    elif original_dataset_id:
+        original_dataset_link = (
+            f'- Based on [{original_dataset_id}]'
+            f'(https://huggingface.co/datasets/{original_dataset_id})'
+        )
+    else:
+        original_dataset_link = ''
     code_repo_link = (
         f'- Code: [{code_repo_url.split("://")[-1]}]({code_repo_url})'
         if code_repo_url
@@ -494,6 +537,16 @@ def generate_readme_with_configs(
             ]
             + bibtex_lines
             + ['    ```']
+        )
+
+    license_section = ''
+    if license:
+        license_section = '\n'.join(
+            [
+                '    ## License',
+                '',
+                f'    The embeddings are released under `{license}`.',
+            ]
         )
 
     badges_block = ''
@@ -556,6 +609,8 @@ def generate_readme_with_configs(
     {model_registry_link}
     {extra_markdown}
 
+{license_section}
+
 {citation_section}
     """)
 
@@ -586,6 +641,13 @@ _MODEL_REGISTRY_FIELDS: list[tuple[str, list[tuple[str, str]]]] = [
                 'model_name',
                 'Full `timm` model identifier, e.g., `vit_large_patch14_clip_224.openai_ft_in1k`. '
                 'Primary key, joined with the `model_name` column of every SEMASIA dataset.',
+            ),
+            (
+                'hf_url',
+                'URL of the model page on the Hugging Face Hub '
+                '(`https://huggingface.co/<hf_hub_id>`), with `hf_hub_id` read from '
+                'the `timm` pretrained config; null if the model has no Hub '
+                'repository or it is not reachable.',
             ),
         ],
     ),
@@ -690,7 +752,10 @@ _MODEL_REGISTRY_FIELDS: list[tuple[str, list[tuple[str, str]]]] = [
             ),
             (
                 'pretrain_dataset',
-                'Corpus: ImageNet-1K/21K/22K, LAION-2B, WebLI, LVD-142M, ...',
+                'List of the pretraining corpora, one element for most models and '
+                'several for models pretrained on a mixture (for example '
+                '["DFN-2B", "COYO", "HQITP"]); ["Undocumented"] if the corpus is '
+                'not documented. The order of the elements has no meaning.',
             ),
             ('pretrain_dataset_size', 'Corpus size when ambiguous: 400M, s39b, 2.1T.'),
             (
@@ -707,7 +772,10 @@ _MODEL_REGISTRY_FIELDS: list[tuple[str, list[tuple[str, str]]]] = [
             ),
             (
                 'pretrain_ft',
-                'Ordered list of the datasets of the subsequent fine-tuning stages (last = final stage), e.g. [ImageNet-1K] or [ImageNet-22K, ImageNet-1K]; null = no fine-tuning.',
+                'Ordered list of the datasets of the fine-tuning stages, first stage '
+                'first, for example [ImageNet-22K, ImageNet-1K]; null if the model '
+                'was not fine-tuned. The pretraining corpora are in '
+                '`pretrain_dataset`.',
             ),
             ('pretrain_resolution', 'Input resolution at pretraining.'),
             ('pretrain_ft_resolution', 'Input resolution at fine-tuning.'),
@@ -776,6 +844,8 @@ def generate_model_registry_readme(
     repo_id: str,
     *,
     num_models: int,
+    citation_bibtex: str | None = None,
+    license: str | None = None,
     push_online: bool = True,
     commit_message: str = 'Update README',
 ) -> None:
@@ -790,6 +860,13 @@ def generate_model_registry_readme(
         Full Hugging Face repository ID (e.g., "spaicom-lab/semasia-model-registry").
     num_models : int
         Number of models in the registry.
+    citation_bibtex : str, optional
+        BibTeX citation to include in a "Citation" section. If None,
+        the section is omitted.
+    license : str, optional
+        Hugging Face license identifier of the registry (e.g., "cc-by-4.0").
+        Written to the YAML front-matter and shown in a "License" section.
+        If None, the field and the section are omitted.
     push_online : bool, optional
         Whether to upload the README to HuggingFace. Defaults to True.
     commit_message : str, optional
@@ -815,6 +892,8 @@ def generate_model_registry_readme(
         'pretty_name': 'Timm Model Metadata Registry',
         'num_models': num_models,
     }
+    if license:
+        yaml_top['license'] = license
     yaml_text = '---\n' + yaml.safe_dump(yaml_top, sort_keys=False) + '---\n'
 
     fields_md = '\n\n'.join(
@@ -918,7 +997,21 @@ def generate_model_registry_readme(
         .replace('@@N@@', str(num_models))
     )
 
-    md_body = md_head + fields_md + md_tail
+    citation_md = ''
+    if citation_bibtex:
+        citation_md = (
+            '\n## Citation\n\n'
+            'If you use this registry, please cite:\n\n'
+            f'```bibtex\n{citation_bibtex.strip()}\n```\n'
+        )
+
+    license_md = (
+        f'\n## License\n\nThe registry is released under `{license}`.\n'
+        if license
+        else ''
+    )
+
+    md_body = md_head + fields_md + md_tail + license_md + citation_md
 
     out_path = repo_dir / 'README.md'
     out_path.write_text(yaml_text + md_body, encoding='utf-8')
